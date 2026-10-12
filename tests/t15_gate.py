@@ -8,7 +8,7 @@ def chk(c,m):
     if not c: print('FAIL',m)
 HOLD="""
 (function(){var N=window.Native,held=[];N.cacheImg=function(id,u){held.push([id,u])};
-window.__heldN=function(){return held.length};
+window.__heldN=function(){return held.length};window.__held_take=function(n){return held.splice(0,n)};
 window.__release=function(failEvery){var h=held.splice(0);h.forEach(function(x,i){ if(failEvery&&i%failEvery==0){window.__imgFail(x[0])}else{window.__imgDone(x[0],'data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2210%22 height=%2210%22/>')}});return h.length};
 })();
 """
@@ -27,6 +27,14 @@ async def main():
         s=await st(pg); held=await pg.evaluate("__heldN()")
         chk(held>500 and not s['ready'] and s['ov']=='on' and s['mods']==0,'A2 sources done but photos pending → still locked: held=%d %s'%(held,json.dumps(s,ensure_ascii=False)))
         chk(s['gate']['left']>500,'A2b gate counts pending photos %s'%s['gate'])
+        # دایره‌ی چرخان با آمدن هر عکس از نو ساخته نشود (قبلاً مدام از اول شروع می‌کرد)
+        await pg.evaluate("window.__sp=document.getElementById('gsp');window.__pp.__n=0")
+        await pg.evaluate("(function(){var h=__held_take(300);h.forEach(function(x){window.__imgDone(x[0],'data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2210%22 height=%2210%22/>')})})()")
+        await pg.wait_for_timeout(700)
+        same=await pg.evaluate("document.getElementById('gsp')===window.__sp && !!window.__sp.isConnected")
+        mid=await pg.evaluate("document.querySelector('#gv2').innerText")
+        chk(same,'A2d spinner element is the same object while photos arrive (animation not restarted) '+mid)
+        chk(not await pg.evaluate("__pp.gate.ready"),'A2e still locked mid-way')
         # بعضی عکس‌ها نیامدند (خطا) ولی بقیه آمدند
         await pg.evaluate("__release(7)"); await pg.wait_for_timeout(900)
         s=await st(pg)

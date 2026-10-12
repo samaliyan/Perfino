@@ -482,31 +482,35 @@ function srcDone() { return Core.SOURCES.filter(function (s) { return db.full[s.
 function imgLeft() { return Object.keys(imgPend).length; }
 function overlay() {
   var o = $('ov');
-  if (db.ready && list.length) { o.className = ''; o.innerHTML = ''; o._h = ''; return; }
+  if (db.ready && list.length) { o.className = ''; o.innerHTML = ''; o._h = ''; o._g = 0; return; }
   o.className = 'on';
   if (!db.ready) {                       // قفل ورود: تا پایان دانلود اولیه وارد برنامه نمی‌شویم
     var N = Core.SOURCES.length, sd = srcDone(), il = imgLeft(), phase = busy ? 'src' : il > 0 ? 'img' : 'fail';
     var sf = phase === 'src' ? (pct() == null ? 0 : pct()) : 1, imf = imgTot ? (imgTot - il) / imgTot : (phase === 'img' ? 0 : 1);
     var all = phase === 'src' ? sf * .75 : phase === 'img' ? .75 + .25 * imf : .75 + .25 * imf;
-    var h = '<div class="gt">';
-    if (phase === 'fail') {
-      h += '<b>همه‌ی اطلاعات هنوز نیامده</b><span>بعضی سایت‌ها جواب نداده‌اند. اینترنت را بررسی کنید؛ برنامه خودش دوباره تلاش می‌کند.</span>';
-    } else {
-      h += '<div class="sp"></div><b>در حال آماده‌سازی برنامه</b><span>بار اول چند دقیقه طول می‌کشد. لطفاً صبر کنید و برنامه را نبندید.</span>';
+    if (!o._g) {                         // اسکلت فقط یک‌بار ساخته می‌شود؛ بعد فقط متن‌ها عوض می‌شوند (تا چرخش دایره از اول شروع نشود)
+      o._h = ''; o._g = 1; o._bk = '';
+      o.innerHTML = '<div class="gt"><div class="sp" id="gsp"></div><b id="gtt"></b><span id="gts"></span><div class="pb"><i id="gpb"></i></div><div class="st">'
+        + '<div id="gr1"><span>فهرست عطرها و قیمت‌ها</span><span id="gv1"></span></div><div id="gr2"><span>عکس‌ها</span><span id="gv2"></span></div></div><div id="gbt"></div></div>';
     }
-    h += '<div class="pb"><i style="width:' + Math.round(all * 100) + '%"></i></div><div class="st">'
-      + '<div class="' + (phase !== 'src' && sd === N ? 'ok' : '') + '"><span>فهرست عطرها و قیمت‌ها</span><span><bdi>' + fa(sd) + '</bdi> از <bdi>' + fa(N) + '</bdi> سایت' + (phase === 'src' && total() ? ' · <bdi>' + fa(total()) + '</bdi> محصول' : '') + '</span></div>'
-      + '<div class="' + (imgTot && il === 0 ? 'ok' : '') + '"><span>عکس‌ها</span><span>' + (imgTot ? '<bdi>' + fa(imgTot - il) + '</bdi> از <bdi>' + fa(imgTot) + '</bdi>' : phase === 'src' ? 'بعد از فهرست' : '—') + '</span></div></div>';
-    if (phase === 'fail') h += '<button id="retry">تلاش دوباره</button>' + (list.length ? '<button id="goon" class="gh2">ادامه با اطلاعات فعلی</button>' : '');
-    h += '</div>';
-    if (o._h !== h) {                     // فقط وقتی چیزی عوض شده؛ تا دکمه‌ها وسط لمس دوباره ساخته نشوند
-      o._h = h; o.innerHTML = h;
-      var b = $('retry'); if (b) b.onclick = function () { refresh(true); };
-      var g = $('goon'); if (g) g.onclick = function () { db.ready = true; saveDb(); enter(); };
+    $('gsp').style.display = phase === 'fail' ? 'none' : '';
+    $('gtt').textContent = phase === 'fail' ? 'همه‌ی اطلاعات هنوز نیامده' : 'در حال آماده‌سازی برنامه';
+    $('gts').textContent = phase === 'fail' ? 'بعضی سایت‌ها جواب نداده‌اند. اینترنت را بررسی کنید؛ برنامه خودش دوباره تلاش می‌کند.' : 'بار اول چند دقیقه طول می‌کشد. لطفاً صبر کنید و برنامه را نبندید.';
+    $('gpb').style.width = Math.round(all * 100) + '%';
+    $('gr1').className = phase !== 'src' && sd === N ? 'ok' : '';
+    $('gv1').innerHTML = '<bdi>' + fa(sd) + '</bdi> از <bdi>' + fa(N) + '</bdi> سایت' + (phase === 'src' && total() ? ' · <bdi>' + fa(total()) + '</bdi> محصول' : '');
+    $('gr2').className = imgTot && il === 0 ? 'ok' : '';
+    $('gv2').innerHTML = imgTot ? '<bdi>' + fa(imgTot - il) + '</bdi> از <bdi>' + fa(imgTot) + '</bdi>' : phase === 'src' ? 'بعد از فهرست' : '—';
+    var bk = phase === 'fail' ? (list.length ? 'f2' : 'f1') : '';
+    if (o._bk !== bk) {                   // دکمه‌ها فقط وقتی حالت عوض شد
+      o._bk = bk;
+      $('gbt').innerHTML = bk ? '<button id="retry">تلاش دوباره</button>' + (bk === 'f2' ? '<button id="goon" class="gh2">ادامه با اطلاعات فعلی</button>' : '') : '';
+      var rb = $('retry'); if (rb) rb.onclick = function () { refresh(true); };
+      var gb = $('goon'); if (gb) gb.onclick = function () { db.ready = true; saveDb(); enter(); };
     }
     return;
   }
-  o._h = ''; o.innerHTML = '<div><b>قیمتی دریافت نشد</b>اینترنت را بررسی کنید و دوباره تلاش کنید.<br><button id="retry">تلاش دوباره</button></div>';
+  o._h = ''; o._g = 0; o.innerHTML = '<div><b>قیمتی دریافت نشد</b>اینترنت را بررسی کنید و دوباره تلاش کنید.<br><button id="retry">تلاش دوباره</button></div>';
   var b2 = $('retry'); if (b2) b2.onclick = function () { refresh(true); };
 }
 function toast(msg, ms) {
