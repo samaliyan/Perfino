@@ -60,7 +60,7 @@ async def main():
         b,ctx,pg,errs=await new_page(p,extra=OLD)
         await pg.goto('file://'+ROOT+'/index.html'); await pg.wait_for_timeout(500)
         s=await st(pg); d=await pg.evaluate("({fv:__pp.state.db.fv,old:!!__pp.state.db.g.old1,full:Object.keys(__pp.state.db.full)})")
-        chk(not s['ready'] and s['mods']==0 and d['fv']==4 and not d['old'],'C1 old v1.2 data discarded, locked until full download: '+json.dumps([s,d],ensure_ascii=False))
+        chk(not s['ready'] and s['mods']==0 and d["fv"]==5 and not d['old'],'C1 old v1.2 data discarded, locked until full download: '+json.dumps([s,d],ensure_ascii=False))
         await b.close()
         # D) پیشرفت درصد در قفل بالا می‌رود
         b,ctx,pg,errs=await new_page(p,extra=HOLD+"window.__DELAY=120;")

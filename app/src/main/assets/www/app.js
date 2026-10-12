@@ -1,7 +1,7 @@
 (function () {
 'use strict';
 var RM = !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
-var VERSION = '1.6';
+var VERSION = '1.7';
 function $(id) { return document.getElementById(id); }
 function fa(n) { return String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, '٬').replace(/\d/g, function (d) { return '۰۱۲۳۴۵۶۷۸۹'[d]; }); }
 function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
@@ -418,15 +418,15 @@ var net = {
 var set = ls.get('pp.set', { theme: 'auto', model: 'a' });
 if (!MODELS[set.model]) set.model = 'a';
 var db = ls.get('pp.db', null);
-if (!db || db.v !== 3 || db.fv !== 4 || !db.g || !db.it) db = Core.newDb();   // نسخه‌ی ۱.۳ همه چیز را یک‌بار از نو و کامل می‌گیرد
-db.fv = 4;
+if (!db || db.v !== 3 || db.fv !== 5 || !db.g || !db.it) db = Core.newDb();   // نسخه‌ی ۱.۳ همه چیز را یک‌بار از نو و کامل می‌گیرد
+db.fv = 5;
 db.full = db.full || {}; db.t = db.t || {}; db.fa = db.fa || {}; db.sc = db.sc || {};
 try { localStorage.removeItem('pp.raw'); } catch (e) {}
 var idx = Core.dbIndex(db);
 var stt = ls.get('pp.st', {}), prog = {}, busy = false, curModel = null, list = [], struct = '', psig = '', mq = window.matchMedia ? matchMedia('(prefers-color-scheme: dark)') : null;
 var ORDER = Core.SOURCES.map(function (s) { return s.id; }), TRUSTED = {}, imgLoc = {}, imgAsked = {};
 Core.SOURCES.forEach(function (s) { if (s.trusted) TRUSTED[s.id] = true; });
-var hiddenN = 0, TREE = [], BR_BY = {}, MD_BY = {}, nav = { lvl: 0, brand: null }, imgPend = {}, imgTot = 0, imgOk = 0, imgBad = 0, imgLastT = 0, startAnchor = ls.get('pp.last', null), lastTried = 0, prevP = null, FLAT = [], ALLB = [], enHidden = 0, gateRetried = 0;
+var hiddenN = 0, TREE = [], BR_BY = {}, MD_BY = {}, nav = { lvl: 0, brand: null }, imgPend = {}, imgTot = 0, imgOk = 0, imgBad = 0, imgLastT = 0, startAnchor = ls.get('pp.last', null), lastTried = 0, prevP = null, FLAT = [], ALLB = [], gateRetried = 0;
 var FULL_EVERY = 3 * 86400e3;
 function friendly(m) {
   m = String(m || '');
@@ -552,9 +552,7 @@ function setEntries() {
 function rebuild() {
   var l = Core.buildList(db, ORDER, TRUSTED, 12 * 3600e3);
   hiddenN = l.hidden || 0; FLAT = l;
-  var lp = set.en ? l : l.filter(function (g) { return /[؀-ۿ]/.test(g.name); });   // نام انگلیسیِ تنها نشان داده نمی‌شود (مگر در تنظیمات روشن شود)
-  enHidden = l.length - lp.length;
-  ALLB = Core.tree(lp); set.off = set.off || {};
+  ALLB = Core.tree(l, set.lang === 'en' ? 'en' : 'fa', db.wd); set.off = set.off || {};
   TREE = ALLB.filter(function (b) { return !set.off[b.id]; }); BR_BY = {}; MD_BY = {};
   TREE.forEach(function (b) { BR_BY[b.id] = b; b.models.forEach(function (m) { m.brandId = b.id; MD_BY[m.id] = m; }); });
   if (nav.brand && !BR_BY[nav.brand]) { nav.lvl = 0; nav.brand = null; }
@@ -745,7 +743,7 @@ function renderSheet() {
   $('sCopy').style.display = bad || adv ? '' : 'none'; $('sFull').style.display = bad || adv ? '' : 'none';
   $('sVer').textContent = 'نسخه ' + VERSION;
   renderBrands();
-  var en = $('sEn'); if (en) { en.classList.toggle('on', !!set.en); en.querySelector('.bc').innerHTML = enHidden && !set.en ? '<bdi>' + fa(enHidden) + '</bdi> مورد مخفی' : ''; }
+  [].forEach.call(document.querySelectorAll('#sLang button'), function (b) { b.classList.toggle('on', b.dataset.l === (set.lang === 'en' ? 'en' : 'fa')); });
 }
 var brOpen = false;
 function renderBrands() {
@@ -764,7 +762,7 @@ function setOff(id, v) {
   set.off = set.off || {}; if (v) set.off[id] = 1; else delete set.off[id];
   ls.set('pp.set', set); try { rebuild(); } catch (e) { console.error(e); } renderBrands();
 }
-$('sEn').onclick = function () { set.en = !set.en; ls.set('pp.set', set); try { rebuild(); } catch (e) { console.error(e); } renderSheet(); };
+$('sLang').onclick = function (e) { var b = e.target.closest('button'); if (!b || !b.dataset.l || b.dataset.l === (set.lang === 'en' ? 'en' : 'fa')) return; set.lang = b.dataset.l; ls.set('pp.set', set); try { rebuild(); } catch (er) { console.error(er); } renderSheet(); };
 $('sBrBtn').onclick = function () { brOpen = !brOpen; renderBrands(); };
 $('sBrList').onclick = function (e) {
   var all = e.target.closest && e.target.closest('#sBrAll');
