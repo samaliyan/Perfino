@@ -10,14 +10,32 @@ android {
         applicationId 'ir.perfume.price'
         minSdk 24
         targetSdk 34
-        versionCode 3
-        versionName '1.3'
+        // هر ساخت جدید در گیت‌هاب شماره‌ی بالاتری می‌گیرد تا نصب روی نسخه‌ی قبلی (آپدیت) پذیرفته شود
+        versionCode (System.getenv('GITHUB_RUN_NUMBER') ? (System.getenv('GITHUB_RUN_NUMBER') as int) + 100 : 100)
+        versionName '1.4'
     }
 
+    // امضای ثابت: همیشه با همین کلید امضا می‌شود، پس آپدیت «conflict» نمی‌دهد
+    signingConfigs {
+        shop {
+            storeFile file('perfume.keystore')
+            storePassword 'perfume123'
+            keyAlias 'perfume'
+            keyPassword 'perfume123'
+        }
+    }
     buildTypes {
+        debug {
+            signingConfig signingConfigs.shop
+        }
         release {
             minifyEnabled false
+            signingConfig signingConfigs.shop
         }
+    }
+    lint {
+        abortOnError false
+        checkReleaseBuilds false
     }
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17

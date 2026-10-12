@@ -28,11 +28,11 @@ jobs:
           f=$(find . -name settings.gradle -not -path './.git/*' | head -n1)
           if [ -z "$f" ]; then echo "settings.gradle not found. Files in repo:"; find . -not -path './.git/*' | head -60; exit 1; fi
           echo "dir=$(dirname "$f")" >> "$GITHUB_OUTPUT"
-      - name: Build debug APK
+      - name: Build release APK
         working-directory: ${{ steps.p.outputs.dir }}
-        run: gradle --no-daemon assembleDebug
+        run: gradle --no-daemon assembleRelease
       - name: Copy APK
-        run: cp "${{ steps.p.outputs.dir }}/app/build/outputs/apk/debug/app-debug.apk" "$RUNNER_TEMP/PerfumePrice.apk"
+        run: cp "${{ steps.p.outputs.dir }}/app/build/outputs/apk/release/app-release.apk" "$RUNNER_TEMP/PerfumePrice.apk"
       - uses: actions/upload-artifact@v4
         with:
           name: PerfumePrice-apk
