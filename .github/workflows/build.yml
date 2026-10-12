@@ -19,9 +19,16 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
+      - name: Find project folder
+        id: p
+        run: |
+          f=$(find . -name settings.gradle -not -path './.git/*' | head -n1)
+          if [ -z "$f" ]; then echo "settings.gradle not found. Files in repo:"; find . -not -path './.git/*' | head -60; exit 1; fi
+          echo "dir=$(dirname "$f")" >> "$GITHUB_OUTPUT"
       - name: Build debug APK
+        working-directory: ${{ steps.p.outputs.dir }}
         run: gradle --no-daemon assembleDebug
       - uses: actions/upload-artifact@v4
         with:
           name: PerfumePrice-apk
-          path: app/build/outputs/apk/debug/app-debug.apk
+          path: ${{ steps.p.outputs.dir }}/app/build/outputs/apk/debug/app-debug.apk
