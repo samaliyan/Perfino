@@ -1,7 +1,7 @@
 (function () {
 'use strict';
 var RM = !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
-var VERSION = '1.4';
+var VERSION = '1.5';
 function $(id) { return document.getElementById(id); }
 function fa(n) { return String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, '٬').replace(/\d/g, function (d) { return '۰۱۲۳۴۵۶۷۸۹'[d]; }); }
 function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
@@ -426,7 +426,7 @@ var idx = Core.dbIndex(db);
 var stt = ls.get('pp.st', {}), prog = {}, busy = false, curModel = null, list = [], struct = '', psig = '', mq = window.matchMedia ? matchMedia('(prefers-color-scheme: dark)') : null;
 var ORDER = Core.SOURCES.map(function (s) { return s.id; }), TRUSTED = {}, imgLoc = {}, imgAsked = {};
 Core.SOURCES.forEach(function (s) { if (s.trusted) TRUSTED[s.id] = true; });
-var hiddenN = 0, TREE = [], BR_BY = {}, MD_BY = {}, nav = { lvl: 0, brand: null }, imgPend = {}, imgTot = 0, imgOk = 0, imgBad = 0, imgLastT = 0, startAnchor = ls.get('pp.last', null), lastTried = 0, prevP = null, FLAT = [];
+var hiddenN = 0, TREE = [], BR_BY = {}, MD_BY = {}, nav = { lvl: 0, brand: null }, imgPend = {}, imgTot = 0, imgOk = 0, imgBad = 0, imgLastT = 0, startAnchor = ls.get('pp.last', null), lastTried = 0, prevP = null, FLAT = [], ALLB = [];
 var FULL_EVERY = 3 * 86400e3;
 function friendly(m) {
   m = String(m || '');
@@ -510,6 +510,7 @@ function overlay() {
     }
     return;
   }
+  if (ALLB.length && !TREE.length) { o._h = ''; o._g = 0; o.innerHTML = '<div><b>همه‌ی برندها خاموش‌اند</b>از تنظیمات (چرخ‌دنده) برندها را روشن کنید.</div>'; return; }
   o._h = ''; o._g = 0; o.innerHTML = '<div><b>قیمتی دریافت نشد</b>اینترنت را بررسی کنید و دوباره تلاش کنید.<br><button id="retry">تلاش دوباره</button></div>';
   var b2 = $('retry'); if (b2) b2.onclick = function () { refresh(true); };
 }
@@ -551,10 +552,12 @@ function setEntries() {
 function rebuild() {
   var l = Core.buildList(db, ORDER, TRUSTED, 12 * 3600e3);
   hiddenN = l.hidden || 0; FLAT = l;
-  TREE = Core.tree(l); BR_BY = {}; MD_BY = {};
+  ALLB = Core.tree(l); set.off = set.off || {};
+  TREE = ALLB.filter(function (b) { return !set.off[b.id]; }); BR_BY = {}; MD_BY = {};
   TREE.forEach(function (b) { BR_BY[b.id] = b; b.models.forEach(function (m) { m.brandId = b.id; MD_BY[m.id] = m; }); });
   if (nav.brand && !BR_BY[nav.brand]) { nav.lvl = 0; nav.brand = null; }
-  var np = priceMap(l), ch = 0;
+  var vis = []; TREE.forEach(function (b) { b.models.forEach(function (m) { m.variants.forEach(function (v) { vis.push(v); }); }); });
+  var np = priceMap(vis), ch = 0;
   if (prevP) Object.keys(np).forEach(function (k) { if (prevP[k] !== undefined && prevP[k] !== np[k]) ch++; });
   prevP = np;
   var before = struct, hadModel = !!curModel;
@@ -737,7 +740,32 @@ function renderSheet() {
   }).join('') + '<div style="border:0;color:var(--mu);font-size:12px;padding-top:8px"><span>نقطه‌ی کوچک کنار قیمت یعنی فقط یک سایت آن را داشته.</span></div>';
   $('sCopy').style.display = bad || adv ? '' : 'none'; $('sFull').style.display = bad || adv ? '' : 'none';
   $('sVer').textContent = 'نسخه ' + VERSION;
+  renderBrands();
 }
+var brOpen = false;
+function renderBrands() {
+  var b = $('sBrBtn'), box = $('sBrList'); if (!b) return;
+  var off = set.off || {}, n = ALLB.length, on = ALLB.filter(function (x) { return !off[x.id]; }).length;
+  b.innerHTML = '<span>برندهای نمایش‌داده‌شده: <bdi>' + fa(on) + '</bdi> از <bdi>' + fa(n) + '</bdi></span>';
+  box.style.display = brOpen && n ? '' : 'none';
+  if (!brOpen || !n) return;
+  var sig = ALLB.map(function (x) { return x.id + (off[x.id] ? 0 : 1); }).join();
+  if (box._s === sig) return; box._s = sig;
+  box.innerHTML = '<button class="btn ghost" id="sBrAll">روشن‌کردن همه</button>' + ALLB.map(function (x) {
+    return '<button class="brw' + (off[x.id] ? '' : ' on') + '" data-id="' + x.id + '"><span class="bn">' + esc(x.name) + '</span><span class="bc"><bdi>' + fa(x.models.length) + '</bdi> عطر</span><i class="sw"></i></button>';
+  }).join('');
+}
+function setOff(id, v) {
+  set.off = set.off || {}; if (v) set.off[id] = 1; else delete set.off[id];
+  ls.set('pp.set', set); try { rebuild(); } catch (e) { console.error(e); } renderBrands();
+}
+$('sBrBtn').onclick = function () { brOpen = !brOpen; renderBrands(); };
+$('sBrList').onclick = function (e) {
+  var all = e.target.closest && e.target.closest('#sBrAll');
+  if (all) { set.off = {}; ls.set('pp.set', set); try { rebuild(); } catch (e2) {} renderBrands(); return; }
+  var r = e.target.closest && e.target.closest('.brw'); if (!r) return;
+  setOff(r.dataset.id, r.classList.contains('on'));
+};
 var sheet = $('sheet'), scm = $('scm'), sSp = new Spring(1, function (y) { sheetY = y; sheet.style.transform = 'translate3d(0,' + (y * 110).toFixed(2) + '%,0)'; scm.style.opacity = String(clamp(1 - y, 0, 1)); scm.style.pointerEvents = y < .98 ? 'auto' : 'none'; });
 sSp.eps = .002;
 function openSheet() { open = true; renderSheet(); sSp.x = sheetY; sSp.to(0, { response: .42, damping: .85 }); }
@@ -770,7 +798,7 @@ window.__back = function () {
 window.__resume = function () { updPill(); var lo = lastOk(); if (!busy && (!lo || Date.now() - lo > 15 * 60000)) refresh(false); };
 document.addEventListener('visibilitychange', function () { if (!document.hidden) window.__resume(); });
 window.addEventListener('beforeunload', function () { if (curModel && nav.lvl === 0) { var a = curModel.getAnchor(); if (a) ls.set('pp.last', a); } });
-window.__pp = { open: openEntry, up: goUp, view: viewImg, closeView: closeViewer, get nav() { return nav; }, get tree() { return TREE; }, get gate() { return { ready: !!db.ready, tot: imgTot, left: imgLeft(), ok: imgOk, bad: imgBad }; }, mount: function (m) { var t = performance.now(); set.model = m; mountModel(curModel ? curModel.getAnchor() : null); return performance.now() - t; }, get model() { return curModel; }, get list() { return list; }, get flat() { return FLAT; }, get state() { return { db: db, st: stt, busy: busy, imgLoc: imgLoc }; }, refresh: refresh, net: net };
+window.__pp = { get allBrands() { return ALLB; }, open: openEntry, up: goUp, view: viewImg, closeView: closeViewer, get nav() { return nav; }, get tree() { return TREE; }, get gate() { return { ready: !!db.ready, tot: imgTot, left: imgLeft(), ok: imgOk, bad: imgBad }; }, mount: function (m) { var t = performance.now(); set.model = m; mountModel(curModel ? curModel.getAnchor() : null); return performance.now() - t; }, get model() { return curModel; }, get list() { return list; }, get flat() { return FLAT; }, get state() { return { db: db, st: stt, busy: busy, imgLoc: imgLoc }; }, refresh: refresh, net: net };
 
 /* شروع */
 applyTheme();

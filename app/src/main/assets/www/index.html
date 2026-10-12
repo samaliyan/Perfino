@@ -218,6 +218,17 @@ svg{display:block}
 #vwb img:not(.big){filter:blur(1.2px)}
 #vwb .vfb{width:min(70vw,320px)}
 #vw .vh2{position:absolute;bottom:calc(18px + env(safe-area-inset-bottom,0px));left:0;right:0;text-align:center;font-size:13px;color:rgba(255,255,255,.7);pointer-events:none}
+.hint2{font-size:12px;color:var(--mu);margin-top:6px;line-height:1.8}
+#sBrList{margin-top:8px;max-height:46vh;overflow-y:auto;border-radius:16px;border:1px solid var(--cb)}
+.brw{display:flex;align-items:center;width:100%;padding:12px 14px;border:0;border-bottom:1px solid var(--cb);background:transparent;font-size:16px;text-align:right;cursor:pointer;min-height:48px}
+.brw>*+*{margin-inline-start:10px}
+.brw .bn{flex:1 1 0;min-width:0;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.brw .bc{font-size:12px;color:var(--mu);white-space:nowrap}
+.brw .sw{flex:0 0 44px;height:26px;border-radius:13px;background:var(--cb);position:relative;transition:background .2s}
+.brw .sw:after{content:"";position:absolute;top:3px;right:3px;width:20px;height:20px;border-radius:50%;background:#fff;transition:transform .2s;box-shadow:0 1px 4px rgba(0,0,0,.3)}
+.brw.on .sw{background:#3ddc97}
+.brw.on .sw:after{transform:translateX(-18px)}
+.brw:not(.on) .bn{opacity:.5;text-decoration:line-through}
 @media (prefers-reduced-motion:reduce){.fl,.pop,.blob,#upd i{animation:none}}
 </style>
 </head>
@@ -244,6 +255,10 @@ svg{display:block}
       <button data-v="z">کانون<small>لیست با کانون</small></button>
       <button data-v="h">استوانه<small>استوانه‌ی رنگی</small></button>
     </div>
+    <h3>برندها</h3>
+    <button class="btn ghost" id="sBrBtn" style="margin-top:0"></button>
+    <div id="sBrList" style="display:none"></div>
+    <div class="hint2">برندی که خاموش کنید در فهرست دیده نمی‌شود و عکسش دانلود نمی‌شود.</div>
     <h3>قیمت‌ها</h3>
     <button class="btn" id="sRef"><span>بروزرسانی قیمت‌ها همین حالا</span></button>
     <div class="srcs" id="sSrc" style="margin-top:12px"></div>
