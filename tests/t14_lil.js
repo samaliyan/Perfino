@@ -37,5 +37,15 @@ var net={get:async function(u){var m=/[?&]page=(\d+)/.exec(u);if(+m[1]>1)return 
   var dg=T.filter(function(b){return b.name==='دولچه و گابانا'})[0];
   eq(dg.models.length,1,'one model'); eq(/دولچه|گابانا/.test(dg.models[0].name),false,'brand words stripped from model name: '+dg.models[0].name);
   eq(dg.models[0].variants[0].gn,'w','variant gender');
+  // برند ناشناخته با راهنمای انگلیسی: نام فارسی از پیشوند مشترک یاد گرفته می‌شود
+  var db2=C.newDb(),i2=C.dbIndex(db2);
+  C.ingest(db2,i2,'digikala',[
+   {id:1,t:'عطر ادکلن کیلیان گود گرل گان بد زنانه ادوپرفیوم 50 میل',price:9000000,img:'',st:0,b:['Kilian']},
+   {id:2,t:'عطر ادکلن کیلیان لاو دانت بی شای زنانه ادوپرفیوم 50 میل',price:9500000,img:'',st:0,b:['Kilian']},
+   {id:3,t:'عطر ادکلن مونتاگ سوواژ زنانه ادوپرفیوم 100 میل',price:5500000,img:'',st:0,b:['Qwerty']}],true);
+  db2.t.digikala=Date.now();
+  var T2=C.tree(C.buildList(db2,['digikala'],{digikala:1},0)).map(function(b){return b.name});
+  eq(T2.some(function(n){return /کیلیان/.test(n)}),true,'learned Persian brand: '+T2);
+  eq(T2.some(function(n){return /^[A-Za-z]/.test(n)}),false,'no Latin brand name: '+T2);
   console.log(ok+' passed, '+bad+' failed'); process.exit(bad?1:0);
 })();

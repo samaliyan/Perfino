@@ -386,9 +386,21 @@ function cmpNm(a, b) {
 }
 /* فهرست برند ← مدل ← نوع (جنسیت/غلظت) ← اندازه و قیمت. groups خروجی buildList است */
 function tree(groups) {
-  var B = {}, M = {};
-  groups.forEach(function (g) {
-    var ent = brandOf(g.key, g.br);
+  var B = {}, M = {}, ENT = groups.map(function (g) { return brandOf(g.key, g.br); }), learn = {};
+  /* برندِ ناشناخته با نامِ انگلیسی (مثلاً از دسته‌بندیِ سایت): نامِ فارسی‌اش را از خودِ عطرها یاد می‌گیریم
+     (بیشترین واژه‌های مشترکِ اول نام‌ها). اگر نشد، زیر «سایر برندها» می‌رود تا نام انگلیسی در فهرست نیاید. */
+  ENT.forEach(function (e, i) { if (e.id.charAt(0) === 'h' && !/[؀-ۿ]/.test(e.name)) (learn[e.id] = learn[e.id] || []).push(i); });
+  Object.keys(learn).forEach(function (id) {
+    var ix = learn[id], pre = null;
+    if (ix.length >= 2) ix.forEach(function (i) {
+      var k = groups[i].key; if (!pre) { pre = k.slice(0, 3); return; }
+      var n = 0; while (n < pre.length && n < k.length && pre[n] === k[n]) n++; pre = pre.slice(0, n);
+    });
+    var ent = pre && pre.length && pre.every(function (w) { return /[؀-ۿ]/.test(w); }) ? { id: id, name: pre.join(' '), al: [pre] } : { id: 'other', name: 'سایر برندها', al: [] };
+    ix.forEach(function (i) { ENT[i] = ent; });
+  });
+  groups.forEach(function (g, gi) {
+    var ent = ENT[gi];
     var rest = stripBrand(g.key, ent), mk = (rest.length ? rest : g.key).slice().sort().join(' ');
     var b = B[ent.id] = B[ent.id] || { id: ent.id, name: ent.name, models: [], mm: {} };
     var m = b.mm[mk];

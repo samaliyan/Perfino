@@ -1,7 +1,7 @@
 (function () {
 'use strict';
 var RM = !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
-var VERSION = '1.5';
+var VERSION = '1.6';
 function $(id) { return document.getElementById(id); }
 function fa(n) { return String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, '٬').replace(/\d/g, function (d) { return '۰۱۲۳۴۵۶۷۸۹'[d]; }); }
 function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
@@ -191,12 +191,12 @@ function rowHtml(p, max) {
 
 /* ================= مدل الف: چرخ نیم‌دایره ================= */
 function ModelA(host, data, anchor) {
-  var el = div('mod ma', '<div class="wh"><div class="sel"></div><div class="fs2 ab"></div><div class="bub2"></div></div><div class="pn"><div class="tx"><div class="bn"></div><div class="nm"></div><span class="tg"></span><div class="lns"></div></div><div class="ph"></div></div>');
+  var el = div('mod ma', '<div class="wh"><div class="sel"></div><div class="rs"></div><div class="fs2 ab"></div><div class="bub2"></div></div><div class="pn"><div class="tx"><div class="bn"></div><div class="nm"></div><span class="tg"></span><div class="lns"></div></div><div class="ph"></div></div>');
   host.appendChild(el);
   var wh = el.querySelector('.wh'), L = data.list, rows = [], st = {}, cur = 0;
   var frag = document.createDocumentFragment();
   L.forEach(function (p, k) { var r = div('wr'); r.dataset.i = k; r.innerHTML = '<span class="wt">' + esc(p.name) + '</span>'; r._f = 0; rows.push(r); frag.appendChild(r); });
-  wh.appendChild(frag);
+  el.querySelector('.rs').appendChild(frag);   // فقط ردیف‌ها محو می‌شوند؛ نوار حروف سر جایش کاملاً دیده می‌شود
   var strip = Strip(el.querySelector('.ab'), { letters: data.LET, box: wh, bub: el.querySelector('.bub2'), pick: function (i) { sc.go(data.FI[data.LET[i]]); } });
   function bgFor(p) { return themeNow() === 'light' ? mix(PAL[p.k % 8].liq, .8) : PAL[p.k % 8].bg; }
   function show(i, quiet) {
@@ -426,7 +426,7 @@ var idx = Core.dbIndex(db);
 var stt = ls.get('pp.st', {}), prog = {}, busy = false, curModel = null, list = [], struct = '', psig = '', mq = window.matchMedia ? matchMedia('(prefers-color-scheme: dark)') : null;
 var ORDER = Core.SOURCES.map(function (s) { return s.id; }), TRUSTED = {}, imgLoc = {}, imgAsked = {};
 Core.SOURCES.forEach(function (s) { if (s.trusted) TRUSTED[s.id] = true; });
-var hiddenN = 0, TREE = [], BR_BY = {}, MD_BY = {}, nav = { lvl: 0, brand: null }, imgPend = {}, imgTot = 0, imgOk = 0, imgBad = 0, imgLastT = 0, startAnchor = ls.get('pp.last', null), lastTried = 0, prevP = null, FLAT = [], ALLB = [];
+var hiddenN = 0, TREE = [], BR_BY = {}, MD_BY = {}, nav = { lvl: 0, brand: null }, imgPend = {}, imgTot = 0, imgOk = 0, imgBad = 0, imgLastT = 0, startAnchor = ls.get('pp.last', null), lastTried = 0, prevP = null, FLAT = [], ALLB = [], enHidden = 0, gateRetried = 0;
 var FULL_EVERY = 3 * 86400e3;
 function friendly(m) {
   m = String(m || '');
@@ -478,7 +478,7 @@ function updPill() {
   if (age > 40 * 60000) { u.classList.add('stale'); t.textContent = 'قیمت‌ها قدیمی‌اند · ' + agoText(age); }
   else t.textContent = 'آخرین بروزرسانی ' + agoText(age);
 }
-function srcDone() { return Core.SOURCES.filter(function (s) { return db.full[s.id]; }).length; }
+function srcDone() { return Core.SOURCES.filter(function (s) { return stt[s.id] && stt[s.id].ok; }).length; }   // سایت‌هایی که اطلاعاتشان آمده
 function imgLeft() { return Object.keys(imgPend).length; }
 function overlay() {
   var o = $('ov');
@@ -494,10 +494,10 @@ function overlay() {
         + '<div id="gr1"><span>فهرست عطرها و قیمت‌ها</span><span id="gv1"></span></div><div id="gr2"><span>عکس‌ها</span><span id="gv2"></span></div></div><div id="gbt"></div></div>';
     }
     $('gsp').style.display = phase === 'fail' ? 'none' : '';
-    $('gtt').textContent = phase === 'fail' ? 'همه‌ی اطلاعات هنوز نیامده' : 'در حال آماده‌سازی برنامه';
-    $('gts').textContent = phase === 'fail' ? 'بعضی سایت‌ها جواب نداده‌اند. اینترنت را بررسی کنید؛ برنامه خودش دوباره تلاش می‌کند.' : 'بار اول چند دقیقه طول می‌کشد. لطفاً صبر کنید و برنامه را نبندید.';
+    $('gtt').textContent = phase === 'fail' ? 'اطلاعاتی دریافت نشد' : 'در حال آماده‌سازی برنامه';
+    $('gts').textContent = phase === 'fail' ? 'هیچ سایتی جواب نداد. اینترنت را بررسی کنید؛ برنامه خودش دوباره تلاش می‌کند.' : 'بار اول چند دقیقه طول می‌کشد. لطفاً صبر کنید و برنامه را نبندید.';
     $('gpb').style.width = Math.round(all * 100) + '%';
-    $('gr1').className = phase !== 'src' && sd === N ? 'ok' : '';
+    $('gr1').className = phase !== 'src' && sd > 0 ? 'ok' : '';
     $('gv1').innerHTML = '<bdi>' + fa(sd) + '</bdi> از <bdi>' + fa(N) + '</bdi> سایت' + (phase === 'src' && total() ? ' · <bdi>' + fa(total()) + '</bdi> محصول' : '');
     $('gr2').className = imgTot && il === 0 ? 'ok' : '';
     $('gv2').innerHTML = imgTot ? '<bdi>' + fa(imgTot - il) + '</bdi> از <bdi>' + fa(imgTot) + '</bdi>' : phase === 'src' ? 'بعد از فهرست' : '—';
@@ -552,7 +552,9 @@ function setEntries() {
 function rebuild() {
   var l = Core.buildList(db, ORDER, TRUSTED, 12 * 3600e3);
   hiddenN = l.hidden || 0; FLAT = l;
-  ALLB = Core.tree(l); set.off = set.off || {};
+  var lp = set.en ? l : l.filter(function (g) { return /[؀-ۿ]/.test(g.name); });   // نام انگلیسیِ تنها نشان داده نمی‌شود (مگر در تنظیمات روشن شود)
+  enHidden = l.length - lp.length;
+  ALLB = Core.tree(lp); set.off = set.off || {};
   TREE = ALLB.filter(function (b) { return !set.off[b.id]; }); BR_BY = {}; MD_BY = {};
   TREE.forEach(function (b) { BR_BY[b.id] = b; b.models.forEach(function (m) { m.brandId = b.id; MD_BY[m.id] = m; }); });
   if (nav.brand && !BR_BY[nav.brand]) { nav.lvl = 0; nav.brand = null; }
@@ -582,7 +584,9 @@ function mountModel(anchor) {
 function enter() { setEntries(); mountModel(nav.lvl ? null : startAnchor); overlay(); navUi(); updPill(); }
 function checkReady() {
   if (db.ready || busy) return;
-  if (srcDone() < Core.SOURCES.length || imgLeft() > 0 || !list.length) { overlay(); return; }
+  if (imgLeft() > 0) { overlay(); return; }
+  if (srcDone() < Core.SOURCES.length && !gateRetried) { gateRetried = 1; overlay(); setTimeout(function () { refresh(false); }, 2500); return; }   // سایتِ ناموفق یک‌بار دیگر امتحان می‌شود؛ بعد هر سایتی که در دسترس بود کافی است
+  if (srcDone() < 1 || !list.length) { overlay(); return; }
   db.ready = true; saveDb(); enter();
 }
 
@@ -741,6 +745,7 @@ function renderSheet() {
   $('sCopy').style.display = bad || adv ? '' : 'none'; $('sFull').style.display = bad || adv ? '' : 'none';
   $('sVer').textContent = 'نسخه ' + VERSION;
   renderBrands();
+  var en = $('sEn'); if (en) { en.classList.toggle('on', !!set.en); en.querySelector('.bc').innerHTML = enHidden && !set.en ? '<bdi>' + fa(enHidden) + '</bdi> مورد مخفی' : ''; }
 }
 var brOpen = false;
 function renderBrands() {
@@ -759,6 +764,7 @@ function setOff(id, v) {
   set.off = set.off || {}; if (v) set.off[id] = 1; else delete set.off[id];
   ls.set('pp.set', set); try { rebuild(); } catch (e) { console.error(e); } renderBrands();
 }
+$('sEn').onclick = function () { set.en = !set.en; ls.set('pp.set', set); try { rebuild(); } catch (e) { console.error(e); } renderSheet(); };
 $('sBrBtn').onclick = function () { brOpen = !brOpen; renderBrands(); };
 $('sBrList').onclick = function (e) {
   var all = e.target.closest && e.target.closest('#sBrAll');

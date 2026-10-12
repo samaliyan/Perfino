@@ -51,21 +51,9 @@ async def main():
         b,ctx,pg,errs=await new_page(p,extra=MODE)
         await pg.goto('file://'+ROOT+'/index.html')
         await pg.wait_for_function("window.__pp.state.busy===false && Object.keys(window.__pp.state.st).length==4",timeout=120000)
-        await pg.wait_for_timeout(1500)
+        await pg.wait_for_function("window.__pp.gate.ready",timeout=60000); await pg.wait_for_timeout(600)
         s=await st(pg)
-        chk(not s['ready'] and s['ov']=='on' and s['mods']==0 and s['retry'] and s['goon'],'B1 one source down → locked with retry+continue buttons: '+json.dumps(s,ensure_ascii=False))
-        chk('همه‌ی اطلاعات هنوز نیامده' in s['ovt'],'B1b message: '+s['ovt'])
-        # دوباره تلاش، بعد از درست‌شدن سایت
-        await pg.evaluate("window.__FIXED=1"); await pg.click('#retry')
-        await pg.wait_for_function("window.__pp.gate.ready",timeout=120000); await pg.wait_for_timeout(500)
-        s=await st(pg); chk(s['ready'] and s['mods']==1 and s['ov']=='','B2 retry works after site recovers: '+json.dumps(s,ensure_ascii=False))
-        await b.close()
-        b,ctx,pg,errs=await new_page(p,extra=MODE)
-        await pg.goto('file://'+ROOT+'/index.html')
-        await pg.wait_for_function("window.__pp.state.busy===false && Object.keys(window.__pp.state.st).length==4",timeout=120000)
-        await pg.wait_for_timeout(1500)
-        await pg.click('#goon'); await pg.wait_for_timeout(700)
-        s=await st(pg); chk(s['ready'] and s['mods']==1 and s['list']>10,'B3 continue with current data works: '+json.dumps(s,ensure_ascii=False))
+        chk(s['ready'] and s['ov']=='' and s['mods']==1 and s['list']>10,'B1 one source down → after one auto-retry enters with the other sites: '+json.dumps(s,ensure_ascii=False))
         await b.close()
         # C) دادهٔ نسخه‌ی قبل (۱.۲) → از نو و کامل
         OLD="localStorage.setItem('pp.db',JSON.stringify({v:3,g:{old1:{k:['a'],c:'',nm:{'قدیمی':1},im:{}}},it:{liliome:{1:['x',1000000,'old1',100]}},full:{liliome:Date.now(),digikala:Date.now(),safir:Date.now(),hiland:Date.now()},t:{liliome:Date.now()},sc:{}}));window.__DELAY=80;"
