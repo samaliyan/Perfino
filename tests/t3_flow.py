@@ -12,7 +12,7 @@ async def load(p,w=360,h=780,scheme='dark',pre='',keep=None):
     await pg.goto('file://'+ROOT+'/index.html')
     return b,ctx,pg,errs
 async def ready(pg,t=40000):
-    await pg.wait_for_function("window.__pp&&window.__pp.list.length>0&&!window.__pp.state.busy",timeout=t)
+    await pg.wait_for_function("window.__pp&&window.__pp.gate.ready&&window.__pp.list.length>0&&!window.__pp.state.busy",timeout=t)
 async def main():
     async with async_playwright() as p:
         # ---- ۱) تنظیمات
@@ -33,7 +33,7 @@ async def main():
         chk('model switched to C',await pg.evaluate("!!document.querySelector('.mod.mc')&&!document.querySelector('.mod.ma')"))
         chk('sheet closed after model pick',await pg.evaluate("document.getElementById('sheet').getBoundingClientRect().top>=innerHeight-2"))
         chk('stored settings',await pg.evaluate("localStorage.getItem('pp.set')")=='{"theme":"light","model":"c"}',await pg.evaluate("localStorage.getItem('pp.set')"))
-        await pg.evaluate("window.__pp.model.goto(500)"); await pg.wait_for_timeout(300)
+        await pg.evaluate("window.__pp.model.goto(20)"); await pg.wait_for_timeout(300)
         a1=await pg.evaluate("window.__pp.model.getAnchor()")
         await pg.click('#gear'); await pg.wait_for_timeout(500); await pg.click('#sModel button[data-v=z]'); await pg.wait_for_timeout(900)
         a2=await pg.evaluate("window.__pp.model.getAnchor()")
@@ -56,14 +56,17 @@ async def main():
         b,ctx,pg,errs=await load(p,360,780,'dark',"__FAIL=['liliome','digikala','safirstores','hilandbeauty'];"); 
         await pg.wait_for_function("window.__pp&&!window.__pp.state.busy&&document.getElementById('ov').className=='on'&&document.getElementById('retry')",timeout=20000)
         txt=await pg.evaluate("document.getElementById('ov').textContent")
-        chk('first-run all fail -> message + retry',('قیمتی دریافت نشد' in txt),txt)
+        chk('first-run all fail -> locked, message + retry',('هنوز نیامده' in txt) and not await pg.evaluate('window.__pp.gate.ready') and await pg.evaluate("document.querySelectorAll('#stage .mod').length")==0,txt)
         chk('pill red when no data',await pg.evaluate("document.getElementById('upd').classList.contains('stale')"))
         await pg.evaluate("window.__FAIL=[]"); await pg.click('#retry'); await ready(pg)
-        chk('retry works',await pg.evaluate("window.__pp.list.length")>1000 and await pg.evaluate("document.getElementById('ov').className")=='')
+        chk('retry works',await pg.evaluate("window.__pp.flat.length")>1000 and await pg.evaluate("document.getElementById('ov').className")=='')
         await b.close()
         # ---- ۴) یک سایت خراب
-        b,ctx,pg,errs=await load(p,360,780,'dark',"__FAIL=['liliome'];"); await ready(pg)
-        n=await pg.evaluate("window.__pp.list.length")
+        b,ctx,pg,errs=await load(p,360,780,'dark',"__FAIL=['liliome'];")
+        await pg.wait_for_function("window.__pp&&!window.__pp.state.busy&&document.getElementById('goon')",timeout=40000)
+        chk('one source down -> locked, continue offered',not await pg.evaluate('window.__pp.gate.ready'))
+        await pg.click('#goon'); await ready(pg)
+        n=await pg.evaluate("window.__pp.flat.length")
         chk('one source down -> list still built',n>800,n)
         await pg.click('#gear'); await pg.wait_for_timeout(600)
         t=await pg.evaluate("document.getElementById('sSrc').innerText")
@@ -97,7 +100,7 @@ async def main():
         await pg.reload(); await pg.wait_for_function("window.__pp&&window.__pp.list.length>0",timeout=15000)
         await pg.wait_for_function("!window.__pp.state.busy",timeout=20000)
         pill=await pg.evaluate("document.getElementById('updt').textContent+'|'+document.getElementById('upd').className")
-        n=await pg.evaluate("window.__pp.list.length")
+        n=await pg.evaluate("window.__pp.flat.length")
         chk('offline with 3h cache: list kept + red pill',(n>1000 and 'stale' in pill and 'ساعت' in pill),(n,pill))
         await pg.screenshot(path='shots/stale_pill.png')
         # کش ۱۳ ساعته دور ریخته شود
@@ -107,22 +110,24 @@ async def main():
         await b.close()
         # ---- ۶) تغییر قیمت هنگام بروزرسانی
         b,ctx,pg,errs=await load(p,360,780,'dark',"localStorage.getItem('pp.set')||localStorage.setItem('pp.set',JSON.stringify({theme:'dark',model:'z'}));"); await ready(pg)
-        await pg.evaluate("window.__pp.model.goto(400)"); await pg.wait_for_timeout(400)
-        a=await pg.evaluate("window.__pp.model.getAnchor()"); el1=await pg.evaluate("window.__el=window.__pp.model.el;1")
-        p_before=await pg.evaluate("JSON.stringify(window.__pp.list.slice(400,402).map(function(x){return x.sizes[0].price}))")
+        await pg.evaluate("window.__pp.model.goto(20)"); await pg.wait_for_timeout(400)
+        pick=await pg.evaluate("""(function(){var L=__pp.state.db.it.liliome,has={};Object.keys(L).forEach(function(k){if(L[k][2]&&L[k][1]>0)has[L[k][2]]=1});var r=null;__pp.tree.forEach(function(b){b.models.forEach(function(m){if(!r&&m.variants.some(function(v){return has[v.id]}))r=[b.id,m.id]})});return r})()""")
+        await pg.evaluate("__pp.open('%s')"%pick[0]); await pg.wait_for_timeout(700); await pg.evaluate("__pp.open('%s')"%pick[1]); await pg.wait_for_timeout(700)
+        el1=await pg.evaluate("window.__el=window.__pp.model.el;1")
+        p_before=await pg.evaluate("[].map.call(document.querySelectorAll('#dtc .zp b'),function(e){return e.textContent}).join('|')")
+        a=await pg.evaluate("window.__pp.model.getAnchor()")
         await pg.evaluate("window.__pp.refresh(true)"); await pg.wait_for_function("!window.__pp.state.busy"); await pg.wait_for_timeout(300)
         chk('same data -> model not rebuilt',await pg.evaluate("window.__el===window.__pp.model.el"))
         await pg.evaluate("window.__PRICEUP=true;window.__pp.refresh(true)"); await pg.wait_for_function("!window.__pp.state.busy"); await pg.wait_for_timeout(600)
         a2=await pg.evaluate("window.__pp.model.getAnchor()")
         chk('prices changed -> updated in place, position kept',(await pg.evaluate("window.__el===window.__pp.model.el")) and a==a2,(a,a2))
-        p_after=await pg.evaluate("JSON.stringify(window.__pp.list.slice(400,402).map(function(x){return x.sizes[0].price}))")
+        p_after=await pg.evaluate("[].map.call(document.querySelectorAll('#dtc .zp b'),function(e){return e.textContent}).join('|')")
         chk('prices actually changed',p_after!=p_before,(p_before,p_after))
-        shown=await pg.evaluate("(function(){var r=document.querySelector('.mz .rw.on .p1');return r?r.textContent:''})()")
-        chk('focused row shows new price',True,shown)
+        chk('detail page stayed open and shows the new prices',await pg.evaluate("document.getElementById('dt').classList.contains('on')") and p_after!='',p_after)
         await b.close()
         # ---- ۷) عکس‌های خراب → بطری
         os.environ['NOIMG']='1'
-        b,ctx,pg,errs=await load(p,360,780,'dark',"localStorage.setItem('pp.set',JSON.stringify({theme:'dark',model:'c'}));"); await ready(pg); await pg.wait_for_timeout(1500)
+        b,ctx,pg,errs=await load(p,360,780,'dark',"localStorage.setItem('pp.set',JSON.stringify({theme:'dark',model:'c'}));window.Native.cacheImg=function(id){setTimeout(function(){window.__imgFail&&window.__imgFail(id)},2)};"); await ready(pg); await pg.wait_for_timeout(1500)
         chk('broken photos -> bottle fallback',await pg.evaluate("document.querySelectorAll('.tile.fb svg').length")>5 and await pg.evaluate("document.querySelectorAll('.tile img').length")==0 or True)
         info=await pg.evaluate("[document.querySelectorAll('.tile.fb svg').length,document.querySelectorAll('.tile img').length]")
         chk('fallback bottles rendered',info[0]>5,info)

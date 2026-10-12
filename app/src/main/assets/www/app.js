@@ -1,7 +1,7 @@
 (function () {
 'use strict';
 var RM = !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
-var VERSION = '1.2';
+var VERSION = '1.3';
 function $(id) { return document.getElementById(id); }
 function fa(n) { return String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, '٬').replace(/\d/g, function (d) { return '۰۱۲۳۴۵۶۷۸۹'[d]; }); }
 function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
@@ -120,7 +120,7 @@ function Scroller(el, o) {
     if (!drag) return; drag = false;
     var v = 0; if (S.length > 1) { var a = S[0], b = S[S.length - 1]; if (b.t > a.t) v = (b.c - a.c) / ((b.t - a.t) / 1000); }
     var vu = o.sign * v / o.step;
-    if (moved < 7 && e.type === 'pointerup') { var t = document.elementFromPoint(e.clientX, e.clientY), it = t && t.closest ? t.closest('[data-i]') : null; if (it && el.contains(it)) { self.go(+it.dataset.i); return; } }
+    if (moved < 7 && e.type === 'pointerup') { var t = document.elementFromPoint(e.clientX, e.clientY), it = t && t.closest ? t.closest('[data-i]') : null; if (it && el.contains(it)) { var ti = +it.dataset.i; if (o.onTap && ti === idx) o.onTap(ti); else self.go(ti); return; } }
     var pj = clamp(vu * .5, -120, 120), tg = clamp(Math.round(pos + pj), 0, Math.max(0, o.n - 1));
     spr.x = pos; spr.to(tg, { response: .5 + Math.min(1.1, Math.abs(pj) / 60), damping: Math.abs(vu) > .6 ? .82 : 1, velocity: vu });
   }
@@ -167,21 +167,23 @@ function Strip(el, o) {
 }
 
 /* ---------- ساخت داده‌ی نمایش ---------- */
-function decorate(list) {
+function decorate(list, title, sub, crumb) {
   var LET = [], FI = {};
-  list.forEach(function (p, i) { p.k = parseInt(p.id, 36) % 64 || 0; if (FI[p.L] === undefined) { FI[p.L] = i; LET.push(p.L); } });
-  return { list: list, LET: LET, FI: FI };
+  list.forEach(function (p, i) { p.k = parseInt(String(p.imgId || p.id).replace(/^b/, ''), 36) % 64 || 0; if (FI[p.L] === undefined) { FI[p.L] = i; LET.push(p.L); } });
+  return { list: list, LET: LET, FI: FI, title: title || '', sub: sub || '', crumb: crumb || '' };
 }
 function div(cls, html) { var d = document.createElement('div'); d.className = cls; if (html) d.innerHTML = html; return d; }
 function idxOf(list, id) { for (var i = 0; i < list.length; i++) if (list[i].id === id) return i; return 0; }
+var CHEV = '<svg class="chev" width="11" height="18" viewBox="0 0 10 16" aria-hidden="true"><path d="M8 1L2 8l6 7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 function priceHtml(p, max) {
+  if (!p.sizes.length) return CHEV;
   return p.sizes.slice(0, max).map(function (z, j) {
     return j ? '<div class="p2">' + fa(z.ml) + ' میل · ' + fa(z.price) + '</div>'
       : '<div class="p1">' + fa(z.price) + (z.n < 2 ? '<i title="فقط یک سایت"></i>' : '') + '<small>' + fa(z.ml) + ' میل</small></div>';
   }).join('');
 }
 var GN = { m: 'مردانه', w: 'زنانه', u: 'یونیسکس' };
-function tagOf(p) { return [p.conc, GN[p.gn]].filter(Boolean).join(' · '); }
+function tagOf(p) { return p.tag || ''; }
 function rowHtml(p, max) {
   var pr = priceHtml(p, max);
   return '<div class="rw" data-id="' + p.id + '">' + tile(p) + '<div class="m"><div class="n">' + esc(p.name) + '</div>' + (tagOf(p) ? '<div class="tg">' + tagOf(p) + '</div>' : '') + '</div><div class="pr">' + pr + '</div></div>';
@@ -189,7 +191,7 @@ function rowHtml(p, max) {
 
 /* ================= مدل الف: چرخ نیم‌دایره ================= */
 function ModelA(host, data, anchor) {
-  var el = div('mod ma', '<div class="wh"><div class="sel"></div><div class="fs2 ab"></div><div class="bub2"></div></div><div class="pn"><div class="tx"><div class="nm"></div><span class="tg"></span><div class="lns"></div></div><div class="ph"></div></div>');
+  var el = div('mod ma', '<div class="wh"><div class="sel"></div><div class="fs2 ab"></div><div class="bub2"></div></div><div class="pn"><div class="tx"><div class="bn"></div><div class="nm"></div><span class="tg"></span><div class="lns"></div></div><div class="ph"></div></div>');
   host.appendChild(el);
   var wh = el.querySelector('.wh'), L = data.list, rows = [], st = {}, cur = 0;
   var frag = document.createDocumentFragment();
@@ -202,7 +204,10 @@ function ModelA(host, data, anchor) {
     var ph = el.querySelector('.ph'); ph.innerHTML = '<div class="pop" style="width:100%;height:100%"><div class="fl" style="width:100%;height:100%">' + tile(p) + '</div></div>';
     var nm = el.querySelector('.nm'); nm.style.fontSize = ''; nm.textContent = p.name;
     var tg = el.querySelector('.tg'); tg.textContent = tagOf(p); tg.style.display = tagOf(p) ? '' : 'none';
+    el.querySelector('.pn').dataset.id = p.id;
+    var bn = el.querySelector('.bn'); bn.textContent = data.crumb || ''; bn.style.display = data.crumb ? '' : 'none';
     var lns = el.querySelector('.lns'), many = p.sizes.length > 2;
+    if (!p.sizes.length) { lns.innerHTML = '<div class="hn">' + esc(p.hint || '') + CHEV + '</div>'; fitLines(nm, 3, 14); strip.setOn(data.LET.indexOf(p.L)); return; }
     lns.innerHTML = p.sizes.slice(0, 4).map(function (z) { return '<div class="ln"><span>' + fa(z.ml) + ' میل</span><b style="' + (many ? 'font-size:21px' : '') + '"></b></div>'; }).join('');
     var bs = lns.querySelectorAll('b');
     p.sizes.slice(0, 4).forEach(function (z, j) { bs[j].textContent = fa(z.price); if (z.n < 2) bs[j].insertAdjacentHTML('afterend', '<span title="فقط یک سایت" style="width:6px;height:6px;border-radius:50%;background:currentColor;opacity:.5;flex:0 0 6px;align-self:center"></span>'); });
@@ -211,7 +216,7 @@ function ModelA(host, data, anchor) {
     Array.prototype.forEach.call(lns.querySelectorAll('b'), function (b, j) { if (!RM && !quiet) tween(b, p.sizes[j].price * .7, p.sizes[j].price, 420); });
     strip.setOn(data.LET.indexOf(p.L));
   }
-  var sc = new Scroller(wh, { n: L.length, step: 54, axis: 'y', sign: -1, onIndex: show, render: function (pos) {
+  var sc = new Scroller(wh, { n: L.length, step: 54, axis: 'y', sign: -1, onIndex: show, onTap: function (i) { openEntry(L[i].id); }, render: function (pos) {
     winRender(rows, pos, 6, st, function (r, d, j) {
       var ad = Math.abs(d), th = Math.min(ad * .3, 1.25), x = -150 * (1 - Math.cos(th)), s = Math.max(.55, 1.12 - .15 * ad);
       r.style.display = 'flex';
@@ -235,7 +240,7 @@ function ModelC(host, data, anchor) {
   var el = div('mod mc', '<div class="blob b1"></div><div class="blob b2"></div><div class="blob b3"></div><div class="hdr"><div><div class="t1">قیمت امروز</div><div class="t2"></div></div><div class="cl"></div></div><div class="scl"></div><div class="fs2"></div><div class="bub2"></div>');
   host.appendChild(el);
   var L = data.list, scl = el.querySelector('.scl'), cl = el.querySelector('.cl'), gi = -1, PADT = 116;
-  el.querySelector('.t2').textContent = fa(L.length) + ' عطر';
+  el.querySelector('.t1').textContent = data.title; el.querySelector('.t2').textContent = data.sub;
   /* فهرست آیتم‌ها با ارتفاع ثابت (برای ساخت فقط ردیف‌های نزدیک صفحه) */
   var items = [], top = 0, gtops = [], rowItem = [];
   L.forEach(function (p, k) {
@@ -244,7 +249,9 @@ function ModelC(host, data, anchor) {
     rowItem[k] = items.length; items.push({ t: 'r', top: top, h: h, k: k }); top += h + 9;
   });
   scl.innerHTML = '<div class="vt" style="position:relative;height:' + top + 'px"></div>';
-  scl.style.paddingTop = PADT + 'px'; scl.style.paddingBottom = '40px';
+  scl.style.paddingTop = PADT + 'px';
+  function padB() { scl.style.paddingBottom = Math.max(40, (scl.clientHeight || 700) - PADT - 120) + 'px'; }   // آخرین حرف هم بتواند به بالای صفحه برسد
+  padB();
   var vt = scl.firstChild, live = {}, tmp = document.createElement('div');
   function find(y) { var a = 0, b = items.length - 1; while (a < b) { var m = (a + b + 1) >> 1; if (items[m].top <= y) a = m; else b = m - 1; } return a; }
   function make(i) {
@@ -270,8 +277,9 @@ function ModelC(host, data, anchor) {
   function toRow(k) { scl.scrollTop = items[rowItem[k]].top - 8; }
   if (anchor) toRow(idxOf(L, anchor));
   run();
-  function onR() { run(); }
+  function onR() { padB(); run(); }
   window.addEventListener('resize', onR);
+  requestAnimationFrame(padB);
   return {
     el: el, goto: function (i) { toRow(i); run(); },
     getAnchor: function () { var it = items[find(scl.scrollTop + 20)]; var k = it.t === 'r' ? it.k : (items[Math.min(items.length - 1, find(scl.scrollTop + 20) + 1)].k || 0); return L[k] ? L[k].id : null; },
@@ -294,7 +302,7 @@ function ModelFocus(kind, host, data, anchor) {
   el.style.setProperty('--rh', RH + 'px'); el.style.setProperty('--gap', GAP + 'px');
   host.appendChild(el);
   var L = data.list, scl = el.querySelector('.scl'), cl = el.querySelector('.cl'), cur = -1, gl = '', rf = 0, CY = 300;
-  el.querySelector('.t2').textContent = fa(L.length) + ' عطر';
+  el.querySelector('.t1').textContent = data.title; el.querySelector('.t2').textContent = data.sub;
   scl.innerHTML = '<div class="vt" style="position:relative;height:' + (L.length * P) + 'px"></div>';
   var vt = scl.firstChild, live = {}, tmp = document.createElement('div');
   function ensure(j) {
@@ -410,14 +418,15 @@ var net = {
 var set = ls.get('pp.set', { theme: 'auto', model: 'a' });
 if (!MODELS[set.model]) set.model = 'a';
 var db = ls.get('pp.db', null);
-if (!db || db.v !== 3 || !db.g || !db.it) db = Core.newDb();
+if (!db || db.v !== 3 || db.fv !== 4 || !db.g || !db.it) db = Core.newDb();   // نسخه‌ی ۱.۳ همه چیز را یک‌بار از نو و کامل می‌گیرد
+db.fv = 4;
 db.full = db.full || {}; db.t = db.t || {}; db.fa = db.fa || {}; db.sc = db.sc || {};
 try { localStorage.removeItem('pp.raw'); } catch (e) {}
 var idx = Core.dbIndex(db);
 var stt = ls.get('pp.st', {}), prog = {}, busy = false, curModel = null, list = [], struct = '', psig = '', mq = window.matchMedia ? matchMedia('(prefers-color-scheme: dark)') : null;
 var ORDER = Core.SOURCES.map(function (s) { return s.id; }), TRUSTED = {}, imgLoc = {}, imgAsked = {};
 Core.SOURCES.forEach(function (s) { if (s.trusted) TRUSTED[s.id] = true; });
-var hiddenN = 0;
+var hiddenN = 0, TREE = [], BR_BY = {}, MD_BY = {}, nav = { lvl: 0, brand: null }, imgPend = {}, imgTot = 0, imgOk = 0, imgBad = 0, imgLastT = 0, startAnchor = ls.get('pp.last', null), lastTried = 0, prevP = null, FLAT = [];
 var FULL_EVERY = 3 * 86400e3;
 function friendly(m) {
   m = String(m || '');
@@ -469,16 +478,36 @@ function updPill() {
   if (age > 40 * 60000) { u.classList.add('stale'); t.textContent = 'قیمت‌ها قدیمی‌اند · ' + agoText(age); }
   else t.textContent = 'آخرین بروزرسانی ' + agoText(age);
 }
+function srcDone() { return Core.SOURCES.filter(function (s) { return db.full[s.id]; }).length; }
+function imgLeft() { return Object.keys(imgPend).length; }
 function overlay() {
   var o = $('ov');
-  if (list.length) { o.className = ''; o.innerHTML = ''; return; }
+  if (db.ready && list.length) { o.className = ''; o.innerHTML = ''; o._h = ''; return; }
   o.className = 'on';
-  if (busy) {
-    var n = total(), p = pct();
-    o.innerHTML = '<div><div class="sp"></div><b>' + (firstLoad() ? 'دریافت اولیه‌ی عطرها' : 'در حال دریافت قیمت‌ها') + '</b>' + (n ? fa(n) + ' محصول خوانده شد' : 'چند لحظه صبر کنید')
-      + (firstLoad() ? '<br><small>این کار فقط بار اول طول می‌کشد؛ دفعه‌های بعد نام‌ها و عکس‌ها روی گوشی می‌ماند.</small>' : '') + '</div>';
-  } else o.innerHTML = '<div><b>قیمتی دریافت نشد</b>اینترنت را بررسی کنید و دوباره تلاش کنید.<br><button id="retry">تلاش دوباره</button></div>';
-  var b = $('retry'); if (b) b.onclick = function () { refresh(true); };
+  if (!db.ready) {                       // قفل ورود: تا پایان دانلود اولیه وارد برنامه نمی‌شویم
+    var N = Core.SOURCES.length, sd = srcDone(), il = imgLeft(), phase = busy ? 'src' : il > 0 ? 'img' : 'fail';
+    var sf = phase === 'src' ? (pct() == null ? 0 : pct()) : 1, imf = imgTot ? (imgTot - il) / imgTot : (phase === 'img' ? 0 : 1);
+    var all = phase === 'src' ? sf * .75 : phase === 'img' ? .75 + .25 * imf : .75 + .25 * imf;
+    var h = '<div class="gt">';
+    if (phase === 'fail') {
+      h += '<b>همه‌ی اطلاعات هنوز نیامده</b><span>بعضی سایت‌ها جواب نداده‌اند. اینترنت را بررسی کنید؛ برنامه خودش دوباره تلاش می‌کند.</span>';
+    } else {
+      h += '<div class="sp"></div><b>در حال آماده‌سازی برنامه</b><span>بار اول چند دقیقه طول می‌کشد. لطفاً صبر کنید و برنامه را نبندید.</span>';
+    }
+    h += '<div class="pb"><i style="width:' + Math.round(all * 100) + '%"></i></div><div class="st">'
+      + '<div class="' + (phase !== 'src' && sd === N ? 'ok' : '') + '"><span>فهرست عطرها و قیمت‌ها</span><span><bdi>' + fa(sd) + '</bdi> از <bdi>' + fa(N) + '</bdi> سایت' + (phase === 'src' && total() ? ' · <bdi>' + fa(total()) + '</bdi> محصول' : '') + '</span></div>'
+      + '<div class="' + (imgTot && il === 0 ? 'ok' : '') + '"><span>عکس‌ها</span><span>' + (imgTot ? '<bdi>' + fa(imgTot - il) + '</bdi> از <bdi>' + fa(imgTot) + '</bdi>' : phase === 'src' ? 'بعد از فهرست' : '—') + '</span></div></div>';
+    if (phase === 'fail') h += '<button id="retry">تلاش دوباره</button>' + (list.length ? '<button id="goon" class="gh2">ادامه با اطلاعات فعلی</button>' : '');
+    h += '</div>';
+    if (o._h !== h) {                     // فقط وقتی چیزی عوض شده؛ تا دکمه‌ها وسط لمس دوباره ساخته نشوند
+      o._h = h; o.innerHTML = h;
+      var b = $('retry'); if (b) b.onclick = function () { refresh(true); };
+      var g = $('goon'); if (g) g.onclick = function () { db.ready = true; saveDb(); enter(); };
+    }
+    return;
+  }
+  o._h = ''; o.innerHTML = '<div><b>قیمتی دریافت نشد</b>اینترنت را بررسی کنید و دوباره تلاش کنید.<br><button id="retry">تلاش دوباره</button></div>';
+  var b2 = $('retry'); if (b2) b2.onclick = function () { refresh(true); };
 }
 function toast(msg, ms) {
   var t = $('toast'); t.textContent = msg; t.classList.add('on');
@@ -497,47 +526,149 @@ function refBtn() {
   b.innerHTML = '<i class="bar' + (p == null ? ' ind' : '') + '" style="width:' + (p == null ? 40 : Math.round(p * 100)) + '%"></i><span>' + (firstLoad() ? 'دریافت اولیه' : 'بروزرسانی قیمت') + (p == null ? ' …' : ' <bdi>' + fa(Math.round(p * 100)) + '٪</bdi>') + '</span>';
 }
 
-/* فهرستِ نمایشی را از حافظه می‌سازد؛ اگر فقط قیمت‌ها عوض شده باشد، همان صفحه را درجا بروز می‌کند (بدون پاک‌شدن و دوباره‌نویسی نام‌ها) */
-function structOf(l) { return l.length + '|' + l.map(function (p) { return p.id + ':' + p.sizes.map(function (z) { return z.ml; }).join('.'); }).join(';'); }
-function priceOf(l) { return l.map(function (p) { return p.id + ':' + p.sizes.map(function (z) { return z.price + '/' + z.n; }).join('.'); }).join(';'); }
+/* برند ← مدل ← نوع و قیمت. فهرستِ هر سطح از درخت ساخته می‌شود؛ قیمت فقط در صفحه‌ی جزئیات است */
+function GNtxt(gs) { return gs.map(function (g) { return GN[g]; }).join(' · '); }
+function curEntries() {
+  var b = nav.brand && BR_BY[nav.brand];
+  if (b) return b.models.map(function (m) { return { id: m.id, name: m.name, L: m.L, tag: GNtxt(m.gset), hint: 'بزنید تا اندازه‌ها و قیمت‌ها را ببینید', sizes: [], img: m.img, imgId: m.imgId, kind: 'm' }; });
+  return TREE.map(function (b2) { return { id: b2.id, name: b2.name, L: b2.L, tag: fa(b2.models.length) + ' عطر', hint: 'بزنید تا نام عطرها را ببینید', sizes: [], img: b2.img, imgId: b2.imgId, kind: 'b' }; });
+}
+function titleOf() {
+  var b = nav.brand && BR_BY[nav.brand];
+  return b ? { t: b.name, s: fa(b.models.length) + ' عطر', c: b.name } : { t: 'برندها', s: fa(TREE.length) + ' برند', c: '' };
+}
+function structOf(l) { return l.length + '|' + l.map(function (p) { return p.id + ':' + p.name + ':' + p.tag; }).join(';'); }
+function priceMap(l) { var o = {}; l.forEach(function (g) { o[g.id] = g.sizes.map(function (z) { return z.ml + ':' + z.price; }).join(','); }); return o; }
+function setEntries() {
+  list = curEntries(); list.forEach(function (p) { p.loc = imgLoc[p.imgId] || ''; });
+  struct = structOf(list);
+}
+/* فهرستِ نمایشی را از حافظه می‌سازد؛ اگر فقط قیمت‌ها عوض شده باشد، همان صفحه سر جایش می‌ماند و فقط صفحه‌ی جزئیات (اگر باز است) بروز می‌شود */
 function rebuild() {
   var l = Core.buildList(db, ORDER, TRUSTED, 12 * 3600e3);
-  hiddenN = l.hidden || 0;
-  l.forEach(function (p) { p.loc = imgLoc[p.id] || ''; });
-  var s = structOf(l), ps = priceOf(l);
-  if (curModel && list.length && s === struct) {
-    if (ps === psig) { overlay(); return 0; }
-    var ch = 0;
-    l.forEach(function (p, i) { if (list[i].sizes[0].price !== p.sizes[0].price) ch++; list[i].sizes = p.sizes; list[i].img = p.img; list[i].loc = p.loc; });
-    psig = ps; curModel.refresh(); overlay(); return ch;
-  }
-  struct = s; psig = ps; list = l;
-  var anchor = curModel ? curModel.getAnchor() : ls.get('pp.last', null);
+  hiddenN = l.hidden || 0; FLAT = l;
+  TREE = Core.tree(l); BR_BY = {}; MD_BY = {};
+  TREE.forEach(function (b) { BR_BY[b.id] = b; b.models.forEach(function (m) { m.brandId = b.id; MD_BY[m.id] = m; }); });
+  if (nav.brand && !BR_BY[nav.brand]) { nav.lvl = 0; nav.brand = null; }
+  var np = priceMap(l), ch = 0;
+  if (prevP) Object.keys(np).forEach(function (k) { if (prevP[k] !== undefined && prevP[k] !== np[k]) ch++; });
+  prevP = np;
+  var before = struct, hadModel = !!curModel;
+  setEntries();
+  if (dtId) { if (MD_BY[dtId]) renderDetail(); else closeDetail(); }
+  if (vwId) refreshViewer();
+  navUi();
+  if (!db.ready) { overlay(); return -1; }
+  if (hadModel && before === struct) { if (curModel.refresh) curModel.refresh(); overlay(); return ch; }
+  var anchor = curModel ? curModel.getAnchor() : (nav.lvl ? null : startAnchor);
   mountModel(anchor);
   overlay();
   return -1;
 }
 function mountModel(anchor) {
   if (curModel) { curModel.destroy(); curModel = null; }
-  if (!list.length) return;
-  curModel = MODELS[set.model]($('stage'), decorate(list), anchor);
+  if (!list.length || !db.ready) return;
+  var T = titleOf();
+  curModel = MODELS[set.model]($('stage'), decorate(list, T.t, T.s, T.c), anchor);
 }
+/* ورود به برنامه (بعد از پایان دانلود اولیه) */
+function enter() { setEntries(); mountModel(nav.lvl ? null : startAnchor); overlay(); navUi(); updPill(); }
+function checkReady() {
+  if (db.ready || busy) return;
+  if (srcDone() < Core.SOURCES.length || imgLeft() > 0 || !list.length) { overlay(); return; }
+  db.ready = true; saveDb(); enter();
+}
+
+/* ---- رفتن بین سطح‌ها ---- */
+function swap(anchor) {
+  var st = $('stage'); st.classList.add('out');
+  setTimeout(function () { setEntries(); mountModel(anchor); navUi(); st.classList.remove('out'); }, RM ? 0 : 140);
+}
+function openEntry(id) {
+  if (BR_BY[id]) { nav.lvl = 1; nav.brand = id; ls.set('pp.last', id); startAnchor = id; swap(null); }
+  else if (MD_BY[id]) openDetail(id);
+}
+function goUp() {
+  if (nav.lvl === 0) return false;
+  var b = nav.brand; nav.lvl = 0; nav.brand = null; swap(b); return true;
+}
+function navUi() { var b = $('bk'); if (b) b.classList.toggle('on', nav.lvl === 1 && !!db.ready); }
+$('bk').onclick = function () { goUp(); };
+$('stage').addEventListener('click', function (e) {
+  var h = e.target.closest && e.target.closest('.rw,.pn'); if (!h || !h.dataset.id) return;
+  if (e.target.closest('.tile')) viewImg(h.dataset.id); else openEntry(h.dataset.id);
+});
+
+/* ---- صفحه‌ی جزئیات: نوع‌ها (مردانه/زنانه) و اندازه‌ها با قیمت ---- */
+var dtId = null, dtEl = $('dt');
+function entryImg(id) {
+  var o = BR_BY[id] || MD_BY[id]; if (!o) return null;
+  return { img: o.img, big: o.big || o.img, loc: imgLoc[o.imgId] || '', k: parseInt(String(o.imgId).replace(/^b/, ''), 36) % 64 || 0, name: o.name };
+}
+function renderDetail() {
+  var m = MD_BY[dtId]; if (!m) return;
+  var im = entryImg(dtId);
+  var vs = m.variants.map(function (v) {
+    var lab = [GN[v.gn], v.conc].filter(Boolean).join(' · ') || 'اندازه‌ها و قیمت‌ها';
+    return '<div class="vr g-' + (v.gn || 'x') + '"><div class="vh">' + esc(lab) + '</div>' + v.sizes.map(function (z) {
+      return '<div class="sz"><span class="zm"><bdi>' + fa(z.ml) + '</bdi> میل</span><span class="zp"><b>' + fa(z.price) + '</b><small>تومان</small>' + (z.n < 2 ? '<i title="فقط یک سایت"></i>' : '') + '</span></div>';
+    }).join('') + '</div>';
+  }).join('');
+  var keep = $('dtc').scrollTop;
+  $('dtc').innerHTML = '<div class="dtop"><div class="dpic" data-vw="1">' + tile({ loc: im.loc, img: im.img, k: im.k }) + '<em>بزرگ‌نمایی</em></div><div class="dti"><div class="dbn">' + esc(BR_BY[m.brandId].name) + '</div><div class="dnm">' + esc(m.name) + '</div></div></div>' + vs
+    + '<div class="dnote">نقطه‌ی کوچک کنار قیمت یعنی فقط یک سایت آن را داشته.</div>';
+  var nm = $('dtc').querySelector('.dnm'); fitLines(nm, 3, 16);
+  $('dtc').scrollTop = keep;
+}
+function openDetail(id) {
+  dtId = id; renderDetail(); $('dtc').scrollTop = 0;
+  dtEl.classList.add('on');
+}
+function closeDetail() { dtId = null; dtEl.classList.remove('on'); }
+$('dtx').onclick = closeDetail;
+$('dtc').addEventListener('click', function (e) { if (e.target.closest('.dpic') && dtId) viewImg(dtId); });
+
+/* ---- عکس بزرگ ---- */
+var vwId = null, vwTok = 0;
+function refreshViewer() {}
+function viewImg(id) {
+  var im = entryImg(id); if (!im) return;
+  vwId = id; var tok = ++vwTok, box = $('vwb'), small = im.loc || im.img;
+  if (!small && !im.big) box.innerHTML = '<div class="vfb">' + bottle(im.k, false) + '</div>';
+  else {
+    box.innerHTML = '<img id="vwi" alt="" referrerpolicy="no-referrer" src="' + esc(small || im.big) + '">';
+    if (im.big && im.big !== small) {
+      var pre = new Image(); pre.referrerPolicy = 'no-referrer';
+      pre.onload = function () { if (tok === vwTok && vwId) { var el = $('vwi'); if (el) { el.src = im.big; el.classList.add('big'); } } };
+      pre.src = im.big;
+    }
+  }
+  $('vw').classList.add('on');
+}
+function closeViewer() { vwId = null; vwTok++; $('vw').classList.remove('on'); }
+$('vw').onclick = closeViewer;
 
 /* ---- عکس‌ها: یک‌بار دانلود و برای همیشه روی گوشی ---- */
 function loadImgs() {
   if (!(window.Native && window.Native.listImgs)) return;
   try { imgLoc = JSON.parse(window.Native.listImgs() || '{}') || {}; } catch (e) { imgLoc = {}; }
 }
+function imgSettled() { imgLastT = Date.now(); tick(); if (!db.ready) checkReady(); }
 window.__imgDone = function (id, path) {
   imgLoc[id] = path;
-  for (var i = 0; i < list.length; i++) if (list[i].id === id) { list[i].loc = path; break; }
+  if (imgPend[id]) { delete imgPend[id]; imgOk++; }
+  for (var i = 0; i < list.length; i++) if (list[i].imgId === id) { list[i].loc = path; break; }
+  imgSettled();
 };
+window.__imgFail = function (id) { if (imgPend[id]) { delete imgPend[id]; imgBad++; } imgSettled(); };
 function queueImgs() {
   if (!(window.Native && window.Native.cacheImg)) return;
-  list.forEach(function (p) {
-    if (!p.img || imgLoc[p.id] || imgAsked[p.id]) return;
-    imgAsked[p.id] = 1;
-    try { window.Native.cacheImg(p.id, p.img); } catch (e) {}
+  TREE.forEach(function (b) {
+    b.models.forEach(function (m) {
+      if (!m.img || imgLoc[m.imgId] || imgAsked[m.imgId]) return;
+      imgAsked[m.imgId] = 1; imgPend[m.imgId] = 1; imgTot++; imgLastT = Date.now();
+      try { window.Native.cacheImg(m.imgId, m.img); } catch (e) { delete imgPend[m.imgId]; imgBad++; }
+    });
   });
 }
 
@@ -578,8 +709,8 @@ async function refresh(manual) {
   }));
   var ch = 0;
   try { ch = rebuild(); } catch (e3) { console.error(e3); }
-  busy = false; saveDb(); updPill(); overlay(); refBtn(); renderSheet();
-  queueImgs();
+  busy = false; lastTried = Date.now(); saveDb(); updPill(); overlay(); refBtn(); renderSheet();
+  queueImgs(); checkReady();
   if (manual) {
     if (!ok) toast('اینترنت یا سایت‌ها جواب ندادند؛ دوباره امتحان کنید', 4200);
     else if (bad) toast('بروزرسانی شد، ولی ' + fa(bad) + ' سایت جواب نداد' + (ch > 0 ? ' · ' + fa(ch) + ' قیمت تغییر کرد' : ''), 4200);
@@ -588,7 +719,7 @@ async function refresh(manual) {
 }
 
 /* ================= تنظیمات ================= */
-var sheetY = 1, open = false;
+var sheetY = 1, open = false, adv = false, advN = 0;
 function renderSheet() {
   Array.prototype.forEach.call($('sTheme').children, function (b) { b.classList.toggle('on', b.dataset.v === set.theme); });
   Array.prototype.forEach.call($('sModel').children, function (b) { b.classList.toggle('on', b.dataset.v === set.model); });
@@ -600,7 +731,7 @@ function renderSheet() {
     else if (x && x.err) { txt = x.err + (x.t ? ' (قیمت قبلی نگه داشته شد)' : ''); cls = 'bad'; bad = true; }
     return '<div class="' + cls + '"><span>' + s.name + '</span><span>' + (busy && P && !P.done ? txt : esc(txt)) + '</span></div>';
   }).join('') + '<div style="border:0;color:var(--mu);font-size:12px;padding-top:8px"><span>نقطه‌ی کوچک کنار قیمت یعنی فقط یک سایت آن را داشته.</span></div>';
-  $('sCopy').style.display = bad ? '' : 'none'; $('sFull').style.display = bad ? '' : 'none';
+  $('sCopy').style.display = bad || adv ? '' : 'none'; $('sFull').style.display = bad || adv ? '' : 'none';
   $('sVer').textContent = 'نسخه ' + VERSION;
 }
 var sheet = $('sheet'), scm = $('scm'), sSp = new Spring(1, function (y) { sheetY = y; sheet.style.transform = 'translate3d(0,' + (y * 110).toFixed(2) + '%,0)'; scm.style.opacity = String(clamp(1 - y, 0, 1)); scm.style.pointerEvents = y < .98 ? 'auto' : 'none'; });
@@ -608,6 +739,7 @@ sSp.eps = .002;
 function openSheet() { open = true; renderSheet(); sSp.x = sheetY; sSp.to(0, { response: .42, damping: .85 }); }
 function closeSheet() { open = false; sSp.x = sheetY; sSp.to(1, { response: .36, damping: 1 }); }
 sSp.cb(1);
+$('sVer').onclick = function () { if (++advN >= 5 && !adv) { adv = true; renderSheet(); toast('گزینه‌های سازنده نشان داده شد', 2200); } };
 $('gear').onclick = openSheet; scm.onclick = closeSheet;
 var dy0 = null, sy = 0;
 sheet.addEventListener('pointerdown', function (e) { if (sheet.scrollTop <= 0 && e.target.closest && !e.target.closest('button')) { dy0 = e.clientY; sy = 0; } });
@@ -620,16 +752,21 @@ $('sRef').onclick = function () { if (busy) { toast('همین حالا در حا
 $('sFull').onclick = function () { if (busy) return; db.full = {}; db.fa = {}; saveDb(); refresh(true); };
 $('sCopy').onclick = function () {
   var t = 'گزارش قیمت عطر ' + VERSION + '\n' + Core.SOURCES.map(function (s) { var x = stt[s.id] || {}; return s.name + ': ' + (x.ok ? 'ok ' + x.n + (x.mode ? ' (' + x.mode + ')' : '') + (x.note ? ' ' + x.note : '') + (x.added ? ' +' + x.added : '') : (x.raw || x.err || 'نامشخص')); }).join('\n')
-    + '\nعطر در حافظه: ' + Object.keys(db.g).length + ' ؛ نمایش: ' + list.length + ' ؛ مبهم‌ (نشان داده نشد): ' + hiddenN + ' ؛ عکس ذخیره‌شده: ' + Object.keys(imgLoc).length
+    + '\nعطر در حافظه: ' + Object.keys(db.g).length + ' ؛ برند: ' + TREE.length + ' ؛ عکس: ' + imgOk + ' نشد: ' + imgBad + ' ؛ نمایش: ' + list.length + ' ؛ مبهم‌ (نشان داده نشد): ' + hiddenN + ' ؛ عکس ذخیره‌شده: ' + Object.keys(imgLoc).length
     + '\n\nخطاها:\n' + netBad.concat(netLog).map(function (l) { return l.s + ' ' + l.u + '\n' + l.b; }).join('\n---\n');
   if (window.Native && window.Native.copy) window.Native.copy(t); else if (navigator.clipboard) navigator.clipboard.writeText(t).catch(function () {});
   $('sCopy').textContent = 'کپی شد؛ در پیام برای سازنده بچسبانید';
 };
-window.__back = function () { if (open) { closeSheet(); return true; } return false; };
+window.__back = function () {
+  if (vwId) { closeViewer(); return true; }
+  if (open) { closeSheet(); return true; }
+  if (dtId) { closeDetail(); return true; }
+  return goUp();
+};
 window.__resume = function () { updPill(); var lo = lastOk(); if (!busy && (!lo || Date.now() - lo > 15 * 60000)) refresh(false); };
 document.addEventListener('visibilitychange', function () { if (!document.hidden) window.__resume(); });
-window.addEventListener('beforeunload', function () { if (curModel) { var a = curModel.getAnchor(); if (a) ls.set('pp.last', a); } });
-window.__pp = { mount: function (m) { var t = performance.now(); set.model = m; mountModel(curModel ? curModel.getAnchor() : null); return performance.now() - t; }, get model() { return curModel; }, get list() { return list; }, get state() { return { db: db, st: stt, busy: busy, imgLoc: imgLoc }; }, refresh: refresh, net: net };
+window.addEventListener('beforeunload', function () { if (curModel && nav.lvl === 0) { var a = curModel.getAnchor(); if (a) ls.set('pp.last', a); } });
+window.__pp = { open: openEntry, up: goUp, view: viewImg, closeView: closeViewer, get nav() { return nav; }, get tree() { return TREE; }, get gate() { return { ready: !!db.ready, tot: imgTot, left: imgLeft(), ok: imgOk, bad: imgBad }; }, mount: function (m) { var t = performance.now(); set.model = m; mountModel(curModel ? curModel.getAnchor() : null); return performance.now() - t; }, get model() { return curModel; }, get list() { return list; }, get flat() { return FLAT; }, get state() { return { db: db, st: stt, busy: busy, imgLoc: imgLoc }; }, refresh: refresh, net: net };
 
 /* شروع */
 applyTheme();
@@ -638,4 +775,10 @@ try { rebuild(); } catch (e) { console.error(e); }
 updPill(); overlay(); renderSheet();
 refresh(false);
 setInterval(function () { updPill(); var lo = lastOk(); if (!busy && (!lo || Date.now() - lo > 15 * 60000)) refresh(false); }, 30000);
+/* قفل ورود: اگر دانلود گیر کرد خودش دوباره تلاش کند؛ عکسی که جواب نداد جلوی ورود را نگیرد */
+setInterval(function () {
+  if (db.ready) return;
+  if (!busy && imgLeft() > 0 && Date.now() - imgLastT > 40000) { imgBad += imgLeft(); imgPend = {}; checkReady(); }
+  else if (!busy && imgLeft() === 0 && srcDone() < Core.SOURCES.length && Date.now() - lastTried > 45000) refresh(false);
+}, 5000);
 })();

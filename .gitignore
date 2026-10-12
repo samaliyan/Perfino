@@ -5,3 +5,4 @@ local.properties
 *.iml
 tests/shots/
 tests/fixtures.json
+__pycache__/

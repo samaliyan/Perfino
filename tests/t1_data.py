@@ -12,7 +12,7 @@ async def main():
         await pg.goto('file://'+ROOT+'/index.html')
         await wait_ready(pg)
         print('ready in',round(time.time()-t,1),'s')
-        lst=await pg.evaluate("window.__pp.list.map(function(p){return {id:p.id,name:p.name,conc:p.conc,L:p.L,img:p.img,sizes:p.sizes}})")
+        lst=await pg.evaluate("window.__pp.flat.map(function(p){return {id:p.id,name:p.name,conc:p.conc,L:p.L,img:p.img,sizes:p.sizes}})")
         st=await pg.evaluate("window.__pp.state.st")
         print('sources',json.dumps(st,ensure_ascii=False))
         print('list size',len(lst),'truth',len(FXJ['truth']))

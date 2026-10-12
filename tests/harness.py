@@ -8,7 +8,7 @@ window.__FX=%s;
  var F=window.__FX;
  function resp(u){
   var m;
-  if(u.indexOf('liliome.com/wp-json')>=0){m=/[?&]page=(\\d+)/.exec(u);var pgn=+m[1];if(pgn>F.liliome.length)return {s:400,b:'{"code":"rest_post_invalid_page_number"}'};var arr=F.liliome[pgn-1]||[];if(u.indexOf('_fields=')>=0&&!window.__NOFIELDS){arr=arr.map(function(x){return {id:x.id,prices:x.prices,is_in_stock:x.is_in_stock,type:x.type}})}return {s:200,b:JSON.stringify(arr)}}
+  if(u.indexOf('liliome.com/wp-json')>=0){m=/[?&]page=(\\d+)/.exec(u);var pgn=+m[1];if(pgn>F.liliome.length)return {s:400,b:'{"code":"rest_post_invalid_page_number"}'};var arr=F.liliome[pgn-1]||[];if(u.indexOf('_fields=')>=0&&!window.__NOFIELDS){arr=arr.map(function(x){return {id:x.id,prices:x.prices,price_html:x.price_html,is_in_stock:x.is_in_stock,type:x.type}})}return {s:200,b:JSON.stringify(arr)}}
   if(u.indexOf('api.digikala.com')>=0){m=/page=(\\d+)/.exec(u);return {s:200,b:JSON.stringify({data:{products:F.digikala[+m[1]-1]||[],pager:{total_pages:F.digikala.length}}})}}
   if(u.indexOf('/wp-json')>=0)return {s:404,b:'{"code":"rest_no_route"}'};
   if(u.indexOf('safirstores.com')>=0){m=/page=(\\d+)/.exec(u);return {s:200,b:F.safirPages[(m?+m[1]:1)-1]||'<html></html>'}}

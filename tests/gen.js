@@ -26,8 +26,10 @@ truth.forEach(function(t,ti){
   t.sizes.forEach(function(s){
     // لیلیوم
     if(R()<.85){
-      lil.push({id:id++,name:'عطر ادکلن '+t.brand+' '+t.name+' '+t.conc+' '+s.ml+' میل',permalink:'https://liliome.com/p/'+id,type:'simple',is_in_stock:R()>.04,
-        prices:{price:String(R()<.03?0:jit(s.price,.04)),currency_code:'IRT',currency_minor_unit:0},images:[{thumbnail:'https://liliome.com/wp-content/uploads/'+id+'-200x200.jpg'}],categories:[{name:'عطر و ادکلن'}]});
+      var noSz=(id%2===0);   // نیمی از محصولات لیلیوم مثل سایت واقعی: اندازه فقط در جدول مشخصات
+      lil.push({id:id++,name:'عطر ادکلن '+t.brand+' '+t.name+' '+t.conc+(noSz?'':' '+s.ml+' میل'),permalink:'https://liliome.com/p/'+id,type:'simple',is_in_stock:R()>.04,
+        short_description:noSz?'<table><tbody><tr><td>سایز</td><td>'+faD(s.ml)+' میل</td></tr><tr><td>طبع</td><td>گرم</td></tr><tr><td>ماندگاری</td><td>متوسط</td></tr></tbody></table>':'',
+        prices:{price:String(R()<.03?0:jit(s.price,.04)),currency_code:'IRT',currency_minor_unit:0},images:[{thumbnail:'https://liliome.com/wp-content/uploads/'+id+'-200x200.jpg',src:'https://liliome.com/wp-content/uploads/'+id+'.jpg'}],categories:[{name:t.brand},{name:'عطر و ادکلن'}]});
       if(R()<.05) lil.push({id:id++,name:'تستر عطر '+t.brand+' '+t.name+' '+t.conc+' '+s.ml+' میل',type:'simple',is_in_stock:true,prices:{price:String(jit(s.price*.7,.02)),currency_code:'IRT',currency_minor_unit:0},images:[],categories:[{name:'عطر'}]});
     }
     // دیجی‌کالا (ریال)

@@ -161,6 +161,63 @@ svg{display:block}
 .srcs span:last-child{color:var(--mu);text-align:left;min-width:0;overflow-wrap:anywhere}
 .srcs .bad span:last-child{color:#ef5b5b}
 .ver{margin-top:14px;font-size:11px;color:var(--mu);text-align:center}
+
+/* ---- برند ← مدل ← جزئیات ---- */
+#stage{transition:opacity .14s ease}
+#stage.out{opacity:0}
+#bk{position:absolute;top:8px;left:12px;z-index:42;width:40px;height:40px;padding:0;border-radius:20px;border:1px solid var(--gb);background:var(--pill);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);display:none;align-items:center;justify-content:center;font-size:14px;font-weight:700;cursor:pointer;color:var(--tx)}
+#bk.on{display:flex}
+.hdr>div:first-child{min-width:0;flex:1 1 auto;padding-inline-end:10px}
+.hdr .t1{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hdr .cl{flex:0 0 auto}
+.chev{opacity:.55;display:block;margin-inline-start:2px}
+.rw .pr:has(.chev){display:flex;align-items:center;flex:0 0 auto}
+.ma .bn{font-size:13px;font-weight:700;color:var(--ac);margin-bottom:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ma .hn{display:flex;align-items:center;justify-content:space-between;margin-top:10px;border-top:1px solid var(--cb);padding-top:8px;font-size:13px;opacity:.8;line-height:1.7}
+.ma .pn{cursor:pointer}
+.rw{cursor:pointer}
+/* قفل ورود */
+#ov .gt{width:100%;max-width:380px;margin:0 auto}
+#ov .gt>span{display:block;font-size:14px;color:var(--mu);line-height:1.9;margin-top:4px}
+#ov .pb{height:10px;border-radius:5px;background:var(--cb);margin:18px 0 12px;overflow:hidden}
+#ov .pb i{display:block;height:100%;border-radius:5px;background:var(--ac);transition:width .4s ease}
+#ov .st{font-size:14px;line-height:2;text-align:right}
+#ov .st>div{display:flex;justify-content:space-between;border-bottom:1px solid var(--cb);padding:3px 0}
+#ov .st>div>*+*{margin-inline-start:10px}
+#ov .st>div.ok span:first-child:before{content:"✓ ";color:#3ddc97;font-weight:800}
+#ov .gh2{display:block;margin:12px auto 0;background:var(--cb);color:var(--tx);font-weight:600;font-size:14px}
+/* صفحه‌ی جزئیات */
+#dt{position:absolute;top:0;left:0;right:0;bottom:0;z-index:45;background:var(--bg);transform:translate3d(0,102%,0);transition:transform .34s cubic-bezier(.2,.8,.2,1);visibility:hidden;display:flex;flex-direction:column;padding-top:54px}
+#dt.on{transform:none;visibility:visible}
+#dtx{position:absolute;top:8px;left:12px;z-index:3;height:40px;min-width:40px;padding:0 16px;border-radius:20px;border:1px solid var(--gb);background:var(--pill);font-size:14px;font-weight:700;cursor:pointer;color:var(--tx)}
+#dtc{flex:1 1 auto;overflow-y:auto;padding:6px 16px 28px;-webkit-overflow-scrolling:touch}
+.dtop{display:flex;align-items:center;margin-bottom:16px}
+.dtop>*+*{margin-inline-start:14px}
+.dpic{position:relative;flex:0 0 clamp(104px,32vw,132px);height:clamp(132px,40vw,166px);border-radius:20px;overflow:hidden;cursor:zoom-in;box-shadow:0 10px 24px -12px rgba(0,0,0,.45)}
+.dpic .tile{width:100%;height:100%;border-radius:20px}
+.dpic em{position:absolute;left:0;right:0;bottom:0;font-style:normal;font-size:11px;text-align:center;padding:3px 0;background:rgba(0,0,0,.5);color:#fff}
+.dti{flex:1 1 0;min-width:0}
+.dbn{font-size:14px;font-weight:700;color:var(--mu);margin-bottom:4px}
+.dnm{font-size:26px;font-weight:800;line-height:1.35;overflow-wrap:anywhere}
+.vr{margin-top:12px;border-radius:20px;background:var(--card);border:1px solid var(--cb);padding:6px 14px 8px;border-inline-start:6px solid var(--mu)}
+.vr.g-m{border-inline-start-color:#4c8dff}.vr.g-w{border-inline-start-color:#ff5c9d}.vr.g-u{border-inline-start-color:#a07dff}
+.vh{font-size:18px;font-weight:800;padding:6px 0 4px;line-height:1.5}
+.sz{display:flex;align-items:baseline;justify-content:space-between;padding:8px 0;border-top:1px solid var(--cb);min-width:0}
+.sz>*+*{margin-inline-start:10px}
+.zm{font-size:16px;white-space:nowrap}
+.zp{white-space:nowrap;font-variant-numeric:tabular-nums;min-width:0}
+.zp b{font-size:22px;font-weight:800}
+.zp small{font-size:12px;color:var(--mu);margin-inline-start:5px}
+.zp i{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--mu);opacity:.55;margin-inline-start:6px}
+.dnote{margin-top:14px;font-size:12px;color:var(--mu);text-align:center}
+/* عکس بزرگ */
+#vw{position:absolute;top:0;left:0;right:0;bottom:0;z-index:60;background:rgba(6,8,18,.94);display:none;align-items:center;justify-content:center;padding:18px;cursor:zoom-out}
+#vw.on{display:flex}
+#vwb{width:100%;height:100%;display:flex;align-items:center;justify-content:center}
+#vwb img{max-width:100%;max-height:100%;object-fit:contain;border-radius:14px;background:#fff;transition:filter .3s}
+#vwb img:not(.big){filter:blur(1.2px)}
+#vwb .vfb{width:min(70vw,320px)}
+#vw .vh2{position:absolute;bottom:calc(18px + env(safe-area-inset-bottom,0px));left:0;right:0;text-align:center;font-size:13px;color:rgba(255,255,255,.7);pointer-events:none}
 @media (prefers-reduced-motion:reduce){.fl,.pop,.blob,#upd i{animation:none}}
 </style>
 </head>
@@ -170,6 +227,9 @@ svg{display:block}
   <div id="ov"></div>
   <div id="upd"><i></i><span id="updt"></span></div>
   <button id="gear" aria-label="تنظیمات"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.2"/><path d="M19.4 13a7.6 7.6 0 0 0 0-2l2-1.6-2-3.4-2.4 1a7.4 7.4 0 0 0-1.7-1L15 3.4h-4l-.4 2.6a7.4 7.4 0 0 0-1.7 1l-2.4-1-2 3.4 2 1.6a7.6 7.6 0 0 0 0 2l-2 1.6 2 3.4 2.4-1c.5.4 1.1.7 1.7 1l.4 2.6h4l.4-2.6c.6-.3 1.2-.6 1.7-1l2.4 1 2-3.4z"/></svg></button>
+  <button id="bk" aria-label="بازگشت"><svg width="13" height="20" viewBox="0 0 10 16" aria-hidden="true" style="transform:scaleX(-1)"><path d="M8 1L2 8l6 7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+  <div id="dt" role="dialog" aria-label="جزئیات"><button id="dtx">بستن</button><div id="dtc"></div></div>
+  <div id="vw" role="dialog" aria-label="عکس بزرگ"><div id="vwb"></div><div class="vh2">برای بستن، روی صفحه بزنید</div></div>
   <div id="scm"></div>
   <div id="toast" role="status" aria-live="polite"></div>
   <div id="sheet" role="dialog" aria-label="تنظیمات">

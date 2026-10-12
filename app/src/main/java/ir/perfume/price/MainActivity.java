@@ -135,7 +135,15 @@ public class MainActivity extends Activity {
         /** عکس را یک‌بار دانلود و برای همیشه روی گوشی نگه می‌دارد. پایان کار: window.__imgDone(id, path) */
         @JavascriptInterface
         public void cacheImg(final String id, final String url) {
-            if (id == null || !id.matches("[A-Za-z0-9_-]{1,40}")) return;
+            if (id == null || !id.matches("[A-Za-z0-9_-]{1,40}") || url == null || !url.startsWith("http")) {
+                if (id != null && id.matches("[A-Za-z0-9_-]{1,40}")) {
+                    final String jf = "window.__imgFail&&window.__imgFail(" + JSONObject.quote(id) + ")";
+                    runOnUiThread(new Runnable() {
+                        @Override public void run() { if (web != null) web.evaluateJavascript(jf, null); }
+                    });
+                }
+                return;
+            }
             imgPool.execute(new Runnable() {
                 @Override
                 public void run() {
@@ -172,7 +180,13 @@ public class MainActivity extends Activity {
                             if (c != null) c.disconnect();
                         }
                     }
-                    if (!ok) return;
+                    if (!ok) {
+                        final String jf = "window.__imgFail&&window.__imgFail(" + JSONObject.quote(id) + ")";
+                        runOnUiThread(new Runnable() {
+                            @Override public void run() { if (web != null) web.evaluateJavascript(jf, null); }
+                        });
+                        return;
+                    }
                     final String js = "window.__imgDone&&window.__imgDone(" + JSONObject.quote(id) + "," + JSONObject.quote("file://" + dst.getAbsolutePath()) + ")";
                     runOnUiThread(new Runnable() {
                         @Override public void run() { if (web != null) web.evaluateJavascript(js, null); }
