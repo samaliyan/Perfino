@@ -464,7 +464,7 @@ function pct() {   // درصد پیشرفت؛ null یعنی نامعلوم
     var p = prog[ks[i]], v;
     if (p.done) v = 1;
     else if (p.pct != null) v = p.pct;
-    else { var exp = p.exp || 0; if (!exp) return null; v = Math.min(.97, p.n / exp); }
+    else { var exp = p.exp || (p.mode === 'full' ? 1300 : 0); if (!exp) return null; v = Math.min(.97, p.n / exp); }   // اولین بار تعدادِ محصولات را نمی‌دانیم؛ حدسِ تقریبی فقط برای نوارِ پیشرفت
     sum += v;
   }
   return ks.length ? sum / ks.length : null;
