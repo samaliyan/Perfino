@@ -36,6 +36,13 @@ var CONC = [
 function isFa(w) { return /[؀-ۿ]/.test(w); }
 function cap(w) { return w.charAt(0).toUpperCase() + w.slice(1); }
 
+/* جنسیت فقط وقتی که صریح نوشته شده باشد: m مردانه | w زنانه | u یونیسکس | '' نامشخص */
+function genderOf(t) {
+  if (/یونیسکس|یونی ?سکس|unisex|مردانه ?(و|\/|&) ?زنانه|زنانه ?(و|\/|&) ?مردانه|men ?(and|&|\/) ?women|women ?(and|&|\/) ?men/.test(t)) return 'u';
+  var m = /مردانه|مردونه|آقایان|آقایون|\bmens?\b|\bman\b|\bmale\b|for him|pour lui/.test(t);
+  var w = /زنانه|زنونه|بانوان|\bwomens?\b|\bwoman\b|\bfemale\b|\bladies\b|for her|pour elle/.test(t);
+  return m && w ? 'u' : m ? 'm' : w ? 'w' : '';
+}
 function parseTitle(raw) {
   var t = normFa(raw, true);
   if (!t || EXCL.test(t)) return null;
@@ -61,25 +68,37 @@ function parseTitle(raw) {
   if (!shown.length) return null;
   var key = shown.map(function (w) { return w.replace(/آ/g, 'ا').replace(/ؤ/g, 'و').replace(/ئ/g, 'ی'); });
   var name = shown.map(function (w) { return hasFa ? w : cap(w); }).join(' ');
-  return { key: key, name: name, conc: conc, ml: ml, fa: hasFa };
+  return { key: key, name: name, conc: conc, ml: ml, fa: hasFa, gn: genderOf(t) };
 }
 
-function lev1(a, b) {
-  if (a === b) return true;
+/* یک ویرایش (حذف/افزودن/جایگزینیِ یک حرف) بین a و b؛ خروجی: [حرف۱، حرف۲] یا null */
+function edit1(a, b) {
+  if (a === b) return null;
   var la = a.length, lb = b.length;
-  if (Math.abs(la - lb) > 1) return false;
-  var i = 0, j = 0, d = 0;
-  while (i < la && j < lb) {
-    if (a[i] === b[j]) { i++; j++; continue; }
-    if (++d > 1) return false;
-    if (la > lb) i++; else if (lb > la) j++; else { i++; j++; }
-  }
-  return d + (la - i) + (lb - j) <= 1;
+  if (Math.abs(la - lb) > 1) return null;
+  var i = 0;
+  while (i < la && i < lb && a[i] === b[i]) i++;
+  if (la === lb) return a.slice(i + 1) === b.slice(i + 1) ? [a[i], b[i]] : null;
+  if (la > lb) return a.slice(i + 1) === b.slice(i) ? [a[i], ''] : null;
+  return a.slice(i) === b.slice(i + 1) ? ['', b[i]] : null;
 }
+function lev1(a, b) { return a === b || !!edit1(a, b); }
+var VOW = 'اآوویهئؤةaeiouy';
+var CONF = ['جژ', 'جچ', 'زژ', 'زذ', 'ذظ', 'زظ', 'ضز', 'ضظ', 'سص', 'سث', 'صث', 'تط', 'حه', 'عا', 'قغ', 'کگ', 'پب', 'cs', 'ck', 'sz', 'kq'];
+function confusable(x, y) {
+  if (!x || !y) return VOW.indexOf(x || y) >= 0;                       // حذف/افزودنِ مصوت
+  if (VOW.indexOf(x) >= 0 && VOW.indexOf(y) >= 0) return true;         // جایگزینیِ مصوت با مصوت
+  return CONF.some(function (p) { return (p[0] === x && p[1] === y) || (p[0] === y && p[1] === x); });
+}
+/* واژه‌ها یکی‌اند یا فقط «املا»ی یک‌حرفیِ معقول (مصوت/حروف هم‌صدا) فرق دارند؛ «بلو/بلک» و «نایت/نایس» یکی نیستند */
+var HD = {};
+function hasD(w) { var v = HD[w]; if (v === undefined) v = HD[w] = /\d/.test(w); return v; }
 function tokEq(a, b) {
   if (a === b) return true;
-  if (/\d/.test(a) || /\d/.test(b)) return false;
-  return a.length >= 4 && b.length >= 4 && lev1(a, b);
+  if (a.length < 3 || b.length < 3 || Math.abs(a.length - b.length) > 1) return false;
+  if (hasD(a) || hasD(b)) return false;
+  var e = edit1(a, b);
+  return !!e && confusable(e[0], e[1]);
 }
 function similar(A, B) {
   var used = {}, m = 0;
@@ -113,54 +132,55 @@ function letterOf(name) {
   return /[a-z]/.test(c) ? 'A' : '#';
 }
 
-/* records: [{src,t,price,img}] قیمت‌ها بر حسب تومان */
-function aggregate(records, srcOrder, trusted) {
-  trusted = trusted || {};
-  var items = [];
-  records.forEach(function (r) {
-    var p = parseTitle(r.t);
-    if (!p || !(r.price > 0)) return;
-    items.push({ src: r.src, key: p.key, name: p.name, conc: p.conc, ml: p.ml, price: r.price, img: r.img || '' });
+/* ---------- یکی‌کردن نام‌ها ---------- */
+function dels(w) { var o = [w]; for (var i = 0; i < w.length; i++) o.push(w.slice(0, i) + w.slice(i + 1)); return o; }   // همسایگیِ «حذف یک حرف» برای یافتنِ سریعِ واژه‌های یک‌ویرایشی
+function Index() { this.m = {}; this.fz = {}; }
+Index.prototype.add = function (g) {
+  var m = this.m, fz = this.fz;
+  g.key.forEach(function (w) {
+    if (!m[w]) { m[w] = []; if (w.length >= 3 && w.length <= 24 && !/\d/.test(w)) dels(w).forEach(function (k) { (fz[k] = fz[k] || []).push(w); }); }
+    m[w].push(g.id);
   });
-  /* گروه‌بندی نام‌ها */
-  var groups = [], index = {};
-  function findGroup(it, concMode) {
-    var best = null, cand = {};
-    it.key.forEach(function (w) { (index[w] || []).forEach(function (g) { cand[g] = 1; }); });
-    Object.keys(cand).forEach(function (gs) {
-      var g = groups[+gs];
-      if (g.conc !== it.conc) return;
-      if (similar(it.key, g.key)) { if (!best) best = g; }
-    });
-    return best;
-  }
-  items.forEach(function (it) {
-    var g = findGroup(it);
-    if (!g) {
-      // املا: توکن تقریباً برابر در فهرست اندیس
-      var cands = {};
-      it.key.forEach(function (w) {
-        if (w.length < 4 || /\d/.test(w)) return;
-        Object.keys(index).forEach(function (iw) { if (iw !== w && iw.length >= 4 && lev1(iw, w)) index[iw].forEach(function (x) { cands[x] = 1; }); });
-      });
-      Object.keys(cands).forEach(function (gs) { var c = groups[+gs]; if (!g && c.conc === it.conc && similar(it.key, c.key)) g = c; });
-    }
-    if (!g) {
-      g = { id: groups.length, key: it.key, conc: it.conc, items: [] };
-      groups.push(g);
-      it.key.forEach(function (w) { (index[w] = index[w] || []).push(g.id); });
-    }
-    g.items.push(it);
+};
+Index.prototype.cands = function (key, fuzz) {   // شناسه‌ی گروه‌هایی که حداقل یک واژه‌ی (تقریباً) یکسان دارند
+  var cand = {}, m = this.m, fz = this.fz;
+  key.forEach(function (w) { (m[w] || []).forEach(function (g) { cand[g] = 1; }); });
+  if (fuzz) key.forEach(function (w) {
+    if (w.length < 3 || w.length > 24 || /\d/.test(w)) return;
+    dels(w).forEach(function (k) { (fz[k] || []).forEach(function (iw) { if (iw !== w && tokEq(iw, w)) m[iw].forEach(function (x) { cand[x] = 1; }); }); });
   });
-  /* غلظت نامشخص: ادغام در گروه هم‌نام اگر دقیقاً یک نامزد باشد */
-  groups.forEach(function (g) {
-    if (g.conc !== '' || g.dead) return;
-    var cands = groups.filter(function (o) { return o !== g && !o.dead && o.conc !== '' && similar(g.key, o.key); });
-    if (cands.length === 1) { cands[0].items = cands[0].items.concat(g.items); g.dead = true; }
-  });
-  groups = groups.filter(function (g) { return !g.dead; });
+  return Object.keys(cand);
+};
+function sk(k) { return k._s || (k._s = k.slice().sort().join(' ')); }   // کلیدِ مرتب‌شده (کش روی همان آرایه)
+/* ۲ = نام کاملاً یکی | ۱ = نام تقریباً یکی (املا/یک واژه کم) | ۰ = متفاوت */
+function nameCmp(A, B) { return sk(A) === sk(B) ? 2 : similar(A, B) ? 1 : 0; }
+function concCmp(a, b) { return a === b ? 2 : (!a || !b) ? 1 : 0; }
+function genCmp(a, b) { return a === b ? 2 : (!a || !b || a === 'u' || b === 'u') ? 1 : 0; }   // مردانه با زنانه هرگز یکی نمی‌شود
+function priceOK(r, lo, hi) { return r >= lo && r <= hi; }
+/* آیا قیمتِ p برای ml میل با قیمت‌های شناخته‌شده‌ی گروه جور است؟ (هم‌اندازه: ±۲۰٪؛ اندازه‌ی دیگر: با تقریبِ نسبت) */
+function corrob(prices, ml, vars) {
+  if (!prices || !prices.length) return false;
+  var same = prices.filter(function (x) { return x.ml === ml; });
+  if (same.length) return same.some(function (x) { return vars.some(function (p) { return priceOK(p / x.p, .8, 1.25); }); });
+  var best = null;
+  prices.forEach(function (x) { if (!best || Math.abs(Math.log(ml / x.ml)) < Math.abs(Math.log(ml / best.ml))) best = x; });
+  var q = best.p * Math.pow(ml / best.ml, .8);
+  return vars.some(function (p) { return priceOK(p / q, .65, 1.55); });
+}
+function scaleVars(db, src, price) {
+  var sc = db.sc && db.sc[src];
+  return sc ? [price * sc] : [price, price / 10, price * 10];
+}
 
-  /* تشخیص خودکار مقیاس (تومان/ریال) هر منبع */
+/* قیمت نهایی گروه‌ها. group: {id,key,conc,gn,items:[{src,ml,price}], nm?, im?} */
+function pickInSource(arr) {   // چند قیمت از یک سایت برای یک گروه و یک سایز (مثلاً دو آگهی/تخفیف)
+  if (arr.length === 1) return arr[0];
+  var s = arr.slice().sort(function (x, y) { return y - x; }), top = s[0];
+  var cl = s.filter(function (v) { return v >= top / 1.35; });   // قیمت‌های نزدیک به بالاترین؛ خیلی ارزان‌تر = احتمالاً اشتباه یا کالای دیگر
+  return cl[cl.length - 1];                                      // در همان خوشه، قیمتِ با تخفیف
+}
+function priceGroups(groups, srcOrder, trusted) {
+  trusted = trusted || {};
   var ratios = {};
   groups.forEach(function (g) {
     var by = {};
@@ -184,7 +204,6 @@ function aggregate(records, srcOrder, trusted) {
     else if (anyTrusted && md > 0.075 && md < 0.133) scale[s] = 10; // فقط وقتی منبع مطمئن هست
   });
 
-  /* قیمت نهایی */
   var out = [];
   groups.forEach(function (g) {
     var bySize = {};
@@ -197,7 +216,7 @@ function aggregate(records, srcOrder, trusted) {
     var sizes = [];
     Object.keys(bySize).forEach(function (ml) {
       var per = bySize[ml], srcs = Object.keys(per);
-      var vals = srcs.map(function (s) { return median(per[s]); });
+      var vals = srcs.map(function (s) { return pickInSource(per[s]); });
       var price, n = vals.length;
       if (n === 1) price = vals[0];
       else if (n === 2) { var lo = Math.min(vals[0], vals[1]), hi = Math.max(vals[0], vals[1]); price = hi / lo > 1.3 ? hi : (lo + hi) / 2; }
@@ -209,20 +228,187 @@ function aggregate(records, srcOrder, trusted) {
     });
     if (!sizes.length) return;
     sizes.sort(function (a, b) { return b.ml - a.ml; });
-    /* نام نمایشی: پرتکرارترین، در تساوی بلندتر */
-    var cnt = {}, best = '';
-    g.items.forEach(function (it) { cnt[it.name] = (cnt[it.name] || 0) + 1; });
+    var cnt = g.nm, best = '';
+    if (!cnt) { cnt = {}; g.items.forEach(function (it) { cnt[it.name] = (cnt[it.name] || 0) + 1; }); }
     Object.keys(cnt).forEach(function (n) { if (!best || cnt[n] > cnt[best] || (cnt[n] === cnt[best] && n.length > best.length)) best = n; });
-    var img = '';
-    (srcOrder || []).some(function (s) { return g.items.some(function (it) { if (it.src === s && it.img) { img = it.img; return true; } }); });
-    if (!img) g.items.some(function (it) { if (it.img) { img = it.img; return true; } });
-    out.push({ id: hash(g.key.join(' ') + '|' + g.conc), name: best, conc: g.conc, sizes: sizes, img: img, L: letterOf(best) });
+    var img = '', im = g.im;
+    if (!im) { im = {}; g.items.forEach(function (it) { if (it.img && !im[it.src]) im[it.src] = it.img; }); }
+    (srcOrder || []).some(function (s) { if (im[s]) { img = im[s]; return true; } });
+    if (!img) Object.keys(im).some(function (s) { if (im[s]) { img = im[s]; return true; } });
+    out.push({ id: g.id || hash(g.key.join(' ') + '|' + g.conc), name: best, conc: g.conc, gn: g.gn || '', sizes: sizes, img: img, L: letterOf(best) });
   });
   out.sort(function (a, b) {
     var la = a.L === 'A' || a.L === '#' ? 1 : 0, lb = b.L === 'A' || b.L === '#' ? 1 : 0;
-    return (la - lb) || cmpName(a.name, b.name) || (a.conc < b.conc ? -1 : 1);
+    return (la - lb) || cmpName(a.name, b.name) || (a.conc < b.conc ? -1 : a.conc > b.conc ? 1 : 0) || (a.gn < b.gn ? -1 : a.gn > b.gn ? 1 : 0);
   });
+  out.scale = scale;
   return out;
+}
+
+/* ---------- حافظه‌ی دائمی نام‌ها (db) ----------
+   db.g[gid] = {k:[توکن‌ها], c:غلظت, gn:جنسیت, nm:{نام:تعداد}, im:{منبع:آدرس عکس}}   ← نام عطرها؛ هیچ‌وقت پاک نمی‌شود
+   db.it[src][pid] = [عنوان, قیمت(تومان؛ ۰=ناموجود), gid(۰=عطر نیست), میل]            ← محصولاتِ هر سایت
+   db.full[src] = زمان آخرین دریافت کاملِ موفق ؛ db.t[src] = آخرین دریافت موفق ؛ db.sc[src] = مقیاس قیمت */
+function newDb() { return { v: 3, g: {}, it: {}, full: {}, t: {}, sc: {} }; }
+function dbIndex(db) {
+  var idx = new Index();
+  Object.keys(db.g).forEach(function (id) { var g = db.g[id]; idx.add({ id: id, key: g.k }); });
+  return idx;
+}
+function gview(db) {
+  var G = {};
+  Object.keys(db.g).forEach(function (id) { var g = db.g[id]; G[id] = { id: id, key: g.k, conc: g.c, gn: g.gn || '' }; });
+  return G;
+}
+function pricesByGroup(db) {
+  var by = {};
+  Object.keys(db.it).forEach(function (s) {
+    var sc = (db.sc && db.sc[s]) || 1, m = db.it[s];
+    Object.keys(m).forEach(function (pid) { var e = m[pid]; if (e[2] && e[1] > 0) (by[e[2]] = by[e[2]] || []).push({ ml: e[3], p: e[1] * sc }); });
+  });
+  return by;
+}
+function moveGroup(db, from, to) {
+  Object.keys(db.it).forEach(function (s) { var m = db.it[s]; Object.keys(m).forEach(function (pid) { if (m[pid][2] === from) m[pid][2] = to; }); });
+  var f = db.g[from], t = db.g[to];
+  Object.keys(f.nm).forEach(function (n) { t.nm[n] = (t.nm[n] || 0) + f.nm[n]; });
+  Object.keys(f.im || {}).forEach(function (s) { t.im = t.im || {}; if (!t.im[s]) t.im[s] = f.im[s]; });
+  delete db.g[from];
+}
+/* گروهی که این آیتم باید به آن بپیوندد؛ null = گروه تازه */
+function resolve(db, idx, G, byG, p, price, src) {
+  function collect(fuzz) {
+    var L = [];
+    idx.cands(p.key, fuzz).forEach(function (id) {
+      var g = G[id]; if (!g) return;
+      var nm = nameCmp(p.key, g.key); if (!nm) return;
+      var cc = concCmp(p.conc, g.conc); if (!cc) return;
+      var gg = genCmp(p.gn, g.gn); if (!gg) return;
+      if ((p.conc !== '' && g.conc === '') || (p.gn !== '' && g.gn === '')) return;   // به گروهِ «مبهم‌تر» نمی‌پیوندیم؛ آن گروه بعداً در reconcile به این می‌پیوندد
+      L.push({ id: id, nm: nm, cc: cc, gg: gg });
+    });
+    return L;
+  }
+  var L = collect(false), full = L.filter(function (x) { return x.nm === 2 && x.cc === 2 && x.gg === 2; });
+  if (full.length) return full[0].id;
+  L = collect(true);                                 // املای متفاوت را فقط وقتی دنبال می‌کنیم که تطبیق دقیق نبود
+  if (!L.length) return null;
+  var vars = scaleVars(db, src, price);
+  var cor = L.filter(function (x) { return corrob(byG[x.id], p.ml, vars); });
+  return cor.length === 1 ? cor[0].id : null;     // مبهم یا ناهم‌خوان → هرگز حدس نمی‌زنیم
+}
+/* گروه‌های دارای ویژگی نامشخص (غلظت/جنسیت) که یک هم‌نامِ مشخص‌تر دارند و قیمتشان فقط با یکی از آن‌ها جور است، به همان بپیوندند */
+function reconcile(db, idx) {
+  var G = gview(db), byG = pricesByGroup(db), moved = 0;
+  Object.keys(G).forEach(function (hid) {
+    var H = G[hid]; if (!H || !(H.conc === '' || H.gn === '')) return;
+    var hp = byG[hid]; if (!hp || !hp.length) return;
+    var sib = idx.cands(H.key, true).filter(function (id) {
+      var S = G[id]; if (!S || id === hid) return false;
+      if (!nameCmp(H.key, S.key) || !concCmp(H.conc, S.conc) || !genCmp(H.gn, S.gn)) return false;
+      return (H.conc === '' || S.conc !== '') && (H.gn === '' || S.gn !== '') && (S.conc !== '' || S.gn !== '');
+    });
+    var cor = sib.filter(function (id) { return hp.some(function (x) { return corrob(byG[id], x.ml, [x.p]); }); });
+    if (cor.length === 1) { moveGroup(db, hid, cor[0]); delete G[hid]; moved++; }
+  });
+  return moved;
+}
+/* list: [{id,t,price,img,st}]  st: 0 عادی | 1 ناموجود | 2 عطر نیست | 3 فقط قیمت (عنوان نداریم)
+   complete: همه‌ی صفحه‌ها خوانده شد → محصولاتِ دیده‌نشده پاک شوند */
+function ingestStart(db, idx, src) {
+  return { db: db, idx: idx, src: src, M: (db.it[src] = db.it[src] || {}), G: gview(db), byG: null, seen: {}, st: { added: 0, unknown: 0, removed: 0 } };
+}
+function ingestChunk(C, list) {
+  var db = C.db, idx = C.idx, src = C.src, M = C.M, G = C.G, seen = C.seen, st = C.st;
+  list.forEach(function (x) {
+    var pid = String(x.id); seen[pid] = 1;
+    var cur = M[pid];
+    var price = x.st === 1 || !(x.price > 0) ? 0 : x.price;
+    if (cur && (x.st === 3 || cur[0] === x.t || !x.t)) {          // شناخته‌شده: فقط قیمت
+      if (cur[2] !== 0) cur[1] = price;
+      if (x.img && cur[2] && db.g[cur[2]]) { var im = db.g[cur[2]].im = db.g[cur[2]].im || {}; if (!im[src]) im[src] = x.img; }
+      return;
+    }
+    if (x.st === 3 || !x.t) { st.unknown++; return; }
+    if (x.st === 2) { M[pid] = [x.t || '', 0, 0, 0]; return; }
+    var p = parseTitle(x.t);
+    if (!p) { M[pid] = [x.t, 0, 0, 0]; return; }
+    st.added++;
+    if (!C.byG) C.byG = pricesByGroup(db);
+    var gid = resolve(db, idx, G, C.byG, p, price, src);
+    if (gid == null) {
+      var h = hash(p.key.join(' ') + '|' + p.conc + '|' + p.gn); gid = h; var n = 1;
+      while (db.g[gid]) gid = h + (n++);
+      db.g[gid] = { k: p.key, c: p.conc, gn: p.gn, nm: {}, im: {} };
+      G[gid] = { id: gid, key: p.key, conc: p.conc, gn: p.gn }; idx.add({ id: gid, key: p.key });
+    }
+    var gg = db.g[gid]; gg.nm[p.name] = (gg.nm[p.name] || 0) + 1;
+    if (x.img) { gg.im = gg.im || {}; if (!gg.im[src]) gg.im[src] = x.img; }
+    M[pid] = [x.t, price, gid, p.ml];
+    if (price > 0) (C.byG[gid] = C.byG[gid] || []).push({ ml: p.ml, p: price * ((db.sc && db.sc[src]) || 1) });
+  });
+}
+function ingestEnd(C, complete) {
+  if (complete) Object.keys(C.M).forEach(function (pid) { if (!C.seen[pid]) { delete C.M[pid]; C.st.removed++; } });
+  if (C.st.added) reconcile(C.db, C.idx);
+  return C.st;
+}
+function ingest(db, idx, src, list, complete) {
+  var C = ingestStart(db, idx, src); ingestChunk(C, list); return ingestEnd(C, complete);
+}
+/* مثل ingest ولی تکه‌تکه، تا صفحه‌ی گوشی هنگ نکند */
+var QUEUE = Promise.resolve();   // هم‌زمان فقط یک سایت وارد حافظه می‌شود (ترتیبِ درست و بدون ناهماهنگی)
+function ingestAsync(db, idx, src, list, complete) {
+  var run = QUEUE.then(function () { return ingestSlices(db, idx, src, list, complete); });
+  QUEUE = run.then(function () {}, function () {});
+  return run;
+}
+async function ingestSlices(db, idx, src, list, complete) {
+  var C = ingestStart(db, idx, src);
+  for (var i = 0; i < list.length; i += 250) {
+    ingestChunk(C, list.slice(i, i + 250));
+    if (i + 250 < list.length) await sleep(0);
+  }
+  return ingestEnd(C, complete);
+}
+/* ساخت فهرست نمایشی از db */
+function buildList(db, srcOrder, trusted, maxAge) {
+  var by = {}, now = Date.now();
+  Object.keys(db.it).forEach(function (s) {
+    if (maxAge && (!db.t[s] || now - db.t[s] > maxAge)) return;
+    var m = db.it[s];
+    Object.keys(m).forEach(function (pid) {
+      var e = m[pid]; if (!e[2] || !(e[1] > 0) || !db.g[e[2]]) return;
+      (by[e[2]] = by[e[2]] || []).push({ src: s, ml: e[3], price: e[1] });
+    });
+  });
+  var ids = Object.keys(by), pidx = new Index();
+  ids.forEach(function (id) { pidx.add({ id: id, key: db.g[id].k }); });
+  var groups = [], hid = 0;
+  ids.forEach(function (id) {
+    var g = db.g[id];
+    if (g.c === '' || (g.gn || '') === '') {          // ویژگی نامشخص و یک هم‌نامِ مشخص‌تر هست → تکراری/مبهم است، نشان نده
+      var hide = pidx.cands(g.k, true).some(function (o) {
+        var S = db.g[o]; if (!S || o === id) return false;
+        return nameCmp(g.k, S.k) && concCmp(g.c, S.c) && genCmp(g.gn || '', S.gn || '') && (g.c === '' || S.c !== '') && ((g.gn || '') === '' || (S.gn || '') !== '') && (S.c !== '' || (S.gn || '') !== '');
+      });
+      if (hide) { hid++; return; }
+    }
+    groups.push({ id: id, key: g.k, conc: g.c, gn: g.gn || '', nm: g.nm, im: g.im, items: by[id] });
+  });
+  var out = priceGroups(groups, srcOrder, trusted);
+  Object.keys(out.scale || {}).forEach(function (s) { db.sc[s] = out.scale[s]; });
+  out.hidden = hid;
+  return out;
+}
+/* ساخت یک‌جا (آزمون‌ها): records: [{src,t,price,img}] */
+function aggregate(records, srcOrder, trusted) {
+  var db = newDb(), idx = new Index(), bySrc = {};
+  records.forEach(function (r, i) { (bySrc[r.src] = bySrc[r.src] || []).push({ id: i, t: r.t, price: r.price, img: r.img || '', st: 0 }); });
+  Object.keys(bySrc).forEach(function (s) { ingest(db, idx, s, bySrc[s], false); db.t[s] = Date.now(); });
+  buildList(db, srcOrder, trusted, 0);   // مقیاس‌ها را بیابد
+  reconcile(db, idx);
+  return buildList(db, srcOrder, trusted, 0);
 }
 
 /* ---------- خواندن سایت‌ها ---------- */
@@ -233,60 +419,106 @@ function titleLooksPerfume(t) {
   return /عطر|ادکلن|ادکلون|ادو ?(پرفیوم|تویلت|کلن|پارفوم)|edp|edt|parfum|cologne|perfume|eau de/i.test(t);
 }
 
-async function wooSource(base, net, rep) {
-  var out = [];
-  for (var page = 1; page <= 40; page++) {
-    var r = await net.get(base + '/wp-json/wc/store/v1/products?per_page=100&page=' + page);
-    if (r.status !== 200) { if (page === 1) throw new Error('HTTP ' + r.status); break; }
-    var arr;
-    try { arr = JSON.parse(r.body); } catch (e) { if (page === 1) throw new Error('پاسخ JSON نیست'); break; }
-    if (!Array.isArray(arr)) { if (page === 1) throw new Error('ساختار ناشناخته'); break; }
-    if (!arr.length) break;
-    arr.forEach(function (it) {
-      var pr = it.prices || {};
-      if (it.is_in_stock === false || it.type === 'variable') return;
-      if (pr.price_range && pr.price_range.min_amount !== pr.price_range.max_amount) return;
-      var minor = pr.currency_minor_unit == null ? 0 : +pr.currency_minor_unit;
-      var v = parseFloat(pr.price) / Math.pow(10, minor);
-      if (!(v > 0)) return;
-      if (/IRR|ریال/i.test(pr.currency_code || pr.currency_symbol || '')) v = v / 10;
-      var title = it.name || '';
-      var cats = (it.categories || []).map(function (c) { return c.name; }).join(' ');
-      if (!titleLooksPerfume(title + ' ' + cats)) return;
-      var im = it.images && it.images[0];
-      out.push({ t: title, price: v, img: im ? (im.thumbnail || im.src || '') : '' });
+var CFG = { retryMs: 700, conc: 4 };
+function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+/* دانلود با تلاش دوباره (قطعی‌های کوتاه و خطاهای سرور) */
+async function getR(net, url, headers, tries) {
+  tries = tries || 3; var last = { status: 0, body: '' };
+  for (var i = 0; i < tries; i++) {
+    try {
+      var r = await net.get(url, headers); last = r;
+      if (r.status < 500 && r.status !== 429 && r.status !== 408) return r;
+    } catch (e) { last = { status: 0, body: String(e && e.message || e) }; }
+    if (i < tries - 1) await sleep(CFG.retryMs * (i + 1) * (i + 1));
+  }
+  return last;
+}
+function parseJson(b) { try { return JSON.parse(b); } catch (e) { return undefined; } }
+
+/* ووکامرس: حالت full = همه‌ی اطلاعات؛ حالت price = فقط شناسه، قیمت و موجودی (چند برابر سبک‌تر) */
+async function wooSource(base, net, rep, mode) {
+  var out = [], notes = [], failed = 0, fields = mode === 'price';
+  var FIELDS = '&_fields=id,prices,is_in_stock,type';
+  function url(p) { return base + '/wp-json/wc/store/v1/products?per_page=100&page=' + p + (fields ? FIELDS : ''); }
+  function conv(it) {
+    var pr = it.prices || {}, name = it.name || '';
+    var minor = pr.currency_minor_unit == null ? 0 : +pr.currency_minor_unit;
+    var v = parseFloat(pr.price) / Math.pow(10, minor);
+    if (/IRR|ریال/i.test(pr.currency_code || pr.currency_symbol || '')) v = v / 10;
+    var st = 0;
+    if (it.is_in_stock === false || it.type === 'variable' || !(v > 0)) st = 1;
+    if (pr.price_range && pr.price_range.min_amount !== pr.price_range.max_amount) st = 1;
+    var cats = (it.categories || []).map(function (c) { return c.name; }).join(' ');
+    if (name && it.categories && !titleLooksPerfume(name + ' ' + cats)) st = 2;
+    else if (!name) st = st === 1 ? 1 : 3;
+    var im = it.images && it.images[0];
+    return { id: it.id, t: name, price: st === 1 ? 0 : v, img: im ? (im.thumbnail || im.src || '') : '', st: st };
+  }
+  async function one(p) {
+    var r = await getR(net, url(p), { Accept: 'application/json' });
+    if (r.status === 200) { var a = parseJson(r.body); if (Array.isArray(a)) return { k: 'ok', a: a }; return { k: p === 1 ? 'bad' : 'end', a: [] }; }
+    if (p > 1 && r.status === 400) return { k: 'end', a: [] };
+    return { k: 'fail', s: r.status, b: r.body };
+  }
+  var first = await one(1);
+  if (first.k !== 'ok' && fields) { fields = false; first = await one(1); }      // سایت _fields را نپذیرفت
+  if (first.k === 'bad') throw new Error('ساختار ناشناخته');
+  if (first.k === 'fail') throw new Error(first.s ? 'HTTP ' + first.s : (first.b || 'اینترنت وصل نیست'));
+  var res = [first], page = 2, ended = first.a.length < 100;
+  function eat(r) { r.a.forEach(function (it) { out.push(conv(it)); }); }
+  eat(first); rep(out.length);
+  while (!ended && page <= 90) {
+    var ps = []; for (var i = 0; i < CFG.conc; i++) ps.push(page + i);
+    var rr = await Promise.all(ps.map(one));
+    rr.forEach(function (r, i) {
+      if (ended && r.k === 'ok') { eat(r); return; }
+      if (r.k === 'fail') { failed++; notes.push('صفحه ' + ps[i] + ' نشد'); return; }
+      if (r.k === 'ok') { eat(r); if (r.a.length < 100) ended = true; } else ended = true;
     });
-    rep(out.length);
-    if (arr.length < 100) break;
+    page += CFG.conc; rep(out.length);
   }
   if (!out.length) throw new Error('محصولی پیدا نشد');
-  return out;
+  return { items: out, complete: ended && !failed, note: failed ? 'ناقص: ' + failed + ' صفحه' : '' };
 }
 
-async function digikalaSource(net, rep) {
-  var out = [], total = 60;
-  for (var page = 1; page <= total; page++) {
-    var r = await net.get('https://api.digikala.com/v1/categories/perfume/search/?page=' + page, { Accept: 'application/json' });
-    if (r.status !== 200) { if (page === 1) throw new Error('HTTP ' + r.status); break; }
-    var j;
-    try { j = JSON.parse(r.body); } catch (e) { if (page === 1) throw new Error('پاسخ JSON نیست'); break; }
-    var d = j && j.data;
-    if (!d || !Array.isArray(d.products)) { if (page === 1) throw new Error('ساختار ناشناخته'); break; }
-    if (d.pager && d.pager.total_pages) total = Math.min(total, d.pager.total_pages);
+var DK_URLS = [
+  function (p) { return 'https://api.digikala.com/v1/categories/perfume/search/?page=' + p; },
+  function (p) { return 'https://api.digikala.com/v1/categories/perfume/search?page=' + p; }
+];
+async function digikalaSource(net, rep, mode) {
+  var out = [], failed = 0, total = 1, vi = 0, err = '';
+  function small(u) { return u ? u.replace(/h_\d+,w_\d+/, 'h_360,w_360') : ''; }
+  function eat(d) {
     d.products.forEach(function (p) {
-      if (p.status && p.status !== 'marketable') return;
       var pr = p.default_variant && p.default_variant.price ? p.default_variant.price : p.price;
       var rial = pr && (pr.selling_price || pr.rrp_price);
-      if (!(rial > 0)) return;
+      var ok = !(p.status && p.status !== 'marketable') && rial > 0;
       var title = p.title_fa || p.title_en || '';
       var img = p.images && p.images.main && p.images.main.url && p.images.main.url[0] || '';
-      out.push({ t: title, price: rial / 10, img: img });
+      out.push({ id: p.id, t: title, price: ok ? rial / 10 : 0, img: small(img), st: ok ? 0 : 1 });
     });
-    rep(out.length);
-    if (!d.products.length) break;
+  }
+  async function one(p, v) {
+    var r = await getR(net, DK_URLS[v](p), { Accept: 'application/json' });
+    if (r.status !== 200) return { k: 'fail', e: r.status === 0 ? r.body : 'HTTP ' + r.status };
+    var j = parseJson(r.body), d = j && j.data;
+    if (!d || !Array.isArray(d.products)) return { k: 'fail', e: 'ساختار ناشناخته' };
+    return { k: 'ok', d: d };
+  }
+  var first = null;
+  for (vi = 0; vi < DK_URLS.length && !first; vi++) { var r1 = await one(1, vi); if (r1.k === 'ok') { first = r1; break; } err = r1.e; }
+  if (!first) throw new Error(err || 'دیجی‌کالا جواب نداد');
+  var d1 = first.d; eat(d1); rep(out.length, 0);
+  total = Math.min(80, (d1.pager && d1.pager.total_pages) || 1);
+  var done = 1;
+  for (var page = 2; page <= total; page += CFG.conc + 1) {
+    var ps = []; for (var i = 0; i < CFG.conc + 1 && page + i <= total; i++) ps.push(page + i);
+    var rr = await Promise.all(ps.map(function (p) { return one(p, vi); }));
+    rr.forEach(function (r) { if (r.k === 'ok') eat(r.d); else failed++; });
+    done += ps.length; rep(out.length, done / total);
   }
   if (!out.length) throw new Error('محصولی پیدا نشد');
-  return out;
+  return { items: out, complete: !failed && total > 0, note: failed ? 'ناقص: ' + failed + ' صفحه' : '' };
 }
 
 /* ---- HTML عمومی (برای سایت‌هایی که API ندارند) ---- */
@@ -313,13 +545,13 @@ function extractCards(doc, pageUrl) {
       if (x['@graph']) walk(x['@graph']);
     })(j);
     list.forEach(function (p) {
-      var o = Array.isArray(p.offers) ? p.offers[0] : p.offers;
-      var price = o && parseFloat(o.price || o.lowPrice);
-      if (!(price > 0) || !p.name) return;
-      if (o.availability && /OutOfStock|SoldOut/i.test(o.availability)) return;
-      if (/IRR/i.test(o.priceCurrency || '')) price /= 10;
+      var offs = (Array.isArray(p.offers) ? p.offers : [p.offers]).filter(function (o) { return o && !(o.availability && /OutOfStock|SoldOut/i.test(o.availability)); });
+      var pr = offs.map(function (o) { return parseFloat(o.price || o.lowPrice); }).filter(function (x) { return x > 0; });
+      if (!pr.length || !p.name) return;
+      var first = pr[0], price = Math.min.apply(null, pr.filter(function (x) { return x >= first / 2.5 && x <= first * 2.5; }));   // دو قیمت (تخفیف) → قیمت با تخفیف
+      if (/IRR/i.test(offs[0].priceCurrency || '')) price /= 10;
       var key = p.url || p.name; if (seen[key]) return; seen[key] = 1;
-      out.push({ t: p.name, price: price, img: Array.isArray(p.image) ? p.image[0] : (p.image || '') });
+      out.push({ u: urlJoin(pageUrl, p.url || ''), t: p.name, price: price, img: Array.isArray(p.image) ? p.image[0] : (p.image || '') });
     });
   });
   if (out.length) return out;
@@ -342,7 +574,8 @@ function extractCards(doc, pageUrl) {
     if (/ناموجود|اتمام موجودی|out of stock|موجود نیست/i.test(txt)) return;
     var pr = priceFromText(txt);
     if (!pr.nums.length) return;
-    var v = pr.nums[0]; if (pr.rial) v = v / 10;
+    var f0 = pr.nums[0], v = Math.min.apply(null, pr.nums.filter(function (x) { return x >= f0 / 2.5 && x <= f0 * 2.5; }));   // قیمت قدیم و جدید کنار هم → قیمت با تخفیف
+    if (pr.rial) v = v / 10;
     var img = a.querySelector('img');
     var title = (img && img.getAttribute('alt')) || a.getAttribute('title') || '';
     if (!title || title.length < 6) {
@@ -353,7 +586,7 @@ function extractCards(doc, pageUrl) {
     if (!title) return;
     seen[url] = 1;
     var src = img && (img.getAttribute('src') || img.getAttribute('data-src') || img.getAttribute('data-lazy-src') || '');
-    out.push({ t: title, price: v, img: src ? urlJoin(pageUrl, src) : '' });
+    out.push({ u: url, t: title, price: v, img: src ? urlJoin(pageUrl, src) : '' });
   });
   return out;
 }
@@ -364,41 +597,47 @@ function findNext(doc, url, i) {
   if (u === url) u = url + (url.indexOf('?') >= 0 ? '&' : '?') + 'page=' + (i + 2);
   return u;
 }
-async function htmlSource(start, net, rep) {
-  var out = [], seen = {}, url = start;
+async function htmlSource(start, net, rep, mode) {
+  var out = [], seen = {}, url = start, pages = 0, natural = false, failed = 0, stop = '';
   for (var i = 0; i < 40 && url; i++) {
-    var r = await net.get(url, { Accept: 'text/html' });
-    if (r.status !== 200) { if (i === 0) throw new Error('HTTP ' + r.status); break; }
+    var r = await getR(net, url, { Accept: 'text/html' });
+    if (r.status !== 200) { if (i === 0) throw new Error(r.status ? 'HTTP ' + r.status : r.body); failed++; stop = 'صفحه ' + (i + 1) + ' نشد'; break; }
     var doc = new DOMParser().parseFromString(r.body, 'text/html');
     var cards = extractCards(doc, url), fresh = 0;
+    pages++;
     cards.forEach(function (c) {
       var k = c.t + '|' + c.price;
       if (seen[k]) return; seen[k] = 1; fresh++;
-      if (titleLooksPerfume(c.t) || parseTitle(c.t)) out.push(c);
+      out.push({ id: c.u || c.t, t: c.t, price: c.price, img: c.img, st: (titleLooksPerfume(c.t) || parseTitle(c.t)) ? 0 : 2 });
     });
     rep(out.length);
-    if (!fresh) break;
+    if (!fresh) { natural = true; stop = 'صفحه ' + (i + 1) + ' کارت تازه نداشت'; break; }
     url = findNext(doc, url, i);
   }
   if (!out.length) throw new Error('محصولی پیدا نشد');
-  return out;
+  return { items: out, complete: natural && !failed, note: pages + ' صفحه؛ ' + (stop || 'سقف صفحه') };
 }
-async function wooOrHtml(base, start, net, rep) {
-  try { return await wooSource(base, net, rep); }
-  catch (e1) {
-    try { return await htmlSource(start, net, rep); }
-    catch (e2) { throw new Error('API: ' + e1.message + ' | HTML: ' + e2.message); }
+var METHOD = {};
+async function wooOrHtml(base, start, net, rep, mode) {
+  if (METHOD[base] !== 'html') {
+    try { var w = await wooSource(base, net, rep, mode); METHOD[base] = 'woo'; return w; }
+    catch (e1) {
+      if (METHOD[base] === 'woo') throw e1;                // قبلاً کار می‌کرده؛ خطای گذرا است
+      try { var h = await htmlSource(start, net, rep, mode); METHOD[base] = 'html'; return h; }
+      catch (e2) { throw new Error('API: ' + e1.message + ' | HTML: ' + e2.message); }
+    }
   }
+  return htmlSource(start, net, rep, mode);
 }
 
 var SOURCES = [
-  { id: 'liliome', name: 'لیلیوم', trusted: true, run: function (net, rep) { return wooSource('https://liliome.com', net, rep); } },
-  { id: 'digikala', name: 'دیجی‌کالا', trusted: true, run: function (net, rep) { return digikalaSource(net, rep); } },
-  { id: 'safir', name: 'سفیر', run: function (net, rep) { return wooOrHtml('https://www.safirstores.com', 'https://www.safirstores.com/category/perfume', net, rep); } },
-  { id: 'hiland', name: 'هایلند', run: function (net, rep) { return wooOrHtml('https://hilandbeauty.com', 'https://hilandbeauty.com/fa/%D8%B9%D8%B7%D8%B1-%D9%88-%D8%A7%D8%AF%DA%A9%D9%84%D9%86', net, rep); } }
+  { id: 'liliome', name: 'لیلیوم', trusted: true, run: function (net, rep, mode) { return wooSource('https://liliome.com', net, rep, mode); } },
+  { id: 'digikala', name: 'دیجی‌کالا', trusted: true, run: function (net, rep, mode) { return digikalaSource(net, rep, mode); } },
+  { id: 'safir', name: 'سفیر', run: function (net, rep, mode) { return wooOrHtml('https://www.safirstores.com', 'https://www.safirstores.com/category/perfume', net, rep, mode); } },
+  { id: 'hiland', name: 'هایلند', run: function (net, rep, mode) { return wooOrHtml('https://hilandbeauty.com', 'https://hilandbeauty.com/fa/%D8%B9%D8%B7%D8%B1-%D9%88-%D8%A7%D8%AF%DA%A9%D9%84%D9%86', net, rep, mode); } }
 ];
 
-root.Core = { normFa: normFa, parseTitle: parseTitle, aggregate: aggregate, SOURCES: SOURCES, extractCards: extractCards,
+root.Core = { genderOf: genderOf, nameCmp: nameCmp, CFG: CFG, newDb: newDb, dbIndex: dbIndex, ingest: ingest, ingestAsync: ingestAsync, buildList: buildList, normFa: normFa, parseTitle: parseTitle, aggregate: aggregate, SOURCES: SOURCES, extractCards: extractCards,
   wooSource: wooSource, digikalaSource: digikalaSource, htmlSource: htmlSource, letterOf: letterOf, median: median, priceFromText: priceFromText, similar: similar };
 if (typeof module !== 'undefined') module.exports = root.Core;
 })(typeof window !== 'undefined' ? window : globalThis);

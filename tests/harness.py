@@ -8,15 +8,15 @@ window.__FX=%s;
  var F=window.__FX;
  function resp(u){
   var m;
-  if(u.indexOf('liliome.com/wp-json')>=0){m=/[?&]page=(\\d+)/.exec(u);return {s:200,b:JSON.stringify(F.liliome[+m[1]-1]||[])}}
+  if(u.indexOf('liliome.com/wp-json')>=0){m=/[?&]page=(\\d+)/.exec(u);var pgn=+m[1];if(pgn>F.liliome.length)return {s:400,b:'{"code":"rest_post_invalid_page_number"}'};var arr=F.liliome[pgn-1]||[];if(u.indexOf('_fields=')>=0&&!window.__NOFIELDS){arr=arr.map(function(x){return {id:x.id,prices:x.prices,is_in_stock:x.is_in_stock,type:x.type}})}return {s:200,b:JSON.stringify(arr)}}
   if(u.indexOf('api.digikala.com')>=0){m=/page=(\\d+)/.exec(u);return {s:200,b:JSON.stringify({data:{products:F.digikala[+m[1]-1]||[],pager:{total_pages:F.digikala.length}}})}}
   if(u.indexOf('/wp-json')>=0)return {s:404,b:'{"code":"rest_no_route"}'};
   if(u.indexOf('safirstores.com')>=0){m=/page=(\\d+)/.exec(u);return {s:200,b:F.safirPages[(m?+m[1]:1)-1]||'<html></html>'}}
   if(u.indexOf('hilandbeauty.com')>=0){m=/page=(\\d+)/.exec(u);return {s:200,b:F.hilandPages[(m?+m[1]:1)-1]||'<html></html>'}}
   return {s:404,b:'nf'};
  }
- window.__calls=[];
- window.Native={fetch:function(id,url,h){window.__calls.push(url);var r=window.__MODE&&window.__MODE(url)||resp(url);setTimeout(function(){window.__nat(id,r.s,r.b)},3)},copy:function(t){window.__copied=t},setBars:function(c,l){window.__bars=[c,l]}};
+ window.__calls=[];window.__bytes=0;
+ window.Native={listImgs:function(){return localStorage.getItem('imgcache')||'{}'},cacheImg:function(id,u){window.__imgReq=(window.__imgReq||[]);window.__imgReq.push(id+'|'+u);setTimeout(function(){var c=JSON.parse(localStorage.getItem('imgcache')||'{}');c[id]='data:image/svg+xml;utf8,<svg xmlns=%%22http://www.w3.org/2000/svg%%22 width=%%2240%%22 height=%%2240%%22><rect width=%%2240%%22 height=%%2240%%22 fill=%%22%%23c33%%22/></svg>';localStorage.setItem('imgcache',JSON.stringify(c));window.__imgDone&&window.__imgDone(id,c[id])},5)},fetch:function(id,url,h){window.__calls.push(url);var r=window.__MODE&&window.__MODE(url)||resp(url);window.__bytes+=(r.b||'').length;setTimeout(function(){window.__nat(id,r.s,r.b)},window.__DELAY||3)},copy:function(t){window.__copied=t},setBars:function(c,l){window.__bars=[c,l]}};
 })();
 """%FX
 async def new_page(p, w=360,h=780, scheme='dark', stub=STUB, extra=None, mobile=True):

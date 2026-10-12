@@ -20,7 +20,11 @@ import android.widget.FrameLayout;
 import org.json.JSONObject;
 
 import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileOutputStream;
 import java.io.InputStream;
+import java.net.CookieHandler;
+import java.net.CookieManager;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.util.Iterator;
@@ -31,13 +35,19 @@ import java.util.concurrent.Executors;
 public class MainActivity extends Activity {
     private WebView web;
     private FrameLayout root;
-    private final ExecutorService pool = Executors.newFixedThreadPool(6);
+    private final ExecutorService pool = Executors.newFixedThreadPool(8);
+    private final ExecutorService imgPool = Executors.newFixedThreadPool(3);
+    private File imgDir;
     private static final int MAX_BYTES = 12 * 1024 * 1024;
 
     @SuppressLint({"SetJavaScriptEnabled", "AddJavascriptInterface"})
     @Override
     protected void onCreate(Bundle b) {
         super.onCreate(b);
+        // کوکی‌ها نگه داشته شوند تا ریدایرکت‌های وابسته به کوکی (مثل دیجی‌کالا) حلقه نزنند
+        if (CookieHandler.getDefault() == null) CookieHandler.setDefault(new CookieManager());
+        imgDir = new File(getFilesDir(), "img");
+        imgDir.mkdirs();
         root = new FrameLayout(this);
         root.setBackgroundColor(Color.parseColor("#0c0f1f"));
         root.setFitsSystemWindows(true);
@@ -107,6 +117,70 @@ public class MainActivity extends Activity {
             });
         }
 
+
+        /** فهرست عکس‌های ذخیره‌شده روی گوشی: {"شناسه":"file:///..."} */
+        @JavascriptInterface
+        public String listImgs() {
+            JSONObject o = new JSONObject();
+            try {
+                File[] fs = imgDir.listFiles();
+                if (fs != null) for (File f : fs) {
+                    String n = f.getName();
+                    if (n.endsWith(".img") && f.length() > 0) o.put(n.substring(0, n.length() - 4), "file://" + f.getAbsolutePath());
+                }
+            } catch (Exception ignore) { }
+            return o.toString();
+        }
+
+        /** عکس را یک‌بار دانلود و برای همیشه روی گوشی نگه می‌دارد. پایان کار: window.__imgDone(id, path) */
+        @JavascriptInterface
+        public void cacheImg(final String id, final String url) {
+            if (id == null || !id.matches("[A-Za-z0-9_-]{1,40}")) return;
+            imgPool.execute(new Runnable() {
+                @Override
+                public void run() {
+                    File dst = new File(imgDir, id + ".img");
+                    File tmp = new File(imgDir, id + ".tmp");
+                    boolean ok = dst.exists() && dst.length() > 0;
+                    if (!ok) {
+                        HttpURLConnection c = null;
+                        try {
+                            c = (HttpURLConnection) new URL(url).openConnection();
+                            c.setConnectTimeout(12000);
+                            c.setReadTimeout(20000);
+                            c.setInstanceFollowRedirects(true);
+                            c.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 13; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Mobile Safari/537.36");
+                            if (c.getResponseCode() == 200) {
+                                InputStream in = c.getInputStream();
+                                FileOutputStream out = new FileOutputStream(tmp);
+                                byte[] buf = new byte[8192];
+                                int n, total = 0;
+                                boolean big = false;
+                                while ((n = in.read(buf)) > 0) {
+                                    total += n;
+                                    if (total > 3 * 1024 * 1024) { big = true; break; }
+                                    out.write(buf, 0, n);
+                                }
+                                out.close();
+                                in.close();
+                                if (!big && total > 200) ok = tmp.renameTo(dst);
+                                if (!ok) tmp.delete();
+                            }
+                        } catch (Exception e) {
+                            tmp.delete();
+                        } finally {
+                            if (c != null) c.disconnect();
+                        }
+                    }
+                    if (!ok) return;
+                    final String js = "window.__imgDone&&window.__imgDone(" + JSONObject.quote(id) + "," + JSONObject.quote("file://" + dst.getAbsolutePath()) + ")";
+                    runOnUiThread(new Runnable() {
+                        @Override public void run() { if (web != null) web.evaluateJavascript(js, null); }
+                    });
+                }
+            });
+        }
+
         @JavascriptInterface
         public void copy(final String text) {
             runOnUiThread(new Runnable() {
@@ -159,6 +233,7 @@ public class MainActivity extends Activity {
     @Override
     protected void onDestroy() {
         pool.shutdownNow();
+        imgPool.shutdownNow();
         if (web != null) { web.destroy(); web = null; }
         super.onDestroy();
     }

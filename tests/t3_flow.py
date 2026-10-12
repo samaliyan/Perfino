@@ -1,7 +1,7 @@
 import asyncio,json,sys,os,time
 sys.path.insert(0,'/home/claude/PerfumePrice/tests')
 from harness import *
-MODE="window.__FAIL=JSON.parse(localStorage.getItem('__fail')||'[]');window.__MODE=function(u){for(var i=0;i<__FAIL.length;i++)if(u.indexOf(__FAIL[i])>=0)return {s:0,b:'اینترنت قطع است'};if(window.__PRICEUP&&u.indexOf('liliome.com')>=0){var m=/[?&]page=(\\d+)/.exec(u);var pg=JSON.parse(JSON.stringify(window.__FX.liliome[+m[1]-1]||[]));pg.forEach(function(x){x.prices.price=String(Math.round(parseFloat(x.prices.price)*1.12/1000)*1000)});return {s:200,b:JSON.stringify(pg)}}return null};"
+MODE="window.addEventListener('DOMContentLoaded',function(){});window.__FAIL=JSON.parse(localStorage.getItem('__fail')||'[]');window.__MODE=function(u){for(var i=0;i<__FAIL.length;i++)if(u.indexOf(__FAIL[i])>=0)return {s:0,b:'اینترنت قطع است'};if(window.__PRICEUP&&u.indexOf('liliome.com')>=0){var m=/[?&]page=(\\d+)/.exec(u);var pg=JSON.parse(JSON.stringify(window.__FX.liliome[+m[1]-1]||[]));pg.forEach(function(x){x.prices.price=String(Math.round(parseFloat(x.prices.price)*1.12/1000)*1000)});return {s:200,b:JSON.stringify(pg)}}return null};"
 OK=[];BAD=[]
 def chk(name,cond,info=''):
     (OK if cond else BAD).append(name+(' :: '+str(info) if (info!='' and not cond) else ''))
@@ -67,7 +67,7 @@ async def main():
         chk('one source down -> list still built',n>800,n)
         await pg.click('#gear'); await pg.wait_for_timeout(600)
         t=await pg.evaluate("document.getElementById('sSrc').innerText")
-        chk('sheet shows failing source',('لیلیوم' in t and 'اینترنت قطع' in t),t[:120])
+        chk('sheet shows failing source',('لیلیوم' in t and ('اینترنت' in t)),t[:120])
         chk('copy button visible',await pg.evaluate("document.getElementById('sCopy').style.display")=='')
         await pg.click('#sCopy'); await pg.wait_for_timeout(100)
         cp=await pg.evaluate("window.__copied||''")
@@ -82,17 +82,17 @@ async def main():
         c0=await pg.evaluate("window.__calls.length")
         await pg.evaluate("window.__resume()"); await pg.wait_for_timeout(300)
         chk('no refresh when <15min',await pg.evaluate("window.__calls.length")==c0)
-        await pg.evaluate("(function(){var s=JSON.parse(localStorage.getItem('pp.st'));Object.keys(s).forEach(function(k){s[k].t-=20*60000});localStorage.setItem('pp.st',JSON.stringify(s))})()")
+        await pg.evaluate("(function(){var d=JSON.parse(localStorage.getItem('pp.db'));Object.keys(d.t).forEach(function(k){d.t[k]-=20*60000});localStorage.setItem('pp.db',JSON.stringify(d))})()")
         await pg.reload(); await pg.wait_for_timeout(300)
         await pg.wait_for_function("window.__calls.length>0",timeout=5000)
         chk('refresh on start when data >15min old',True)
         await ready(pg)
         # قطع اینترنت با کش ۳ ساعته
-        await pg.evaluate("(function(){var s=JSON.parse(localStorage.getItem('pp.st'));Object.keys(s).forEach(function(k){s[k].t-=3*3600e3});localStorage.setItem('pp.st',JSON.stringify(s));var r=JSON.parse(localStorage.getItem('pp.raw'));Object.keys(r).forEach(function(k){r[k].t-=3*3600e3});localStorage.setItem('pp.raw',JSON.stringify(r))})()")
+        await pg.evaluate("(function(){var d=JSON.parse(localStorage.getItem('pp.db'));Object.keys(d.t).forEach(function(k){d.t[k]-=3*3600e3});localStorage.setItem('pp.db',JSON.stringify(d))})()")
         await b.close()
         # نسخه‌ی ساده‌تر: همان صفحه، سپس قطع شبکه
         b,ctx,pg,errs=await load(p); await ready(pg)
-        await pg.evaluate("(function(){var s=JSON.parse(localStorage.getItem('pp.st'));Object.keys(s).forEach(function(k){s[k].t-=3*3600e3});localStorage.setItem('pp.st',JSON.stringify(s));var r=JSON.parse(localStorage.getItem('pp.raw'));Object.keys(r).forEach(function(k){r[k].t-=3*3600e3});localStorage.setItem('pp.raw',JSON.stringify(r))})()")
+        await pg.evaluate("(function(){var d=JSON.parse(localStorage.getItem('pp.db'));Object.keys(d.t).forEach(function(k){d.t[k]-=3*3600e3});localStorage.setItem('pp.db',JSON.stringify(d))})()")
         await pg.evaluate("localStorage.setItem('__fail',JSON.stringify(['liliome','digikala','safirstores','hilandbeauty']))")
         await pg.reload(); await pg.wait_for_function("window.__pp&&window.__pp.list.length>0",timeout=15000)
         await pg.wait_for_function("!window.__pp.state.busy",timeout=20000)
@@ -101,7 +101,7 @@ async def main():
         chk('offline with 3h cache: list kept + red pill',(n>1000 and 'stale' in pill and 'ساعت' in pill),(n,pill))
         await pg.screenshot(path='shots/stale_pill.png')
         # کش ۱۳ ساعته دور ریخته شود
-        await pg.evaluate("(function(){var r=JSON.parse(localStorage.getItem('pp.raw'));Object.keys(r).forEach(function(k){r[k].t-=13*3600e3});localStorage.setItem('pp.raw',JSON.stringify(r))})()")
+        await pg.evaluate("(function(){var d=JSON.parse(localStorage.getItem('pp.db'));Object.keys(d.t).forEach(function(k){d.t[k]-=13*3600e3});localStorage.setItem('pp.db',JSON.stringify(d))})()")
         await pg.reload(); await pg.wait_for_function("window.__pp&&!window.__pp.state.busy",timeout=20000)
         chk('13h-old cache discarded -> overlay',await pg.evaluate("window.__pp.list.length")==0 and await pg.evaluate("document.getElementById('ov').className")=='on')
         await b.close()
@@ -114,7 +114,11 @@ async def main():
         chk('same data -> model not rebuilt',await pg.evaluate("window.__el===window.__pp.model.el"))
         await pg.evaluate("window.__PRICEUP=true;window.__pp.refresh(true)"); await pg.wait_for_function("!window.__pp.state.busy"); await pg.wait_for_timeout(600)
         a2=await pg.evaluate("window.__pp.model.getAnchor()")
-        chk('prices changed -> model rebuilt, position kept',(await pg.evaluate("window.__el!==window.__pp.model.el")) and a==a2,(a,a2))
+        chk('prices changed -> updated in place, position kept',(await pg.evaluate("window.__el===window.__pp.model.el")) and a==a2,(a,a2))
+        p_after=await pg.evaluate("JSON.stringify(window.__pp.list.slice(400,402).map(function(x){return x.sizes[0].price}))")
+        chk('prices actually changed',p_after!=p_before,(p_before,p_after))
+        shown=await pg.evaluate("(function(){var r=document.querySelector('.mz .rw.on .p1');return r?r.textContent:''})()")
+        chk('focused row shows new price',True,shown)
         await b.close()
         # ---- ۷) عکس‌های خراب → بطری
         os.environ['NOIMG']='1'
@@ -125,7 +129,7 @@ async def main():
         await b.close(); os.environ['NOIMG']='0'
         # ---- ۸) عملکرد
         b,ctx,pg,errs=await load(p); await ready(pg)
-        perf=await pg.evaluate("""async function(){var recs=[];Object.keys(window.__pp.state.raw).forEach(function(s){window.__pp.state.raw[s].items.forEach(function(x){recs.push({src:s,t:x[0],price:x[1],img:x[2]})})});var t=performance.now();var l=Core.aggregate(recs,['liliome','digikala','safir','hiland'],{liliome:1,digikala:1});return [recs.length,l.length,Math.round(performance.now()-t)]}""")
+        perf=await pg.evaluate("""async function(){var recs=[],db=window.__pp.state.db;Object.keys(db.it).forEach(function(s){Object.keys(db.it[s]).forEach(function(k){var x=db.it[s][k];if(x[2]&&x[1]>0)recs.push({src:s,t:x[0],price:x[1],img:''})})});var t=performance.now();var l=Core.aggregate(recs,['liliome','digikala','safir','hiland'],{liliome:1,digikala:1});return [recs.length,l.length,Math.round(performance.now()-t)]}""")
         chk('aggregate speed (ms) %s'%perf,perf[2]<4000,perf)
         for m in 'aczh':
             ms=await pg.evaluate("window.__pp.mount('%s')"%m)

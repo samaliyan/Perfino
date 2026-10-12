@@ -145,6 +145,15 @@ svg{display:block}
 .seg.mods button{flex:1 1 calc(50% - 8px);display:flex;flex-direction:column;align-items:center;line-height:1.4}
 .seg.mods small{margin-top:2px;font-size:11px;color:var(--mu);font-weight:400}
 .btn{width:100%;padding:13px;border-radius:18px;border:0;background:var(--ac);color:#0c0f1f;font-size:16px;font-weight:800;cursor:pointer}
+.btn{position:relative;overflow:hidden}
+.btn>span{position:relative;z-index:1}
+.btn.busy{background:var(--cb);color:var(--tx)}
+.btn .bar{position:absolute;top:0;bottom:0;right:0;background:var(--ac);opacity:.55;transition:width .4s ease;z-index:0}
+.btn .bar.ind{animation:ind 1.3s ease-in-out infinite alternate}
+@keyframes ind{from{transform:translateX(0)}to{transform:translateX(-150%)}}
+#toast{position:absolute;left:16px;right:16px;bottom:calc(22px + env(safe-area-inset-bottom,0px));z-index:70;margin:0 auto;max-width:420px;padding:12px 16px;border-radius:16px;background:var(--tx);color:var(--bg);font-size:14px;font-weight:600;line-height:1.7;text-align:center;box-shadow:0 10px 30px rgba(0,0,0,.3);opacity:0;transform:translateY(20px);pointer-events:none;transition:opacity .25s,transform .25s}
+#toast.on{opacity:1;transform:none}
+#ov small{display:block;font-size:12px;color:var(--mu);margin-top:6px;line-height:1.8}
 .btn.ghost{background:var(--cb);color:var(--tx);font-weight:600;font-size:14px;margin-top:8px;padding:10px}
 .srcs{font-size:13px;line-height:1.9}
 .srcs div>*+*{margin-inline-start:10px}
@@ -162,21 +171,23 @@ svg{display:block}
   <div id="upd"><i></i><span id="updt"></span></div>
   <button id="gear" aria-label="تنظیمات"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.2"/><path d="M19.4 13a7.6 7.6 0 0 0 0-2l2-1.6-2-3.4-2.4 1a7.4 7.4 0 0 0-1.7-1L15 3.4h-4l-.4 2.6a7.4 7.4 0 0 0-1.7 1l-2.4-1-2 3.4 2 1.6a7.6 7.6 0 0 0 0 2l-2 1.6 2 3.4 2.4-1c.5.4 1.1.7 1.7 1l.4 2.6h4l.4-2.6c.6-.3 1.2-.6 1.7-1l2.4 1 2-3.4z"/></svg></button>
   <div id="scm"></div>
+  <div id="toast" role="status" aria-live="polite"></div>
   <div id="sheet" role="dialog" aria-label="تنظیمات">
     <div class="gr"></div>
     <h2>تنظیمات</h2>
     <h3>رنگ صفحه</h3>
     <div class="seg" id="sTheme"><button data-v="light">روشن</button><button data-v="dark">تاریک</button><button data-v="auto">خودکار</button></div>
-    <h3>شکل نمایش</h3>
+    <h3>شکل لیست</h3>
     <div class="seg mods" id="sModel">
-      <button data-v="a">الف<small>چرخ نیم‌دایره</small></button>
-      <button data-v="c">ج<small>لیست شیشه‌ای</small></button>
-      <button data-v="z">ز<small>لیست با کانون</small></button>
-      <button data-v="h">ح<small>استوانه‌ی رنگی</small></button>
+      <button data-v="a">چرخ<small>چرخ نیم‌دایره</small></button>
+      <button data-v="c">شیشه<small>لیست شیشه‌ای</small></button>
+      <button data-v="z">کانون<small>لیست با کانون</small></button>
+      <button data-v="h">استوانه<small>استوانه‌ی رنگی</small></button>
     </div>
     <h3>قیمت‌ها</h3>
-    <button class="btn" id="sRef">بروزرسانی همین حالا</button>
+    <button class="btn" id="sRef"><span>بروزرسانی قیمت‌ها همین حالا</span></button>
     <div class="srcs" id="sSrc" style="margin-top:12px"></div>
+    <button class="btn ghost" id="sFull" style="display:none">دریافت کامل از اول</button>
     <button class="btn ghost" id="sCopy" style="display:none">کپی گزارش خطا برای ارسال به سازنده</button>
     <div class="ver" id="sVer"></div>
   </div>
