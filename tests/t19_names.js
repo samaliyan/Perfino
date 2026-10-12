@@ -8,7 +8,7 @@ eq(C.en2fa(['good','girl','gone','bad'],null),'گود گرل گان بد','en ph
 eq(C.en2fa(['black','orchid'],null)!=='' ,true,'en→fa nonempty');
 eq(C.slug,undefined,'-');
 eq(C.enTokens('Dior Sauvage Eau de Parfum For Men 100ml'),['dior','sauvage'],'enTokens');
-eq(C.enTokens("Guerlain L'Homme Ideal EDT 50 ml"),['guerlain',"l'homme",'ideal'],'apostrophe kept');
+eq(C.enTokens("Guerlain L'Homme Ideal EDT 50 ml"),['guerlain','lhomme','ideal'],'apostrophe joined');
 eq(C.titleEn(["l'homme",'ideal','pour','homme','de','marly']),"L'Homme Ideal Pour Homme de Marly",'title case');
 // ingest: نام انگلیسی از سایت + یادگیری واژه
 var db=C.newDb(),idx=C.dbIndex(db);

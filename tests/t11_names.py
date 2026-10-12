@@ -64,7 +64,7 @@ async def main():
         # extractCards: قیمت قدیم و جدید
         html1='<html><body><div><a href="/p/1"><img src="/i.jpg" alt="عطر دیور ساواج ادو تویلت 100 میل"></a><span>۳۰٬۰۰۰٬۰۰۰</span> <span>۲۴٬۰۰۰٬۰۰۰ تومان</span></div></body></html>'
         html2='<html><body><div><a href="/p/2"><img src="/i.jpg" alt="عطر دیور ساواج ادو تویلت 100 میل"></a><span class="new">۲۴٬۰۰۰٬۰۰۰</span><span class="x">۳۰٬۰۰۰٬۰۰۰</span><span>اقساط ماهانه ۳٬۰۰۰٬۰۰۰</span></div></body></html>'
-        ld={"@type":"Product","name":"عطر دیور ساواج","offers":[{"price":"30000000","priceCurrency":"IRT"},{"price":"24000000","priceCurrency":"IRT"}]}
+        ld={"@type":"Product","name":"عطر دیور ساواج","offers":[{"price":"30000000","priceCurrency":"IRT","availability":"https://schema.org/InStock"},{"price":"24000000","priceCurrency":"IRT","availability":"https://schema.org/InStock"}]}
         html3='<html><head><script type="application/ld+json">%s</script></head><body></body></html>'%json.dumps(ld)
         out=await pg.evaluate("function(h){return h.map(function(x){var d=new DOMParser().parseFromString(x,'text/html');return Core.extractCards(d,'https://x.ir/').map(function(c){return c.price})})}",[html1,html2,html3])
         print(out)

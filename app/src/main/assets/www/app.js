@@ -1,7 +1,7 @@
 (function () {
 'use strict';
 var RM = !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
-var VERSION = '1.8';
+var VERSION = '1.9';
 function $(id) { return document.getElementById(id); }
 function fa(n) { return String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, '٬').replace(/\d/g, function (d) { return '۰۱۲۳۴۵۶۷۸۹'[d]; }); }
 function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
@@ -9,7 +9,7 @@ function clamp(x, a, b) { return Math.max(a, Math.min(b, x)); }
 function mix(hex, t) { var n = parseInt(hex.slice(1), 16), r = n >> 16, g = (n >> 8) & 255, b = n & 255; function m(c) { return Math.round(c + (255 - c) * t); } return 'rgb(' + m(r) + ',' + m(g) + ',' + m(b) + ')'; }
 var ls = {
   get: function (k, d) { try { var v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch (e) { return d; } },
-  set: function (k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
+  set: function (k, v) { try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch (e) { return false; } }
 };
 function themeNow() { return document.documentElement.getAttribute('data-th'); }
 
@@ -426,7 +426,7 @@ var idx = Core.dbIndex(db);
 var stt = ls.get('pp.st', {}), prog = {}, busy = false, curModel = null, list = [], struct = '', psig = '', mq = window.matchMedia ? matchMedia('(prefers-color-scheme: dark)') : null;
 var ORDER = Core.SOURCES.map(function (s) { return s.id; }), TRUSTED = {}, imgLoc = {}, imgAsked = {};
 Core.SOURCES.forEach(function (s) { if (s.trusted) TRUSTED[s.id] = true; });
-var hiddenN = 0, TREE = [], BR_BY = {}, MD_BY = {}, nav = { lvl: 0, brand: null }, imgPend = {}, imgTot = 0, imgOk = 0, imgBad = 0, imgLastT = 0, startAnchor = ls.get('pp.last', null), lastTried = 0, prevP = null, FLAT = [], ALLB = [], gateRetried = 0;
+var treeSig = '', staleN = 0, audOpen = false, hiddenN = 0, TREE = [], BR_BY = {}, MD_BY = {}, nav = { lvl: 0, brand: null }, imgPend = {}, imgTot = 0, imgOk = 0, imgBad = 0, imgLastT = 0, startAnchor = ls.get('pp.last', null), lastTried = 0, prevP = null, FLAT = [], ALLB = [], gateRetried = 0;
 var FULL_EVERY = 3 * 86400e3;
 function friendly(m) {
   m = String(m || '');
@@ -436,7 +436,17 @@ function friendly(m) {
   if (/Too many follow-up/i.test(m)) return 'سایت درخواست را در چرخه انداخت';
   return m;
 }
-function saveDb() { ls.set('pp.db', db); ls.set('pp.st', stt); }
+var saveFail = false;
+/* حافظه‌ی گوشی پر شد: عنوانِ محصولاتِ «عطر نیست» و فرهنگِ واژه‌ها را کم می‌کنیم و دوباره تلاش می‌کنیم؛ اگر باز نشد در گزارش می‌گوییم */
+function shrinkDb() {
+  Object.keys(db.it).forEach(function (s) { var m = db.it[s]; Object.keys(m).forEach(function (p) { if (!m[p][2]) m[p][0] = ''; }); });
+}
+function saveDb() {
+  var ok = ls.set('pp.db', db);
+  if (!ok) { shrinkDb(); ok = ls.set('pp.db', db); }
+  if (!ok) { db.wd = {}; ok = ls.set('pp.db', db); }   // آخرین چاره: واژه‌نامه‌ی یادگرفته‌شده دوباره ساخته می‌شود
+  saveFail = !ok; ls.set('pp.st', stt);
+}
 
 function applyTheme() {
   var t = set.theme === 'auto' ? (mq && mq.matches === false ? 'light' : 'dark') : set.theme;
@@ -555,10 +565,12 @@ function setEntries() {
   struct = structOf(list);
 }
 /* فهرستِ نمایشی را از حافظه می‌سازد؛ اگر فقط قیمت‌ها عوض شده باشد، همان صفحه سر جایش می‌ماند و فقط صفحه‌ی جزئیات (اگر باز است) بروز می‌شود */
-function rebuild() {
-  var l = Core.buildList(db, ORDER, TRUSTED, 12 * 3600e3);
-  hiddenN = l.hidden || 0; FLAT = l;
-  ALLB = Core.tree(l, set.lang === 'en' ? 'en' : 'fa', db.wd); set.off = set.off || {};
+function rebuild(light) {
+  var l = light && FLAT.length ? FLAT : Core.buildList(db, ORDER, TRUSTED, 12 * 3600e3);   // light: فقط روشن/خاموشیِ برندها عوض شده؛ داده همان است
+  if (l !== FLAT) { hiddenN = l.hidden || 0; staleN = l.stale || 0; } FLAT = l;
+  var sig = (set.lang === 'en' ? 'en' : 'fa') + '|' + l.length + '|' + Object.keys(db.wd || {}).length + '|' + l.map(function (g) { return g.id + '~' + g.name + '~' + g.img + g.sizes.map(function (z) { return z.ml + ':' + z.price + ':' + z.srcs.map(function (r) { return r.s + r.pid + r.price + (r.used ? 1 : 0); }).join('/'); }).join(','); }).join(';');
+  if (sig !== treeSig || !ALLB.length) { ALLB = Core.tree(l, set.lang === 'en' ? 'en' : 'fa', db.wd); treeSig = sig; }   // درخت فقط وقتی دوباره ساخته می‌شود که داده/زبان عوض شده باشد
+  set.off = set.off || {};
   TREE = ALLB.filter(function (b) { return !set.off[b.id]; }); BR_BY = {}; MD_BY = {};
   TREE.forEach(function (b) { BR_BY[b.id] = b; b.models.forEach(function (m) { m.brandId = b.id; MD_BY[m.id] = m; }); });
   if (nav.brand && !BR_BY[nav.brand]) { nav.lvl = 0; nav.brand = null; }
@@ -615,7 +627,16 @@ $('stage').addEventListener('click', function (e) {
 });
 
 /* ---- صفحه‌ی جزئیات: نوع‌ها (مردانه/زنانه) و اندازه‌ها با قیمت ---- */
-var dtId = null, dtEl = $('dt');
+var dtId = null, dtEl = $('dt'), szOpen = {};
+function srcName(id) { var r = ''; Core.SOURCES.forEach(function (s) { if (s.id === id) r = s.name; }); return r || id; }
+/* صفحه‌ی محصول در مرورگر گوشی باز می‌شود (در برنامه فقط سایت‌های خودِ برنامه) */
+function openLink(u) {
+  window.__lastOpen = u;
+  if (!/^https?:\/\//i.test(u || '') || !Core.itemUrl('x', u)) return;          // فقط آدرسِ سایت‌های خودِ برنامه
+  var now = Date.now(); if (now - (openLink.t || 0) < 700) return; openLink.t = now;   // دو بار لمس = یک بار باز شدن
+  if (window.Native && window.Native.open) { var okOpen = false; try { okOpen = window.Native.open(u); } catch (e) { } if (!okOpen) { openLink.t = 0; toast('باز نشد؛ مرورگر پیدا نشد یا آدرس درست نبود', 3200); } return; }
+  try { window.open(u, '_blank', 'noopener'); } catch (e2) { }   // فقط در مرورگرِ آزمایشی، نه در برنامه
+}
 function entryImg(id) {
   var o = BR_BY[id] || MD_BY[id]; if (!o) return null;
   return { img: o.img, big: o.big || o.img, loc: imgLoc[o.imgId] || '', k: parseInt(String(o.imgId).replace(/^b/, ''), 36) % 64 || 0, name: o.name };
@@ -625,13 +646,18 @@ function renderDetail() {
   var im = entryImg(dtId);
   var vs = m.variants.map(function (v) {
     var lab = [GN[v.gn], v.conc].filter(Boolean).join(' · ') || 'اندازه‌ها و قیمت‌ها';
-    return '<div class="vr g-' + (v.gn || 'x') + '"><div class="vh">' + esc(lab) + '</div>' + v.sizes.map(function (z) {
-      return '<div class="sz"><span class="zm"><bdi>' + fa(z.ml) + '</bdi> میل</span><span class="zp"><b>' + fa(z.price) + '</b><small>تومان</small>' + (z.n < 2 ? '<i title="فقط یک سایت"></i>' : '') + '</span></div>';
+    return '<div class="vr g-' + (v.gn || 'x') + '"><div class="vh">' + esc(lab) + '</div>' + v.sizes.map(function (z, zi) {
+      var key = v.id + ':' + z.ml, op = szOpen[key] ? ' on' : '';
+      return '<div class="sz' + op + '" data-k="' + esc(key) + '"><span class="zm"><bdi>' + fa(z.ml) + '</bdi> میل</span><span class="zp"><b>' + fa(z.price) + '</b><small>تومان</small>' + (z.n < 2 ? '<i title="فقط یک سایت"></i>' : '') + '<em class="cv"></em></span></div>'
+        + '<div class="srl' + op + '">' + (z.srcs || []).map(function (q) {
+          var u = Core.itemUrl(q.s, q.pid), nmS = srcName(q.s);
+          return '<div class="sr' + (q.used ? '' : ' x') + '"><span class="sn">' + esc(nmS) + '</span><span class="sp"><bdi>' + fa(q.price) + '</bdi>' + (q.used ? '' : '<small>در محاسبه نیامد</small>') + '</span>' + (u ? '<button class="go" data-u="' + esc(u) + '">دیدن در سایت</button>' : '') + '</div>';
+        }).join('') + '</div>';
     }).join('') + '</div>';
   }).join('');
   var keep = $('dtc').scrollTop;
   $('dtc').innerHTML = '<div class="dtop"><div class="dpic" data-vw="1">' + tile({ loc: im.loc, img: im.img, k: im.k }) + '<em>بزرگ‌نمایی</em></div><div class="dti"><div class="dbn">' + esc(BR_BY[m.brandId].name) + '</div><div class="dnm">' + esc(m.name) + '</div></div></div>' + vs
-    + '<div class="dnote">نقطه‌ی کوچک کنار قیمت یعنی فقط یک سایت آن را داشته.</div>';
+    + '<div class="dnote">روی هر اندازه بزنید تا قیمتِ هر سایت و دکمه‌ی دیدن در سایت بیاید. نقطه‌ی کوچک یعنی فقط یک سایت آن را داشته.</div>';
   var nm = $('dtc').querySelector('.dnm'); fitLines(nm, 3, 16);
   $('dtc').scrollTop = keep;
 }
@@ -641,7 +667,11 @@ function openDetail(id) {
 }
 function closeDetail() { dtId = null; dtEl.classList.remove('on'); }
 $('dtx').onclick = closeDetail;
-$('dtc').addEventListener('click', function (e) { if (e.target.closest('.dpic') && dtId) viewImg(dtId); });
+$('dtc').addEventListener('click', function (e) {
+  if (e.target.closest('.dpic') && dtId) { viewImg(dtId); return; }
+  var g = e.target.closest('.go'); if (g) { openLink(g.dataset.u); return; }
+  var z = e.target.closest('.sz'); if (z && z.dataset.k) { var on = !z.classList.contains('on'); szOpen[z.dataset.k] = on; z.classList.toggle('on', on); if (z.nextElementSibling) z.nextElementSibling.classList.toggle('on', on); }
+});
 
 /* ---- عکس بزرگ ---- */
 var vwId = null, vwTok = 0;
@@ -768,16 +798,32 @@ function reportData() {
 }
 function renderReport() {
   var el = $('sRep'); if (!el) return;
-  var r = reportData(), rows = [], allOk = r.src.every(function (x) { return x.ok; }) && r.ps.have >= r.ps.need && !busy;
+  var r = reportData(), rows = [], allOk = r.src.every(function (x) { return x.ok; }) && r.ps.have >= r.ps.need && !busy && !saveFail;
   function row(a, b, bad) { rows.push('<div' + (bad ? ' class="bad"' : '') + '><span>' + a + '</span><span>' + b + '</span></div>'); }
   row('وضعیت کلی', busy ? 'در حال بروزرسانی…' : allOk ? 'همه‌چیز کامل است' : 'ناقص؛ جزئیات پایین', !busy && !allOk);
   r.src.forEach(function (x) {
     row(esc(x.name), esc(x.st) + ' · <bdi>' + fa(x.cnt) + '</bdi> محصول · ' + clock(x.t) + (x.note && /ناقص/.test(x.note) ? ' · ' + esc(x.note) : ''), /^خطا|ناقص|قدیمی|هنوز/.test(x.st));
   });
+  var au = (ALLB && ALLB.audit) || { bare: [], brands: [], models: [] };
+  var ap = [];
+  if (au.nb) ap.push('<bdi>' + fa(au.nb) + '</bdi> عطرِ بی‌نام حذف شد');
+  if (au.brands.length) ap.push('<bdi>' + fa(au.brands.length) + '</bdi> برندِ تکراری یکی شد');
+  if (au.models.length) ap.push('<bdi>' + fa(au.models.length) + '</bdi> نامِ تکراری یکی شد');
+  if (staleN) ap.push('<bdi>' + fa(staleN) + '</bdi> کالایی که چند ساعت است در سایت دیده نشده کنار رفت');
+  row('پایش اطلاعات', (ap.length ? ap.join(' · ') : 'مورد تکراری یا بی‌نامی پیدا نشد') + ' · <button class="aud-t" type="button">نمونه‌ها</button>');
+  if (audOpen) {
+    var ex = [];
+    au.bare.slice(0, 8).forEach(function (x) { ex.push('حذف (بی‌نام): ' + x); });
+    au.brands.slice(0, 8).forEach(function (x) { ex.push('برند: ' + x); });
+    au.models.slice(0, 8).forEach(function (x) { ex.push('مدل: ' + x); });
+    rows.push('<div class="audl"><span>' + (ex.length ? ex.map(function (x) { return '<bdi>' + esc(x) + '</bdi>'; }).join('<br>') : 'موردی نبود') + '</span></div>');
+  }
+  if (saveFail) row('ذخیره‌سازی', 'حافظه‌ی گوشی پر است؛ اطلاعات بعد از بستن برنامه ممکن است برنگردد', true);
   row('فهرست', '<bdi>' + fa(r.nb) + '</bdi> برند · <bdi>' + fa(r.nm) + '</bdi> عطر · <bdi>' + fa(r.nv) + '</bdi> نوع' + (hiddenN ? ' · <bdi>' + fa(hiddenN) + '</bdi> مبهم پنهان' : ''));
   row('عکس‌ها', '<bdi>' + fa(r.ps.have) + '</bdi> از <bdi>' + fa(r.ps.need) + '</bdi> روی گوشی' + (r.ps.pend ? ' · <bdi>' + fa(r.ps.pend) + '</bdi> در حال دانلود' : '') + (r.ps.bad ? ' · <bdi>' + fa(r.ps.bad) + '</bdi> نشد' : ''), r.ps.have < r.ps.need && !r.ps.pend);
   row('نام انگلیسی', '<bdi>' + fa(r.withEn) + '</bdi> از <bdi>' + fa(r.all) + '</bdi> را خودِ سایت‌ها داده‌اند؛ بقیه ساخته می‌شود');
   el.innerHTML = rows.join('');
+  var t = el.querySelector('.aud-t'); if (t) t.onclick = function () { audOpen = !audOpen; renderReport(); };
 }
 var brOpen = false;
 function renderBrands() {
@@ -794,13 +840,13 @@ function renderBrands() {
 }
 function setOff(id, v) {
   set.off = set.off || {}; if (v) set.off[id] = 1; else delete set.off[id];
-  ls.set('pp.set', set); try { rebuild(); } catch (e) { console.error(e); } renderBrands();
+  ls.set('pp.set', set); try { rebuild(true); } catch (e) { console.error(e); } try { queueImgs(); } catch (e) {} renderBrands(); renderReport();
 }
 $('sLang').onclick = function (e) { var b = e.target.closest('button'); if (!b || !b.dataset.l || b.dataset.l === (set.lang === 'en' ? 'en' : 'fa')) return; set.lang = b.dataset.l; ls.set('pp.set', set); try { rebuild(); } catch (er) { console.error(er); } renderSheet(); };
 $('sBrBtn').onclick = function () { brOpen = !brOpen; renderBrands(); };
 $('sBrList').onclick = function (e) {
   var all = e.target.closest && e.target.closest('#sBrAll');
-  if (all) { set.off = {}; ls.set('pp.set', set); try { rebuild(); } catch (e2) {} renderBrands(); return; }
+  if (all) { set.off = {}; ls.set('pp.set', set); try { rebuild(true); } catch (e2) {} try { queueImgs(); } catch (e3) {} renderBrands(); renderReport(); return; }
   var r = e.target.closest && e.target.closest('.brw'); if (!r) return;
   setOff(r.dataset.id, r.classList.contains('on'));
 };

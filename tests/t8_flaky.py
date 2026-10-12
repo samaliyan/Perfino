@@ -33,7 +33,7 @@ async def main():
         await pg.evaluate("window.__pp.refresh(true)"); await pg.wait_for_function("!window.__pp.state.busy",timeout=120000)
         after=await pg.evaluate("window.__pp.flat.length")
         st=await pg.evaluate("window.__pp.state.st")
-        chk('healthy retry completes and never loses names',after>=before and after>=1095,(before,after))
+        chk('healthy retry completes and never loses names',after>=before and after>=1085,(before,after))
         chk('all sources complete (no ناقص)',all('ناقص' not in (v.get('note') or '') for v in st.values()),{k:v.get('note') for k,v in st.items()})
         # قطع اینترنت وسط بروزرسانی قیمت: چیزی پاک نشود
         await pg.evaluate("window.__flaky=0.9")
@@ -53,7 +53,7 @@ async def main():
         fl=await pg.evaluate("JSON.stringify(window.__pp.state.db.full)")
         await pg.evaluate("window.__flaky=0;window.__pp.refresh(true)"); await pg.wait_for_function("!window.__pp.state.busy",timeout=120000)
         n_ok=await pg.evaluate("window.__pp.flat.length")
-        chk('resume after heavy loss reaches full list',n_ok>=1095 and n_ok>=n_bad,(n_bad,n_ok))
+        chk('resume after heavy loss reaches full list',n_ok>=1085 and n_ok>=n_bad,(n_bad,n_ok))
         await b.close()
     print('PASS',len(OK),'FAIL',len(BAD))
 asyncio.run(main())

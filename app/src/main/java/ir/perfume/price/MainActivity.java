@@ -5,6 +5,8 @@ import android.app.Activity;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
+import android.content.Intent;
+import android.net.Uri;
 import android.graphics.Color;
 import android.os.Build;
 import android.os.Bundle;
@@ -39,6 +41,15 @@ public class MainActivity extends Activity {
     private final ExecutorService imgPool = Executors.newFixedThreadPool(3);
     private File imgDir;
     private static final int MAX_BYTES = 12 * 1024 * 1024;
+    private static final String[] ALLOW_HOSTS = {"liliome.com", "digikala.com", "safirstores.com", "hilandbeauty.com"};
+
+    /** فقط سایت‌های خودِ برنامه (و زیردامنه‌هایشان) */
+    private static boolean allowedHost(String h) {
+        if (h == null) return false;
+        h = h.toLowerCase(java.util.Locale.ROOT);
+        for (String a : ALLOW_HOSTS) { if (h.equals(a) || h.endsWith("." + a)) return true; }
+        return false;
+    }
 
     @SuppressLint({"SetJavaScriptEnabled", "AddJavascriptInterface"})
     @Override
@@ -60,12 +71,22 @@ public class MainActivity extends Activity {
         s.setJavaScriptEnabled(true);
         s.setDomStorageEnabled(true);
         s.setAllowFileAccess(true);
-        s.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
+        s.setMixedContentMode(WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE);
         s.setCacheMode(WebSettings.LOAD_DEFAULT);
         s.setSupportZoom(false);
         s.setTextZoom(100); // اندازه‌ی فونت سیستم نوشته‌ها را به‌هم نریزد
         web.setOverScrollMode(View.OVER_SCROLL_NEVER);
-        web.setWebViewClient(new WebViewClient());
+        web.setWebViewClient(new WebViewClient() {
+            @Override
+            public boolean shouldOverrideUrlLoading(WebView v, String u) {
+                return u == null || !u.startsWith("file:///android_asset/");   // صفحه‌ی برنامه هرگز به جای دیگری نمی‌رود
+            }
+            @Override
+            public boolean onRenderProcessGone(WebView v, android.webkit.RenderProcessGoneDetail d) {
+                runOnUiThread(new Runnable() { @Override public void run() { recreate(); } });   // WebView مرده قابل استفاده نیست؛ صفحه از نو ساخته می‌شود
+                return true;
+            }
+        });
         web.setWebChromeClient(new WebChromeClient());
         web.addJavascriptInterface(new Bridge(), "Native");
         web.loadUrl("file:///android_asset/www/index.html");
@@ -81,10 +102,13 @@ public class MainActivity extends Activity {
                     String body;
                     HttpURLConnection c = null;
                     try {
-                        c = (HttpURLConnection) new URL(url).openConnection();
+                        if (url == null || !(url.startsWith("https://") || url.startsWith("http://"))) throw new java.io.IOException("bad url");
+                        URL u0 = new URL(url);
+                        if (!allowedHost(u0.getHost())) throw new java.io.IOException("host not allowed");
+                        c = (HttpURLConnection) u0.openConnection();
                         c.setConnectTimeout(15000);
                         c.setReadTimeout(25000);
-                        c.setInstanceFollowRedirects(true);
+                        c.setInstanceFollowRedirects(false);
                         c.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 13; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Mobile Safari/537.36");
                         c.setRequestProperty("Accept-Language", "fa-IR,fa;q=0.9,en;q=0.5");
                         c.setRequestProperty("Accept", "application/json, text/html;q=0.9, */*;q=0.5");
@@ -94,6 +118,21 @@ public class MainActivity extends Activity {
                             while (it.hasNext()) { String k = it.next(); c.setRequestProperty(k, h.getString(k)); }
                         } catch (Exception ignore) { }
                         status = c.getResponseCode();
+                        for (int hop = 0; hop < 5 && status >= 300 && status < 400; hop++) {   // تغییر مسیر فقط به همان چهار سایت
+                            String loc = c.getHeaderField("Location");
+                            if (loc == null) break;
+                            URL nu = new URL(u0, loc);
+                            if (!(nu.getProtocol().equals("https") || nu.getProtocol().equals("http")) || !allowedHost(nu.getHost())) throw new java.io.IOException("redirect not allowed");
+                            c.disconnect();
+                            u0 = nu;
+                            c = (HttpURLConnection) u0.openConnection();
+                            c.setConnectTimeout(15000);
+                            c.setReadTimeout(25000);
+                            c.setInstanceFollowRedirects(false);
+                            c.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 13; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Mobile Safari/537.36");
+                            c.setRequestProperty("Accept-Language", "fa-IR,fa;q=0.9,en;q=0.5");
+                            status = c.getResponseCode();
+                        }
                         InputStream in = status >= 400 ? c.getErrorStream() : c.getInputStream();
                         ByteArrayOutputStream out = new ByteArrayOutputStream();
                         if (in != null) {
@@ -153,7 +192,10 @@ public class MainActivity extends Activity {
                     if (!ok) {
                         HttpURLConnection c = null;
                         try {
-                            c = (HttpURLConnection) new URL(url).openConnection();
+                            URL iu = new URL(url);
+                            String ih = iu.getHost() == null ? "" : iu.getHost().toLowerCase(java.util.Locale.ROOT);
+                            if (!iu.getProtocol().equals("https") || ih.isEmpty() || ih.equals("localhost") || ih.matches("[0-9.]+") || ih.contains(":") || ih.endsWith(".local")) throw new java.io.IOException("image host not allowed");
+                            c = (HttpURLConnection) iu.openConnection();
                             c.setConnectTimeout(12000);
                             c.setReadTimeout(20000);
                             c.setInstanceFollowRedirects(true);
@@ -163,15 +205,20 @@ public class MainActivity extends Activity {
                                 FileOutputStream out = new FileOutputStream(tmp);
                                 byte[] buf = new byte[8192];
                                 int n, total = 0;
-                                boolean big = false;
+                                boolean big = false, magicOk = false;
                                 while ((n = in.read(buf)) > 0) {
+                                    if (total == 0 && n >= 4) {      // فقط عکسِ واقعی (JPEG/PNG/GIF/WebP) ذخیره شود، نه صفحه‌ی خطای HTML
+                                        int b0 = buf[0] & 255, b1 = buf[1] & 255, b2 = buf[2] & 255;
+                                        magicOk = (b0 == 0xFF && b1 == 0xD8) || (b0 == 0x89 && b1 == 0x50) || (b0 == 'G' && b1 == 'I' && b2 == 'F') || (b0 == 'R' && b1 == 'I' && b2 == 'F');
+                                        if (!magicOk) break;
+                                    }
                                     total += n;
                                     if (total > 3 * 1024 * 1024) { big = true; break; }
                                     out.write(buf, 0, n);
                                 }
                                 out.close();
                                 in.close();
-                                if (!big && total > 200) ok = tmp.renameTo(dst);
+                                if (!big && magicOk && total > 200) ok = tmp.renameTo(dst);
                                 if (!ok) tmp.delete();
                             }
                         } catch (Exception e) {
@@ -193,6 +240,33 @@ public class MainActivity extends Activity {
                     });
                 }
             });
+        }
+
+        /** صفحه‌ی محصول را در مرورگرِ گوشی باز می‌کند؛ فقط آدرس http(s) سایت‌های خودِ برنامه. */
+        @JavascriptInterface
+        public boolean open(final String url) {
+            try {
+                if (url == null || url.length() > 2000) return false;
+                for (int i = 0; i < url.length(); i++) { char ch = url.charAt(i); if (ch <= ' ' || ch == '\\' || ch == 0x7f) return false; }
+                Uri u = Uri.parse(url);
+                if (u.getUserInfo() != null) return false;
+                String sc = u.getScheme(), h = u.getHost();
+                if (sc == null || h == null || !(sc.equals("https") || sc.equals("http"))) return false;
+                h = h.toLowerCase(java.util.Locale.ROOT);
+                boolean ok = false;
+                ok = allowedHost(h);
+                if (!ok) return false;
+                final Intent it = new Intent(Intent.ACTION_VIEW, u);
+                it.addCategory(Intent.CATEGORY_BROWSABLE);
+                it.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                final boolean[] res = new boolean[1];
+                final java.util.concurrent.CountDownLatch latch = new java.util.concurrent.CountDownLatch(1);
+                runOnUiThread(new Runnable() {
+                    @Override public void run() { try { startActivity(it); res[0] = true; } catch (Exception ignore) { } latch.countDown(); }
+                });
+                try { latch.await(2, java.util.concurrent.TimeUnit.SECONDS); } catch (InterruptedException ie) { return false; }
+                return res[0];
+            } catch (Exception e) { return false; }
         }
 
         @JavascriptInterface
