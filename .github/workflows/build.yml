@@ -1,7 +1,10 @@
 name: Build APK
 on:
   push:
+    branches: ['**']
   workflow_dispatch:
+permissions:
+  contents: write
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -28,7 +31,15 @@ jobs:
       - name: Build debug APK
         working-directory: ${{ steps.p.outputs.dir }}
         run: gradle --no-daemon assembleDebug
+      - name: Copy APK
+        run: cp "${{ steps.p.outputs.dir }}/app/build/outputs/apk/debug/app-debug.apk" "$RUNNER_TEMP/PerfumePrice.apk"
       - uses: actions/upload-artifact@v4
         with:
           name: PerfumePrice-apk
-          path: ${{ steps.p.outputs.dir }}/app/build/outputs/apk/debug/app-debug.apk
+          path: ${{ runner.temp }}/PerfumePrice.apk
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete latest --yes --cleanup-tag || true
+          gh release create latest "$RUNNER_TEMP/PerfumePrice.apk" --target "$GITHUB_SHA" --title "PerfumePrice (latest)" --notes "Latest build"
