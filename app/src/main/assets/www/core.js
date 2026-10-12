@@ -201,6 +201,23 @@ function similar(A, B) {      // هم‌طول و واژه‌به‌واژه ی�
   for (var i = 0; i < A.length; i++) if (!tokEq(A[i], B[i])) return false;
   return true;
 }
+/* واژه‌های «نوع» که جای‌شان در نام فرق می‌کند ولی عطر همان است: «الکسیر ساواج» = «ساواج الکسیر».
+   (جابه‌جاییِ واژه‌های دیگر مثل Black XS / XS Black دو عطرِ جدا هستند و یکی نمی‌شوند) */
+var MODW = {}; ('الکسیر اینتنس اینتنسو ابسولو ابسولوت اکستریم لیمیتد ادیشن پرایو پرایوت elixir intense intenso absolu absolute absolut extreme limited edition prive private').split(' ').forEach(function (w) { MODW[w] = 1; });
+function lead(n) { return MODW[normFa(String(n).split(' ')[0])] ? 1 : 0; }      // «الکسیر ساواج» ← «ساواج الکسیر»: نوع در آخر بهتر است
+function lineSplit(k) {
+  if (k._ls) return k._ls;
+  var core = [], lw = [];
+  k.forEach(function (w) { if (MODW[w]) lw.push(w); else core.push(w); });
+  return (k._ls = { core: core, lw: lw.sort() });
+}
+function sameLine(A, B) {
+  if (A.length !== B.length) return false;
+  var a = lineSplit(A), b = lineSplit(B);
+  if (!a.lw.length || a.lw.length !== b.lw.length || !a.core.length || a.core.length !== b.core.length) return false;
+  for (var i = 0; i < a.lw.length; i++) if (!tokEq(a.lw[i], b.lw[i])) return false;
+  return similar(a.core, b.core);
+}
 function median(a) {
   var s = a.slice().sort(function (x, y) { return x - y; }), n = s.length;
   return n % 2 ? s[(n - 1) / 2] : (s[n / 2 - 1] + s[n / 2]) / 2;
@@ -256,7 +273,7 @@ function nameCmp(A, B) {
   if (A._b !== B._b || a.length !== b.length) return 0;      // برندِ دیگر یا تعدادِ واژه‌ی دیگر = عطرِ دیگر
   var same = true;
   for (var i = 0; i < a.length; i++) { if (a[i] !== b[i]) { same = false; break; } }
-  return same ? 2 : similar(a, b) ? 1 : 0;
+  return same ? 2 : (similar(a, b) || sameLine(a, b)) ? 1 : 0;
 }
 function concCmp(a, b) { return a === b ? 2 : (!a || !b) ? 1 : 0; }
 function genCmp(a, b) { return a === b ? 2 : (!a || !b || a === 'u' || b === 'u') ? 1 : 0; }   // مردانه با زنانه هرگز یکی نمی‌شود
@@ -387,7 +404,7 @@ function priceGroups(groups, srcOrder, trusted, prior) {
             ۲) واژه‌نامه‌ی داخلی (پایین) ۳) واژه‌هایی که برنامه از جفت‌عنوان‌های سایت‌ها یاد گرفته (db.wd)
    اگر هیچ‌کدام نبود، واج‌نویسی تقریبی می‌کند. */
 var NAME_DICT = [
-['ساواج|ساوج|ساواژ|سواج', 'Sauvage'], ['اونتوس|آونتوس|اوانتوس|اونتوس', 'Aventus'], ['لیبره|لیبر', 'Libre'], ['وان میلیون|وان میلیون', 'One Million'],
+['ساواج|ساوج|ساواژ|سواج|سواژ|سوواژ|ساوژ|ساوواژ|ساواگ', 'Sauvage'], ['اونتوس|آونتوس|اوانتوس|اونتوس', 'Aventus'], ['لیبره|لیبر', 'Libre'], ['وان میلیون|وان میلیون', 'One Million'],
 ['لیدی میلیون', 'Lady Million'], ['میلیون', 'Million'], ['وان میلیون|1 میلیون|یک میلیون', 'One Million'], ['اینویکتوس|اینوکتوس|اینویکتس', 'Invictus'], ['اروس|اروز', 'Eros'], ['اکوا دی جیو|آکوا دی جیو|اکوا دی جو', 'Acqua di Gio'],
 ['پروفومو', 'Profumo'], ['اکوا|آکوا', 'Acqua'], ['دیلان بلو', 'Dylan Blue'], ['دیلن بلو', 'Dylan Blue'], ['بلو دو', 'Bleu de'], ['بلو', 'Blue'], ['بلک', 'Black'], ['وایت', 'White'],
 ['رد', 'Red'], ['گرین', 'Green'], ['گلد', 'Gold'], ['گلدن', 'Golden'], ['سیلور', 'Silver'], ['پلاتینیوم|پلاتینوم', 'Platinum'], ['دارک', 'Dark'], ['نایت', 'Night'], ['نوآر|نویر|نوار', 'Noir'],
@@ -401,7 +418,7 @@ var NAME_DICT = [
 ['پور', 'Pour'], ['هوم|اوم|هومو', 'Homme'], ['فم|فام', 'Femme'], ['الکسیر|الیکسیر|الکسر|اکسیر|اکسر|الیکسر', 'Elixir'], ['اینتنس|اینتنسو|اینتنز|اینتنس', 'Intense'], ['اینتنسو', 'Intenso'], ['لانویت|لا نویت', 'La Nuit'], ['لا ویه است بل|لاویه است بل|لا ویی است بل', 'La Vie Est Belle'],
 ['لا ویه', 'La Vie'], ['لا', 'La'], ['لو|له', 'Le'], ['لس', 'Les'], ['دو', 'de'], ['د وان', 'The One'], ['د', 'The'], ['دی', 'di'], ['مای', 'My'], ['مای سلف', 'My Self'], ['سلف', 'Self'], ['اند', '&'],
 ['کریستال نویر|کریستال نوآر', 'Crystal Noir'], ['کریستال', 'Crystal'], ['جادور|ژادور|جی ادور', "J'adore"], ['میس دیور', 'Miss Dior'], ['میس', 'Miss'], ['پویزن|پوازن', 'Poison'], ['هیپنوتیک', 'Hypnotic'], ['فارنهایت|فهرنهایت|فرنهایت', 'Fahrenheit'],
-['اوپیوم|اپیوم', 'Opium'], ['ابسولو|ابسولو', 'Absolu'], ['ریزرو|رزرو', 'Reserve'], ['ویکتوری|ویکتوریا', 'Victory'], ['سنتس', 'Scents'], ['ارکید', 'Orchid'], ['بلوم', 'Bloom'], ['آتلانتیک|اتلانتیک', 'Atlantic'],
+['اوپیوم|اپیوم', 'Opium'], ['ابسولو|ابسولو', 'Absolu'], ['ابسولوت|ابسولوت', 'Absolute'], ['فلیم|فلیمز|فلم', 'Flame'], ['نویت|نوی', 'Nuit'], ['تونیک|تانیک', 'Tonic'], ['پیور|پیوره', 'Pure'], ['ریزرو|رزرو', 'Reserve'], ['ویکتوری|ویکتوریا', 'Victory'], ['سنتس', 'Scents'], ['ارکید', 'Orchid'], ['بلوم', 'Bloom'], ['آتلانتیک|اتلانتیک', 'Atlantic'],
 ['ایرزیستیبل|ایریزیستیبل', 'Irresistible'], ['امبلم', 'Emblem'], ['شانس|چنس|چانس', 'Chance'], ['مادمازل|مدمازل', 'Mademoiselle'], ['کوکو', 'Coco'], ['الور|آلور', 'Allure'], ['اگویست|اگویست', 'Egoiste'], ['نامبر|نمبر|نامبر', 'No'], ['شماره', 'No'],
 ['کلن|کلون|کولون', 'Cologne'], ['ادیشن', 'Edition'], ['لیمیتد|لیمیتد', 'Limited'], ['اکسکلوسیو|اکسکلوسیو', 'Exclusif'], ['کالکشن|کلکسیون', 'Collection'], ['پرایو|پریو', 'Prive'], ['پرایوت', 'Private'], ['پرستیژ', 'Prestige'],
 ['دایموند|الماس', 'Diamond'], ['استار|ستاره', 'Star'], ['مون|ماه', 'Moon'], ['سان|خورشید', 'Sun'], ['پرل|مروارید', 'Pearl'], ['ایمپریال', 'Imperial'], ['ماجستیک', 'Majestic'], ['اینفینیتی', 'Infinity'], ['اترنیتی|اترنیتی', 'Eternity'],
@@ -818,7 +835,7 @@ function tree(groups, lang, lex) {
     delete b.mm;
     mergeModels(b, AUD);
     b.models.forEach(function (m) {
-      var best = ''; Object.keys(m.cnt).forEach(function (n) { if (!best || m.cnt[n] > m.cnt[best] || (m.cnt[n] === m.cnt[best] && n.length < best.length)) best = n; });
+      var best = ''; Object.keys(m.cnt).forEach(function (n) { if (!best || m.cnt[n] > m.cnt[best] || (m.cnt[n] === m.cnt[best] && (lead(n) < lead(best) || (lead(n) === lead(best) && n.length < best.length)))) best = n; });
       m.name = best; m.L = letterOf(best, lang); m.z = zOf(m.L, EN); delete m.cnt;
       m.variants.sort(function (x, y) { return (GORD[x.gn] - GORD[y.gn]) || (CORD[x.conc] - CORD[y.conc]); });
       var first = m.variants.filter(function (v) { return v.img; })[0] || m.variants[0];
@@ -872,7 +889,7 @@ function mergeModels(b, AUD) {
     for (var j = i + 1; j < ms.length; j++) {
       if (gone[j]) continue;
       var A = ms[i], C = ms[j];
-      if (!similar(A.rk, C.rk)) continue;
+      if (!similar(A.rk, C.rk) && !sameLine(A.rk, C.rk)) continue;
       var kk = {}, clash = false;
       A.variants.forEach(function (v) { kk[v.gn + '|' + v.conc] = 1; });
       C.variants.forEach(function (v) { if (kk[v.gn + '|' + v.conc]) clash = true; });
