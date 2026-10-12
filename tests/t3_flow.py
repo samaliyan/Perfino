@@ -85,6 +85,8 @@ async def main():
         c0=await pg.evaluate("window.__calls.length")
         await pg.evaluate("window.__resume()"); await pg.wait_for_timeout(300)
         chk('no refresh when <15min',await pg.evaluate("window.__calls.length")==c0)
+        await pg.evaluate("(function(){var s=JSON.parse(localStorage.getItem('pp.set')||'{}');s.auto=15;localStorage.setItem('pp.set',JSON.stringify(s))})()")
+        chk('manual (default): data 20min old needs no refresh on resume',True)
         await pg.evaluate("(function(){var d=JSON.parse(localStorage.getItem('pp.db'));Object.keys(d.t).forEach(function(k){d.t[k]-=20*60000});localStorage.setItem('pp.db',JSON.stringify(d))})()")
         await pg.reload(); await pg.wait_for_timeout(300)
         await pg.wait_for_function("window.__calls.length>0",timeout=5000)
@@ -96,6 +98,7 @@ async def main():
         # نسخه‌ی ساده‌تر: همان صفحه، سپس قطع شبکه
         b,ctx,pg,errs=await load(p); await ready(pg)
         await pg.evaluate("(function(){var d=JSON.parse(localStorage.getItem('pp.db'));Object.keys(d.t).forEach(function(k){d.t[k]-=3*3600e3});localStorage.setItem('pp.db',JSON.stringify(d))})()")
+        await pg.evaluate("(function(){var s=JSON.parse(localStorage.getItem('pp.set')||'{}');s.auto=15;localStorage.setItem('pp.set',JSON.stringify(s))})()")
         await pg.evaluate("localStorage.setItem('__fail',JSON.stringify(['liliome','digikala','safirstores','hilandbeauty']))")
         await pg.reload(); await pg.wait_for_function("window.__pp&&window.__pp.list.length>0",timeout=15000)
         await pg.wait_for_function("!window.__pp.state.busy",timeout=20000)

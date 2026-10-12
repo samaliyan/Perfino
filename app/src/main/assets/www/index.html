@@ -144,6 +144,7 @@ svg{display:block}
 .seg button{margin:4px;flex:1 1 auto;min-width:0;padding:11px 8px;border-radius:16px;border:1.5px solid var(--cb);background:transparent;font-size:15px;font-weight:600;cursor:pointer;transition:transform .15s}
 .seg button:active{transform:scale(.96)}
 .seg button.on{border-color:var(--ac);background:var(--cb)}
+#sAuto button{flex:1 1 calc(20% - 8px);padding:9px 1px;font-size:13px}
 .seg.mods button{flex:1 1 calc(50% - 8px);display:flex;flex-direction:column;align-items:center;line-height:1.4}
 .seg.mods small{margin-top:2px;font-size:11px;color:var(--mu);font-weight:400}
 .btn{width:100%;padding:13px;border-radius:18px;border:0;background:var(--ac);color:#0c0f1f;font-size:16px;font-weight:800;cursor:pointer}
@@ -275,6 +276,8 @@ svg{display:block}
     <div class="hint2">برندی که خاموش کنید در فهرست دیده نمی‌شود و عکسش دانلود نمی‌شود.</div>
     <h3>قیمت‌ها</h3>
     <button class="btn" id="sRef"><span>بروزرسانی قیمت‌ها همین حالا</span></button>
+    <div class="hint2" style="margin-top:12px">بروزرسانی خودکار</div>
+    <div class="seg mods" id="sAuto"><button data-m="0">خاموش<small>دستی</small></button><button data-m="15">۱۵<small>دقیقه</small></button><button data-m="30">۳۰<small>دقیقه</small></button><button data-m="60">۱<small>ساعت</small></button><button data-m="180">۳<small>ساعت</small></button></div>
     <div class="srcs" id="sSrc" style="margin-top:12px"></div>
     <h3>گزارش به‌روز</h3>
     <div class="srcs" id="sRep"></div>

@@ -1,7 +1,7 @@
 (function () {
 'use strict';
 var RM = !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
-var VERSION = '1.9';
+var VERSION = '1.9.1';
 function $(id) { return document.getElementById(id); }
 function fa(n) { return String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, '٬').replace(/\d/g, function (d) { return '۰۱۲۳۴۵۶۷۸۹'[d]; }); }
 function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
@@ -485,7 +485,7 @@ function updPill() {
   if (busy) { u.classList.add('busy'); t.textContent = firstLoad() ? 'دریافت اولیه‌ی عطرها…' : 'در حال بروزرسانی قیمت…'; return; }
   if (!lo) { u.classList.add('stale'); t.textContent = 'قیمتی دریافت نشده'; return; }
   var age = Date.now() - lo;
-  if (age > 40 * 60000) { u.classList.add('stale'); t.textContent = 'قیمت‌ها قدیمی‌اند · ' + agoText(age); }
+  if (age > (autoMs() ? 40 * 60000 : 24 * 3600000)) { u.classList.add('stale'); t.textContent = 'قیمت‌ها قدیمی‌اند · ' + agoText(age); }
   else t.textContent = 'آخرین بروزرسانی ' + agoText(age);
 }
 function srcDone() { return Core.SOURCES.filter(function (s) { return stt[s.id] && stt[s.id].ok; }).length; }   // سایت‌هایی که اطلاعاتشان آمده
@@ -748,7 +748,7 @@ async function refresh(manual) {
       stt[s.id] = { ok: false, err: friendly(e && e.message || e).slice(0, 200), raw: String(e && e.message || e).slice(0, 200), n: pv.n || 0, t: pv.t || 0, note: pv.note || '' };
       if (prog[s.id]) prog[s.id].done = true;
     }
-    saveDb();
+    if (firstLoad()) saveDb();
     try { if (!list.length) rebuild(); } catch (e2) { stt[s.id].err = 'خطای ادغام: ' + e2.message; }
     tick();
   }));
@@ -767,6 +767,7 @@ async function refresh(manual) {
 var sheetY = 1, open = false, adv = false, advN = 0;
 function renderSheet() {
   Array.prototype.forEach.call($('sTheme').children, function (b) { b.classList.toggle('on', b.dataset.v === set.theme); });
+  Array.prototype.forEach.call($('sAuto').children, function (b) { b.classList.toggle('on', +b.dataset.m === (+set.auto > 0 ? +set.auto : 0)); });
   Array.prototype.forEach.call($('sModel').children, function (b) { b.classList.toggle('on', b.dataset.v === set.model); });
   var bad = false;
   $('sSrc').innerHTML = Core.SOURCES.map(function (s) {
@@ -864,6 +865,7 @@ function sUp() { if (dy0 == null) return; var d = sy; dy0 = null; if (d > 80) cl
 sheet.addEventListener('pointerup', sUp); sheet.addEventListener('pointercancel', sUp);
 $('sTheme').onclick = function (e) { var v = e.target.dataset && e.target.dataset.v; if (!v) return; set.theme = v; ls.set('pp.set', set); applyTheme(); renderSheet(); };
 $('sModel').onclick = function (e) { var b = e.target.closest && e.target.closest('button'); if (!b || !b.dataset.v) return; set.model = b.dataset.v; ls.set('pp.set', set); renderSheet(); var a = curModel ? curModel.getAnchor() : null; mountModel(a); closeSheet(); };
+$('sAuto').onclick = function (e) { var b = e.target.closest('button'); if (!b || b.dataset.m == null) return; set.auto = +b.dataset.m; ls.set('pp.set', set); renderSheet(); updPill(); if (set.auto > 0 && !busy && autoDue()) refresh(false); };
 $('sRef').onclick = function () { if (busy) { toast('همین حالا در حال بروزرسانی است…', 2200); return; } refresh(true); };
 $('sFull').onclick = function () { if (busy) return; db.full = {}; db.fa = {}; saveDb(); refresh(true); };
 $('sCopy').onclick = function () {
@@ -879,7 +881,9 @@ window.__back = function () {
   if (dtId) { closeDetail(); return true; }
   return goUp();
 };
-window.__resume = function () { updPill(); var lo = lastOk(); if (!busy && (!lo || Date.now() - lo > 15 * 60000)) refresh(false); };
+function autoMs() { var m = +set.auto; return m > 0 ? m * 60000 : 0; }      // ۰ = دستی (پیش‌فرض)
+function autoDue() { var lo = lastOk(); if (!lo) return true; var a = autoMs(); return a > 0 && Date.now() - lo > a; }
+window.__resume = function () { updPill(); if (!busy && autoDue()) refresh(false); };
 document.addEventListener('visibilitychange', function () { if (!document.hidden) window.__resume(); });
 window.addEventListener('beforeunload', function () { if (curModel && nav.lvl === 0) { var a = curModel.getAnchor(); if (a) ls.set('pp.last', a); } });
 window.__pp = { get allBrands() { return ALLB; }, open: openEntry, up: goUp, view: viewImg, closeView: closeViewer, get nav() { return nav; }, get tree() { return TREE; }, get gate() { var ps = photoStat(); return { need: ps.need, have: ps.have, ready: !!db.ready, tot: imgTot, left: imgLeft(), ok: imgOk, bad: imgBad }; }, mount: function (m) { var t = performance.now(); set.model = m; mountModel(curModel ? curModel.getAnchor() : null); return performance.now() - t; }, get model() { return curModel; }, get list() { return list; }, get flat() { return FLAT; }, get state() { return { db: db, st: stt, busy: busy, imgLoc: imgLoc }; }, refresh: refresh, net: net };
@@ -889,8 +893,8 @@ applyTheme();
 loadImgs();
 try { rebuild(); } catch (e) { console.error(e); }
 updPill(); overlay(); renderSheet();
-refresh(false);
-setInterval(function () { updPill(); var lo = lastOk(); if (!busy && (!lo || Date.now() - lo > 15 * 60000)) refresh(false); }, 30000);
+if (autoDue()) refresh(false);
+setInterval(function () { updPill(); if (!busy && autoDue()) refresh(false); }, 30000);
 /* قفل ورود: اگر دانلود گیر کرد خودش دوباره تلاش کند؛ عکسی که جواب نداد جلوی ورود را نگیرد */
 setInterval(function () {
   if (db.ready) return;

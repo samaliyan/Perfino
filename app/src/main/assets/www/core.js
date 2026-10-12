@@ -9,7 +9,17 @@ function decodeEnt(s) {
     .replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&nbsp;/g, ' ')
     .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&[a-z]+;/g, ' ');
 }
+var NF_C = {}, NF_N = 0;
 function normFa(s, keepAlef) {
+  var raw = s == null ? '' : s;
+  if (typeof raw === 'string' && raw.length < 400) {
+    var ck = (keepAlef ? '1' : '0') + raw, h = NF_C[ck]; if (h !== undefined) return h;
+    if (NF_N > 30000) { NF_C = {}; NF_N = 0; }
+    NF_N++; return (NF_C[ck] = normFa0(raw, keepAlef));
+  }
+  return normFa0(raw, keepAlef);
+}
+function normFa0(s, keepAlef) {
   s = decodeEnt(String(s == null ? '' : s));
   s = s.replace(/[\u200b\u00ad\u2060\ufeff]/g, '').replace(/\u2011/g, '-');
   if (/[\ufb50-\ufdff\ufe70-\ufeff]/.test(s)) s = s.normalize('NFKC');           // شکل‌های نمایشیِ عربی → حروف عادی
@@ -1076,9 +1086,9 @@ function buildList(db, srcOrder, trusted, maxAge) {
   ids.forEach(function (id) {
     var g = db.g[id];
     if (g.c === '' || (g.gn || '') === '') {          // ویژگی نامشخص و یک هم‌نامِ مشخص‌تر هست → تکراری/مبهم است، نشان نده
+      var sm = {}; (by[id] || []).forEach(function (x) { sm[x.src + '|' + x.ml] = 1; });
       var hide = pidx.cands(g.k, true).some(function (o) {
         var S = db.g[o]; if (!S || o === id) return false;
-        var sm = {}; (by[id] || []).forEach(function (x) { sm[x.src + '|' + x.ml] = 1; });
         if ((by[o] || []).some(function (x) { return sm[x.src + '|' + x.ml]; })) return false;   // همان سایت و همان اندازه در هر دو: جدا هستند
         return nameCmp(g.k, S.k) && concCmp(g.c, S.c) && genCmp(g.gn || '', S.gn || '') && (g.c === '' || S.c !== '') && ((g.gn || '') === '' || (S.gn || '') !== '') && ((g.c === '' && S.c !== '') || ((g.gn || '') === '' && (S.gn || '') !== ''));   // S باید دقیق‌تر از g باشد (نه هم‌سطح؛ وگرنه هر دو همدیگر را پنهان می‌کنند)
       });
@@ -1256,7 +1266,13 @@ var OUT_SCHEMA = /OutOfStock|SoldOut|Discontinued|PreOrder|BackOrder|PreSale/i;
 var ATTRS = ['data-availability', 'data-stock', 'data-stock-status', 'data-in-stock', 'data-instock', 'data-available'];
 var BAD_HREF = /add[-_]to[-_](?:cart|wishlist)|[?&]add-to-cart=|wishlist|compare|quick[-_ ]?view|[?&]action=|\/cart\/?(?:$|\?)|\/checkout|\/login|\/account|\/(?:brands?|manufacturer|product-category|category|tag)\//i;
 var OLD_CLS = /(^|[-_ ])(old|del|deleted|before|regular|prev|previous|strike|strikethrough|line-through)([-_ ]|$)/i;
+var NU_C = {}, NU_N = 0;
 function normUrl(u) {
+  var h = NU_C[u]; if (h !== undefined) return h;
+  if (NU_N > 20000) { NU_C = {}; NU_N = 0; }
+  NU_N++; return (NU_C[u] = normUrl0(u));
+}
+function normUrl0(u) {
   try { var x = new URL(u); var p = x.pathname.replace(/\/+$/, ''); try { p = decodeURIComponent(p); } catch (e) { } return (x.origin + p + x.search).toLowerCase(); } catch (e2) { return String(u || '').toLowerCase(); }
 }
 function shapeOf(u) { var m = /^https?:\/\/[^\/]+\/+([^\/?#]+)/i.exec(u); return m ? m[1].toLowerCase() : ''; }
@@ -1324,19 +1340,21 @@ function extractCards(doc, pageUrl) {
     });
   });
   // کارت‌های معمولی: لینکِ دارای عکس. «کارت» = بالاترین نیایی که فقط یک محصول (یک لینکِ هم‌شکل) دارد
-  var doneCard = [];
+  var doneCard = new WeakSet(), NL = new WeakMap();
   Array.prototype.forEach.call(doc.querySelectorAll('a[href]'), function (a) {
     if (!a.querySelector('img')) return;
     var href = a.getAttribute('href') || '';
     if (!href || href.charAt(0) === '#' || /^javascript:/i.test(href) || BAD_HREF.test(href)) return;
     var url = urlJoin(pageUrl, href), shape = shapeOf(url), me = normUrl(url);
     function nLinks(el) {
+      var ck = NL.get(el); if (ck && ck[shape] !== undefined) return ck[shape];
       var set = {}, n = 0;
       Array.prototype.forEach.call(el.querySelectorAll('a[href]'), function (x) {
         var h = x.getAttribute('href') || ''; if (!h || h.charAt(0) === '#' || BAD_HREF.test(h) || !x.querySelector('img')) return;
         var u2 = urlJoin(pageUrl, h); if (shapeOf(u2) !== shape) return;
         var k = normUrl(u2); if (!set[k]) { set[k] = 1; n++; }
       });
+      (ck || (ck = {}))[shape] = n; NL.set(el, ck);
       return n;
     }
     var card = a;
@@ -1345,7 +1363,7 @@ function extractCards(doc, pageUrl) {
       if (nLinks(par) > 1) break;
       card = par;
     }
-    if (doneCard.indexOf(card) >= 0) return; doneCard.push(card);
+    if (doneCard.has(card)) return; doneCard.add(card);
     var outFlag = false, chain = a;
     for (var q = 0; q < 12 && chain; q++) { if (elOut(chain)) { outFlag = true; break; } if (chain === card) break; chain = chain.parentElement; }
     if (!outFlag) { var all = card.querySelectorAll('*'); for (var z = 0; z < all.length && z < 400; z++) if (elOut(all[z])) { outFlag = true; break; } }
