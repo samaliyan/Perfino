@@ -1,7 +1,7 @@
 (function () {
 'use strict';
 var RM = !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
-var VERSION = '1.7';
+var VERSION = '1.8';
 function $(id) { return document.getElementById(id); }
 function fa(n) { return String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, '٬').replace(/\d/g, function (d) { return '۰۱۲۳۴۵۶۷۸۹'[d]; }); }
 function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
@@ -480,13 +480,19 @@ function updPill() {
 }
 function srcDone() { return Core.SOURCES.filter(function (s) { return stt[s.id] && stt[s.id].ok; }).length; }   // سایت‌هایی که اطلاعاتشان آمده
 function imgLeft() { return Object.keys(imgPend).length; }
+/* عکس‌ها: need = مدل‌هایی که عکس دارند (برندهای روشن)، have = آن‌هایی که روی گوشی هست */
+function photoStat() {
+  var need = 0, have = 0;
+  TREE.forEach(function (b) { b.models.forEach(function (m) { if (!m.img) return; need++; if (imgLoc[m.imgId]) have++; }); });
+  return { need: need, have: have, pend: imgLeft(), bad: imgBad };
+}
 function overlay() {
   var o = $('ov');
   if (db.ready && list.length) { o.className = ''; o.innerHTML = ''; o._h = ''; o._g = 0; return; }
   o.className = 'on';
   if (!db.ready) {                       // قفل ورود: تا پایان دانلود اولیه وارد برنامه نمی‌شویم
     var N = Core.SOURCES.length, sd = srcDone(), il = imgLeft(), phase = busy ? 'src' : il > 0 ? 'img' : 'fail';
-    var sf = phase === 'src' ? (pct() == null ? 0 : pct()) : 1, imf = imgTot ? (imgTot - il) / imgTot : (phase === 'img' ? 0 : 1);
+    var ps = photoStat(), sf = phase === 'src' ? (pct() == null ? 0 : pct()) : 1, imf = ps.need ? ps.have / ps.need : (phase === 'img' ? 0 : 1);
     var all = phase === 'src' ? sf * .75 : phase === 'img' ? .75 + .25 * imf : .75 + .25 * imf;
     if (!o._g) {                         // اسکلت فقط یک‌بار ساخته می‌شود؛ بعد فقط متن‌ها عوض می‌شوند (تا چرخش دایره از اول شروع نشود)
       o._h = ''; o._g = 1; o._bk = '';
@@ -499,8 +505,8 @@ function overlay() {
     $('gpb').style.width = Math.round(all * 100) + '%';
     $('gr1').className = phase !== 'src' && sd > 0 ? 'ok' : '';
     $('gv1').innerHTML = '<bdi>' + fa(sd) + '</bdi> از <bdi>' + fa(N) + '</bdi> سایت' + (phase === 'src' && total() ? ' · <bdi>' + fa(total()) + '</bdi> محصول' : '');
-    $('gr2').className = imgTot && il === 0 ? 'ok' : '';
-    $('gv2').innerHTML = imgTot ? '<bdi>' + fa(imgTot - il) + '</bdi> از <bdi>' + fa(imgTot) + '</bdi>' : phase === 'src' ? 'بعد از فهرست' : '—';
+    $('gr2').className = ps.need && il === 0 && ps.have >= ps.need ? 'ok' : '';
+    $('gv2').innerHTML = ps.need ? '<bdi>' + fa(ps.have) + '</bdi> از <bdi>' + fa(ps.need) + '</bdi>' + (il > 0 && ps.have > 0 ? ' · <bdi>' + fa(il) + '</bdi> مانده' : '') : phase === 'src' ? 'بعد از فهرست' : '—';
     var bk = phase === 'fail' ? (list.length ? 'f2' : 'f1') : '';
     if (o._bk !== bk) {                   // دکمه‌ها فقط وقتی حالت عوض شد
       o._bk = bk;
@@ -740,10 +746,38 @@ function renderSheet() {
     else if (x && x.err) { txt = x.err + (x.t ? ' (قیمت قبلی نگه داشته شد)' : ''); cls = 'bad'; bad = true; }
     return '<div class="' + cls + '"><span>' + s.name + '</span><span>' + (busy && P && !P.done ? txt : esc(txt)) + '</span></div>';
   }).join('') + '<div style="border:0;color:var(--mu);font-size:12px;padding-top:8px"><span>نقطه‌ی کوچک کنار قیمت یعنی فقط یک سایت آن را داشته.</span></div>';
+  renderReport();
   $('sCopy').style.display = bad || adv ? '' : 'none'; $('sFull').style.display = bad || adv ? '' : 'none';
   $('sVer').textContent = 'نسخه ' + VERSION;
   renderBrands();
   [].forEach.call(document.querySelectorAll('#sLang button'), function (b) { b.classList.toggle('on', b.dataset.l === (set.lang === 'en' ? 'en' : 'fa')); });
+}
+function clock(t) { if (!t) return '—'; var d = new Date(t), p = function (n) { return (n < 10 ? '0' : '') + n; }; var ago = Math.round((Date.now() - t) / 60000); return (p(d.getHours()) + ':' + p(d.getMinutes())).replace(/\d/g, function (c) { return '۰۱۲۳۴۵۶۷۸۹'[c]; }) + (ago >= 1 ? ' (' + fa(ago < 120 ? ago : Math.round(ago / 60)) + (ago < 120 ? ' دقیقه' : ' ساعت') + ' پیش)' : ' (همین الان)'); }
+/* گزارش به‌روز: وضعیت دریافت هر سایت، فهرست، عکس‌ها و نام‌ها؛ تا تنظیمات باز است خودش تازه می‌شود */
+function reportData() {
+  var ps = photoStat(), nb = TREE.length, nm = 0, nv = 0;
+  TREE.forEach(function (b) { nm += b.models.length; b.models.forEach(function (m) { nv += m.variants.length; }); });
+  var withEn = 0; FLAT.forEach(function (g) { if (g.en) withEn++; });
+  var src = Core.SOURCES.map(function (s) {
+    var x = stt[s.id] || {}, P = prog[s.id], fullT = db.full[s.id];
+    var st = busy && P && !P.done ? 'در حال دریافت (' + fa(P.n) + ')' : x.ok ? (fullT ? 'کامل' : 'ناقص (دوباره امتحان می‌کند)') : x.err ? 'خطا: ' + x.err : (db.t[s.id] ? 'قدیمی' : 'هنوز نیامده');
+    var cnt = 0; Object.keys(db.it[s.id] || {}).forEach(function (k) { var e = db.it[s.id][k]; if (e[2] && e[1] > 0) cnt++; });
+    return { name: s.name, st: st, ok: !!x.ok && !!fullT, cnt: cnt, t: db.t[s.id] || 0, note: x.note || '' };
+  });
+  return { ps: ps, nb: nb, nm: nm, nv: nv, withEn: withEn, all: FLAT.length, src: src };
+}
+function renderReport() {
+  var el = $('sRep'); if (!el) return;
+  var r = reportData(), rows = [], allOk = r.src.every(function (x) { return x.ok; }) && r.ps.have >= r.ps.need && !busy;
+  function row(a, b, bad) { rows.push('<div' + (bad ? ' class="bad"' : '') + '><span>' + a + '</span><span>' + b + '</span></div>'); }
+  row('وضعیت کلی', busy ? 'در حال بروزرسانی…' : allOk ? 'همه‌چیز کامل است' : 'ناقص؛ جزئیات پایین', !busy && !allOk);
+  r.src.forEach(function (x) {
+    row(esc(x.name), esc(x.st) + ' · <bdi>' + fa(x.cnt) + '</bdi> محصول · ' + clock(x.t) + (x.note && /ناقص/.test(x.note) ? ' · ' + esc(x.note) : ''), /^خطا|ناقص|قدیمی|هنوز/.test(x.st));
+  });
+  row('فهرست', '<bdi>' + fa(r.nb) + '</bdi> برند · <bdi>' + fa(r.nm) + '</bdi> عطر · <bdi>' + fa(r.nv) + '</bdi> نوع' + (hiddenN ? ' · <bdi>' + fa(hiddenN) + '</bdi> مبهم پنهان' : ''));
+  row('عکس‌ها', '<bdi>' + fa(r.ps.have) + '</bdi> از <bdi>' + fa(r.ps.need) + '</bdi> روی گوشی' + (r.ps.pend ? ' · <bdi>' + fa(r.ps.pend) + '</bdi> در حال دانلود' : '') + (r.ps.bad ? ' · <bdi>' + fa(r.ps.bad) + '</bdi> نشد' : ''), r.ps.have < r.ps.need && !r.ps.pend);
+  row('نام انگلیسی', '<bdi>' + fa(r.withEn) + '</bdi> از <bdi>' + fa(r.all) + '</bdi> را خودِ سایت‌ها داده‌اند؛ بقیه ساخته می‌شود');
+  el.innerHTML = rows.join('');
 }
 var brOpen = false;
 function renderBrands() {
@@ -802,7 +836,7 @@ window.__back = function () {
 window.__resume = function () { updPill(); var lo = lastOk(); if (!busy && (!lo || Date.now() - lo > 15 * 60000)) refresh(false); };
 document.addEventListener('visibilitychange', function () { if (!document.hidden) window.__resume(); });
 window.addEventListener('beforeunload', function () { if (curModel && nav.lvl === 0) { var a = curModel.getAnchor(); if (a) ls.set('pp.last', a); } });
-window.__pp = { get allBrands() { return ALLB; }, open: openEntry, up: goUp, view: viewImg, closeView: closeViewer, get nav() { return nav; }, get tree() { return TREE; }, get gate() { return { ready: !!db.ready, tot: imgTot, left: imgLeft(), ok: imgOk, bad: imgBad }; }, mount: function (m) { var t = performance.now(); set.model = m; mountModel(curModel ? curModel.getAnchor() : null); return performance.now() - t; }, get model() { return curModel; }, get list() { return list; }, get flat() { return FLAT; }, get state() { return { db: db, st: stt, busy: busy, imgLoc: imgLoc }; }, refresh: refresh, net: net };
+window.__pp = { get allBrands() { return ALLB; }, open: openEntry, up: goUp, view: viewImg, closeView: closeViewer, get nav() { return nav; }, get tree() { return TREE; }, get gate() { var ps = photoStat(); return { need: ps.need, have: ps.have, ready: !!db.ready, tot: imgTot, left: imgLeft(), ok: imgOk, bad: imgBad }; }, mount: function (m) { var t = performance.now(); set.model = m; mountModel(curModel ? curModel.getAnchor() : null); return performance.now() - t; }, get model() { return curModel; }, get list() { return list; }, get flat() { return FLAT; }, get state() { return { db: db, st: stt, busy: busy, imgLoc: imgLoc }; }, refresh: refresh, net: net };
 
 /* شروع */
 applyTheme();

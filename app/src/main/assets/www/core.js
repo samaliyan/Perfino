@@ -536,7 +536,11 @@ function brandOf(key, hints) {
     var e = T.byName[tk.join(' ')];
     if (!e) T.list.some(function (b) { return b.al.some(function (al) { return al.length >= 2 && seqAt(tk, al) >= 0; }) && (e = b); });
     if (e) { ent = e; return true; }
-    if (!unk) unk = { id: 'h' + hash(tk.join(' ')), name: String(h).replace(/\s*&\s*/g, ' & '), al: [tk] };
+    if (!unk) {
+      var ftk = tk.filter(function (w) { return /[؀-ۿ]/.test(w); }), ltk = tk.filter(function (w) { return !/[؀-ۿ]/.test(w); });
+      if (ftk.length && ltk.length) unk = { id: 'h' + hash(tk.join(' ')), name: ftk.join(' '), en: titleEn(ltk), al: [ftk, ltk] };   // «Louis Vuitton | لویی ویتون»
+      else unk = { id: 'h' + hash(tk.join(' ')), name: String(h).replace(/\s*&\s*/g, ' & '), al: [tk] };
+    }
     return false;
   });
   if (!ent) {
@@ -591,10 +595,19 @@ function modelName(g, ent, EN, lex) {
   var r3 = stripBrandEn(g.key, ent);
   return en2fa(r3.length ? r3 : g.key, lex);
 }
+/* همه‌ی واژه‌ها به خطِ زبان انتخابی درمی‌آیند (تا در فهرست فارسی حرفِ A و در انگلیسی حرفِ فارسی نیاید) */
+function purify(name, EN, lex) {
+  var ch = false, out = String(name).split(/\s+/).filter(Boolean).map(function (w) {
+    if (EN) { if (HAS_FA.test(w)) { ch = true; return fa2en(brandNorm(w), lex); } return w; }
+    if (/[A-Za-z]/.test(w)) { ch = true; var lt = w.toLowerCase().replace(/[^a-z0-9']/g, ''); return lt ? en2fa([lt], lex) : w; }
+    return w;
+  });
+  return ch ? out.join(' ') : name;
+}
 function brandName(ent, EN, lex) {
   if (ent.id === 'other') return EN ? 'Other brands' : 'سایر برندها';
-  if (!EN) return ent.name;
-  return ent.en || fa2en(brandNorm(ent.name), lex);
+  if (!EN) return purify(ent.name, false, lex);
+  return purify(ent.en || fa2en(brandNorm(ent.name), lex), true, lex);
 }
 /* فهرست برند ← مدل ← نوع (جنسیت/غلظت) ← اندازه و قیمت. groups خروجی buildList است.
    lang: 'fa' | 'en' (نام و حرف‌ها)؛ ساختار در هر دو زبان یکی است. lex: واژه‌های یادگرفته (db.wd) */
@@ -627,7 +640,7 @@ function tree(groups, lang, lex) {
       b.models.push(m);
     }
     m.variants.push(g);
-    var shown = modelName(g, ent, EN, lex);
+    var shown = purify(modelName(g, ent, EN, lex), EN, lex);
     m.cnt[shown || g.name] = (m.cnt[shown || g.name] || 0) + g.sizes.length;
   });
   var brands = Object.keys(B).map(function (k) { return B[k]; });

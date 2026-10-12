@@ -12,7 +12,11 @@ INJ="""(function(){var F=window.__FX,n=0,dk=F.digikala;
   if(n==3){p.title_fa='عطر ادکلن دیور مدل ساواج الکسیر زنانه ادوپرفیوم 60 میل';p.title_en='Dior Sauvage Elixir Eau de Parfum 60ml';p.id=9990001}
   if(n==5){p.title_fa='Zzqx Wnrk Eau de Parfum 100ml';p.title_en='';p.id=9990002}
   if(n==7){p.title_fa='عطر ادکلن شنل مدل بلو دو شنل مردانه ادوپرفیوم 100 میل';p.title_en='';p.id=9990003}
- })})})();"""
+ })});
+ var m=0;F.liliome.forEach(function(pg){pg.forEach(function(p){m++;
+  if(m%61==0)p.categories=[{name:'Zorg Plam | زرگ پلم'},{name:'عطر و ادکلن'}];
+  if(m%67==0)p.categories=[{name:'Qaxel Brand'},{name:'عطر و ادکلن'}];
+ })});})();"""
 LATIN=re.compile(r"^[A-Za-z0-9 '&.\-éôè]+$")
 FA=re.compile(r"[؀-ۿ]")
 async def go(p,lang,model='a',w=360,h=780,extra=''):
@@ -29,7 +33,8 @@ async def main():
         b,pg,errs=await go(p,'fa')
         A=await pg.evaluate(ALL)
         chk(all(FA.search(x['n']) for x in A),'fa: every brand/model name has Persian letters: '+str([x['n'] for x in A if not FA.search(x['n'])][:5]))
-        chk(not [x for x in A if x['L']=='A'],'fa: no Latin "A" section')
+        chk(not [x for x in A if x['L']=='A'],'fa: no Latin "A" section: '+str([x['n'] for x in A if x['L']=='A'][:5]))
+        chk(any(x['t']=='b' and x['n']=='زرگ پلم' for x in A),'fa: mixed-script brand hint → Persian part: '+str([x['n'] for x in A if x['t']=='b' and x['L']=='ز']))
         zz=[x for x in A if x['t']=='m' and 'ونرک' in x['n']]
         print('latin-only in fa:',[x['n'] for x in zz])
         chk(len(zz)==1,'fa: latin-only item shown with Persian letters')
@@ -46,6 +51,8 @@ async def main():
         dior=[x['n'] for x in A if x['t']=='m' and x['b']=='Dior']
         chk(any(re.search(r'sauvage',n,re.I) for n in dior),'en: Dior has Sauvage model (name from site title_en): '+str(dior[:6]))
         chk(any(x['t']=='b' and x['n']=='Chanel' for x in A),'en: brand Chanel')
+        chk(any(x['t']=='b' and x['n']=='Zorg Plam' for x in A),'en: mixed-script brand hint → Latin part')
+        chk(any(x['t']=='b' and x['n']=='Qaxel Brand' for x in A),'en: Latin-hint brand shown by its own name: '+str([x['n'] for x in A if x['t']=='b' and x['L']=='Q']))
         chan=[x['n'] for x in A if x['t']=='m' and x['b']=='Chanel']
         chk(any(n.lower().startswith('bleu') for n in chan),'en: Chanel Bleu de (made from Persian by dictionary): '+str(chan[:8]))
         chk(any('zzqx' in x['n'].lower() for x in A),'en: latin-only item shown')
