@@ -1,7 +1,7 @@
 (function () {
 'use strict';
 var RM = !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
-var VERSION = '1.9.2';
+var VERSION = '1.10';
 function $(id) { return document.getElementById(id); }
 function fa(n) { return String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, '٬').replace(/\d/g, function (d) { return '۰۱۲۳۴۵۶۷۸۹'[d]; }); }
 function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
@@ -738,6 +738,7 @@ async function doSource(s) {
 }
 async function refresh(manual) {
   if (busy) return;
+  if (Core.CLEANSE) { Core.CLEANSE.n = 0; Core.CLEANSE.junk = 0; }
   busy = true; prog = {}; updPill(); overlay(); refBtn(); if (open) renderSheet();
   var ok = 0, bad = 0;
   await Promise.all(Core.SOURCES.map(async function (s) {
@@ -768,6 +769,7 @@ var sheetY = 1, open = false, adv = false, advN = 0;
 function renderSheet() {
   Array.prototype.forEach.call($('sTheme').children, function (b) { b.classList.toggle('on', b.dataset.v === set.theme); });
   Array.prototype.forEach.call($('sAuto').children, function (b) { b.classList.toggle('on', +b.dataset.m === (+set.auto > 0 ? +set.auto : 0)); });
+  Array.prototype.forEach.call($('sUpdA').children, function (b) { b.classList.toggle('on', +b.dataset.v === (updAutoOn() ? 1 : 0)); });
   Array.prototype.forEach.call($('sModel').children, function (b) { b.classList.toggle('on', b.dataset.v === set.model); });
   var bad = false;
   $('sSrc').innerHTML = Core.SOURCES.map(function (s) {
@@ -810,6 +812,9 @@ function renderReport() {
   if (au.nb) ap.push('<bdi>' + fa(au.nb) + '</bdi> عطرِ بی‌نام حذف شد');
   if (au.brands.length) ap.push('<bdi>' + fa(au.brands.length) + '</bdi> برندِ تکراری یکی شد');
   if (au.models.length) ap.push('<bdi>' + fa(au.models.length) + '</bdi> نامِ تکراری یکی شد');
+  var CL = Core.CLEANSE || {};
+  if (CL.n) ap.push('<bdi>' + fa(CL.n) + '</bdi> عنوان پالایش شد (سال، کد یا واژه‌ی اضافه برداشته شد)');
+  if (CL.junk) ap.push('<bdi>' + fa(CL.junk) + '</bdi> عنوانِ بی‌معنی کنار رفت');
   if (staleN) ap.push('<bdi>' + fa(staleN) + '</bdi> کالایی که چند ساعت است در سایت دیده نشده کنار رفت');
   row('پایش اطلاعات', (ap.length ? ap.join(' · ') : 'مورد تکراری یا بی‌نامی پیدا نشد') + ' · <button class="aud-t" type="button">نمونه‌ها</button>');
   if (audOpen) {
@@ -865,6 +870,15 @@ function sUp() { if (dy0 == null) return; var d = sy; dy0 = null; if (d > 80) cl
 sheet.addEventListener('pointerup', sUp); sheet.addEventListener('pointercancel', sUp);
 $('sTheme').onclick = function (e) { var v = e.target.dataset && e.target.dataset.v; if (!v) return; set.theme = v; ls.set('pp.set', set); applyTheme(); renderSheet(); };
 $('sModel').onclick = function (e) { var b = e.target.closest && e.target.closest('button'); if (!b || !b.dataset.v) return; set.model = b.dataset.v; ls.set('pp.set', set); renderSheet(); var a = curModel ? curModel.getAnchor() : null; mountModel(a); closeSheet(); };
+$('sUpdA').onclick = function (e) { var b = e.target.closest('button'); if (!b || b.dataset.v == null) return; set.updAuto = +b.dataset.v; ls.set('pp.set', set); renderSheet(); if (set.updAuto && updDue()) updCheck(false); };
+$('sUpd').onclick = function () { updSt.asked = false; updCheck(true); };
+$('updLater').onclick = function () { $('updBox').classList.remove('on'); };
+$('updGo').onclick = function () {
+  $('updGo').disabled = true; updSt.installing = true;
+  $('updTx').textContent = 'در حال نصب… اگر اندروید پرسید، گزینه‌ی بروزرسانی را بزنید.';
+  var ok = false; try { ok = window.Native.updInstall(); } catch (e) { }
+  if (!ok) window.__updErr('start');
+};
 $('sAuto').onclick = function (e) { var b = e.target.closest('button'); if (!b || b.dataset.m == null) return; set.auto = +b.dataset.m; ls.set('pp.set', set); renderSheet(); updPill(); if (set.auto > 0 && !busy && autoDue()) refresh(false); };
 $('sRef').onclick = function () { if (busy) { toast('همین حالا در حال بروزرسانی است…', 2200); return; } refresh(true); };
 $('sFull').onclick = function () { if (busy) return; db.full = {}; db.fa = {}; saveDb(); refresh(true); };
@@ -876,14 +890,53 @@ $('sCopy').onclick = function () {
   $('sCopy').textContent = 'کپی شد؛ در پیام برای سازنده بچسبانید';
 };
 window.__back = function () {
+  if ($('updBox').classList.contains('on')) { $('updBox').classList.remove('on'); return true; }
   if (vwId) { closeViewer(); return true; }
   if (open) { closeSheet(); return true; }
   if (dtId) { closeDetail(); return true; }
   return goUp();
 };
+/* ---------- بروزرسانی خودِ برنامه از گیت‌هاب ---------- */
+var updSt = { code: 0, ready: 0, asked: false, manual: false }, UPD_EVERY = 3 * 3600000;
+function hasN(k) { return !!(window.Native && typeof window.Native[k] === 'function'); }
+function updText(t) { var e = $('sUpdT'); if (e) e.textContent = t; }
+function updAutoOn() { return set.updAuto !== 0; }
+function updCheck(manual) {
+  updSt.manual = !!manual;
+  if (!hasN('updCheck')) { if (manual) toast('این امکان فقط در برنامه‌ی نصب‌شده کار می‌کند', 3000); return; }
+  ls.set('pp.updt', Date.now());
+  if (manual) updText('در حال بررسی…');
+  try { window.Native.updCheck(); } catch (e) { }
+}
+function updDue() { return updAutoOn() && hasN('updCheck') && Date.now() - (+ls.get('pp.updt', 0) || 0) > UPD_EVERY; }
+function showUpd() {
+  if (updSt.asked && !updSt.manual) return;
+  updSt.asked = true;
+  $('updTx').textContent = 'نسخه‌ی جدید برنامه آماده است. الان نصب شود؟ بعد از نصب باید برنامه را دوباره باز کنید.';
+  $('updGo').disabled = false; $('updBox').classList.add('on');
+}
+window.__updInfo = function (code) {
+  var cur = hasN('appCode') ? +window.Native.appCode() : 0;
+  if (code > cur) {
+    updSt.code = code;
+    if (updSt.ready === code) { showUpd(); return; }
+    updText('نسخه‌ی تازه پیدا شد؛ در حال دانلود…');
+    try { window.Native.updDownload(); } catch (e) { }
+  } else {
+    updText('برنامه‌ی شما آخرین نسخه است');
+    if (updSt.manual) toast('آخرین نسخه را دارید', 2500);
+  }
+};
+window.__updReady = function (code) { updSt.ready = code; updText('نسخه‌ی تازه آماده‌ی نصب است'); showUpd(); };
+window.__updErr = function (m) {
+  $('updBox').classList.remove('on');
+  updText('بروزرسانیِ برنامه انجام نشد؛ بعداً دوباره امتحان کنید');
+  if (updSt.manual || updSt.installing) toast('بروزرسانیِ برنامه انجام نشد', 3500);
+  updSt.installing = false;
+};
 function autoMs() { var m = +set.auto; return m > 0 ? m * 60000 : 0; }      // ۰ = دستی (پیش‌فرض)
 function autoDue() { var lo = lastOk(); if (!lo) return true; var a = autoMs(); return a > 0 && Date.now() - lo > a; }
-window.__resume = function () { updPill(); if (!busy && autoDue()) refresh(false); };
+window.__resume = function () { updPill(); if (updDue()) updCheck(false); if (!busy && autoDue()) refresh(false); };
 document.addEventListener('visibilitychange', function () { if (!document.hidden) window.__resume(); });
 window.addEventListener('beforeunload', function () { if (curModel && nav.lvl === 0) { var a = curModel.getAnchor(); if (a) ls.set('pp.last', a); } });
 window.__pp = { get allBrands() { return ALLB; }, open: openEntry, up: goUp, view: viewImg, closeView: closeViewer, get nav() { return nav; }, get tree() { return TREE; }, get gate() { var ps = photoStat(); return { need: ps.need, have: ps.have, ready: !!db.ready, tot: imgTot, left: imgLeft(), ok: imgOk, bad: imgBad }; }, mount: function (m) { var t = performance.now(); set.model = m; mountModel(curModel ? curModel.getAnchor() : null); return performance.now() - t; }, get model() { return curModel; }, get list() { return list; }, get flat() { return FLAT; }, get state() { return { db: db, st: stt, busy: busy, imgLoc: imgLoc }; }, refresh: refresh, net: net };
@@ -894,6 +947,7 @@ loadImgs();
 try { rebuild(); } catch (e) { console.error(e); }
 updPill(); overlay(); renderSheet();
 if (autoDue()) refresh(false);
+setTimeout(function () { if (updDue()) updCheck(false); }, 8000);
 setInterval(function () { updPill(); if (!busy && autoDue()) refresh(false); }, 30000);
 /* قفل ورود: اگر دانلود گیر کرد خودش دوباره تلاش کند؛ عکسی که جواب نداد جلوی ورود را نگیرد */
 setInterval(function () {

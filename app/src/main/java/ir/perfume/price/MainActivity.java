@@ -40,6 +40,7 @@ public class MainActivity extends Activity {
     private final ExecutorService pool = Executors.newFixedThreadPool(8);
     private final ExecutorService imgPool = Executors.newFixedThreadPool(3);
     private File imgDir;
+    private Updater upd;
     private static final int MAX_BYTES = 12 * 1024 * 1024;
     private static final String[] ALLOW_HOSTS = {"liliome.com", "digikala.com", "safirstores.com", "hilandbeauty.com"};
 
@@ -88,6 +89,11 @@ public class MainActivity extends Activity {
             }
         });
         web.setWebChromeClient(new WebChromeClient());
+        upd = new Updater(this, new Updater.Js() {
+            @Override public void run(final String script) {
+                runOnUiThread(new Runnable() { @Override public void run() { if (web != null) web.evaluateJavascript(script, null); } });
+            }
+        });
         web.addJavascriptInterface(new Bridge(), "Native");
         web.loadUrl("file:///android_asset/www/index.html");
     }
@@ -269,6 +275,11 @@ public class MainActivity extends Activity {
             } catch (Exception e) { return false; }
         }
 
+        @JavascriptInterface public int appCode() { return upd == null ? 0 : upd.appCode(); }
+        @JavascriptInterface public void updCheck() { if (upd != null) upd.check(); }
+        @JavascriptInterface public void updDownload() { if (upd != null) upd.download(); }
+        @JavascriptInterface public boolean updInstall() { return upd != null && upd.install(); }
+
         @JavascriptInterface
         public void copy(final String text) {
             runOnUiThread(new Runnable() {
@@ -323,6 +334,7 @@ public class MainActivity extends Activity {
         pool.shutdownNow();
         imgPool.shutdownNow();
         if (web != null) { web.destroy(); web = null; }
+        if (upd != null) upd.destroy();
         super.onDestroy();
     }
 }

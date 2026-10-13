@@ -156,6 +156,10 @@ svg{display:block}
 @keyframes ind{from{transform:translateX(0)}to{transform:translateX(-150%)}}
 #toast{position:absolute;left:16px;right:16px;bottom:calc(22px + env(safe-area-inset-bottom,0px));z-index:70;margin:0 auto;max-width:420px;padding:12px 16px;border-radius:16px;background:var(--tx);color:var(--bg);font-size:14px;font-weight:600;line-height:1.7;text-align:center;box-shadow:0 10px 30px rgba(0,0,0,.3);opacity:0;transform:translateY(20px);pointer-events:none;transition:opacity .25s,transform .25s}
 #toast.on{opacity:1;transform:none}
+#updBox{position:absolute;left:16px;right:16px;bottom:calc(22px + env(safe-area-inset-bottom,0px));z-index:90;margin:0 auto;max-width:420px;padding:16px;border-radius:20px;background:var(--sheet);border:1.5px solid var(--ac);box-shadow:0 12px 40px rgba(0,0,0,.45);display:none}
+#updBox.on{display:block}
+#updTx{font-size:15px;font-weight:600;line-height:1.9;text-align:center;margin-bottom:12px}
+#updBox .updb{display:flex;gap:10px}#updBox .updb .btn{flex:1;margin:0}
 #ov small{display:block;font-size:12px;color:var(--mu);margin-top:6px;line-height:1.8}
 .btn.ghost{background:var(--cb);color:var(--tx);font-weight:600;font-size:14px;margin-top:8px;padding:10px}
 .srcs{font-size:13px;line-height:1.9}
@@ -254,6 +258,7 @@ svg{display:block}
   <div id="dt" role="dialog" aria-label="جزئیات"><button id="dtx">بستن</button><div id="dtc"></div></div>
   <div id="vw" role="dialog" aria-label="عکس بزرگ"><div id="vwb"></div><div class="vh2">برای بستن، روی صفحه بزنید</div></div>
   <div id="scm"></div>
+  <div id="updBox" role="dialog" aria-live="polite"><div id="updTx"></div><div class="updb"><button class="btn" id="updGo"><span>بله، نصب شود</span></button><button class="btn ghost" id="updLater"><span>بعداً</span></button></div></div>
   <div id="toast" role="status" aria-live="polite"></div>
   <div id="sheet" role="dialog" aria-label="تنظیمات">
     <div class="gr"></div>
@@ -279,6 +284,10 @@ svg{display:block}
     <div class="hint2" style="margin-top:12px">بروزرسانی خودکار</div>
     <div class="seg mods" id="sAuto"><button data-m="0">خاموش<small>دستی</small></button><button data-m="15">۱۵<small>دقیقه</small></button><button data-m="30">۳۰<small>دقیقه</small></button><button data-m="60">۱<small>ساعت</small></button><button data-m="180">۳<small>ساعت</small></button></div>
     <div class="srcs" id="sSrc" style="margin-top:12px"></div>
+    <h3>نسخه‌ی برنامه</h3>
+    <div class="seg mods" id="sUpdA"><button data-v="1">خودکار<small>پیدا و دانلود می‌کند</small></button><button data-v="0">دستی<small>فقط وقتی بخواهم</small></button></div>
+    <button class="btn" id="sUpd" style="margin-top:8px"><span>بررسی نسخه‌ی جدید</span></button>
+    <div class="hint2" id="sUpdT"></div>
     <h3>گزارش به‌روز</h3>
     <div class="srcs" id="sRep"></div>
     <button class="btn ghost" id="sFull" style="display:none">دریافت کامل از اول</button>

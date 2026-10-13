@@ -38,7 +38,7 @@ function normFa0(s, keepAlef) {
 }
 var EXCL = /تستر|tester|نمونه|سمپل|sample|گیفت|gift ?set|ست هدیه|مینیاتور|miniature|دکانت|decant|اسانس|تکه ای|ریفیل|refill|بادی ?اسپری|body ?(spray|mist|lotion|wash)|لوسیون|شمع|خوشبو ?کننده|اسپری بدن|دئودورانت|دیودورانت|deodorant|ژل دوش|shower|کرم |اسپری مو|هیر ?میست|hair ?mist|شامپو|روغن عطر|عطر روغنی|رول ?ان|roll ?on|صابون|(^| )پک |(^| )ست( |$)|\bset\b|\bkit\b|(^| )کیت( |$)|مجموعه|جا ?عطری|\d+ ?تایی|\d+ ?عددی|عمده|بدون ?(جعبه|پلمب)|پلمب شکسته|دست دوم|کارکرده|اکسسوری|مشابه|کپی|الهام ?گرفته|\binspired\b|\bclone\b|ایمیتیشن|imitation|هم ?رایحه|افتر ?شیو|آفتر ?شیو|after ?shave|body ?splash|بادی ?اسپلش|hair ?perfume|عطر مو|perfume ?oil|\bcandle\b|\bsoap\b|\bunboxed\b|without ?box|\bused\b|بدون ?کارتن|یدک|\d ?pack\b|\d+ ?عدد\b|تقسیمی|بدون ?برچسب|فاقد ?جعبه|استوک|(^| )طرح( |$)|عطر ماشین|خوشبو ?کننده|room ?spray|\bcar\b|\bcream\b|کرم|\bshampoo\b|\blotion\b|\bdupe\b|similar to|gift ?pack|gift ?box|پک هدیه|\bpack\b|ماسک (صورت|مو|پوست)|(صورت|مو) ماسک|(face|hair|sheet) ?mask|بادی ?میست|fragrance ?mist|\bmist\b|body ?(butter|scrub|oil|crem|creme)|\bbutter\b|\bscrub\b|hair ?oil|gel ?douche|\bcr[eè]me\b|diffuser|\bdeo\b|دئو|coffret|\bduo\b|بخور|\d ?x ?\d|روغن (مو|بدن)|معادل|الهامی|با رایحه|\balternative\b|\bequivalent\b|\bimpression\b/;
 var STOP = {};
-('عطر ادکلن ادکلون مردانه زنانه مردونه زنونه یونیسکس یونی اورجینال اصل اصلی original حجم میلی لیتر لیتری برند مدل مناسب خرید قیمت فروش اسپری spray for men women unisex ml oz by ادو cc fl نسخه جدید پرفروش ارجینال تضمینی ویژه رایگان ارسال گارانتی پلمپ پلمب کارتن جعبه باکس box عطرادکلن وارداتی اروپایی ایتالیایی تخفیف موجود هدیه فوری نمایندگی رسمی لوکس کیفیت کوالیتی perfume fragrance genuine authentic sale shipping france mens womens stock instock ضمانت اصالت عالی انبار سریع نوروز عددی brand box damaged vintage').split(' ').forEach(function (w) { STOP[w] = 1; });
+('عطر ادکلن ادکلون مردانه زنانه مردونه زنونه یونیسکس یونی اورجینال اصل اصلی original حجم میلی لیتر لیتری برند مدل مناسب خرید قیمت فروش اسپری spray for men women unisex ml oz by ادو cc fl نسخه جدید پرفروش ارجینال تضمینی ویژه رایگان ارسال گارانتی پلمپ پلمب کارتن جعبه باکس box عطرادکلن وارداتی اروپایی ایتالیایی تخفیف موجود هدیه فوری نمایندگی رسمی لوکس کیفیت کوالیتی perfume fragrance genuine authentic sale shipping france mens womens stock instock ضمانت اصالت عالی انبار سریع نوروز عددی brand box damaged vintage ترین بهترین برتر پرطرفدار محبوب تازه محصول کالا نیش niche luxury ایرانی اوریجینال اورجینال ارجینال آنلاین فروشگاه batch بارکد barcode').split(' ').forEach(function (w) { STOP[w] = 1; });
 var RE_SIZE = /(\d+(?:\.\d+)?)\s*(?:میلی ?لیتر|میلی|میل|مل|ml|cc)(?![a-zا-ی])/g;
 var RE_OZ = /(\d+(?:\.\d+)?)\s*(?:fl\.? ?)?oz(?![a-z])/g;
 var CONC = [
@@ -116,6 +116,28 @@ function cleanToks(toks) {
   });
   return out;
 }
+/* ---------- پالایش (Data Cleansing) ----------
+   متنِ نام را قبل از شکستن به واژه تمیز می‌کند: کد و شناسه، سالِ تبلیغاتی (۲۰۲۵ ۲۰۲۶ ۱۴۰۴)، عددِ طولانی (بارکد)، تکرارِ عدد */
+var YEAR_RE = /^(?:20(?:1[89]|2\d|30)|139[5-9]|140\d)$/;
+function cleanseText(k, st) {
+  var before = k;
+  k = k.replace(/(?:^| )(?:کد|code|sku|batch|ref|id|شناسه|بچ|سریال|serial)\s*:?\s*(?:[a-z]{1,4}\s+)?[a-z0-9\-]*\d[a-z0-9\-]*/g, ' ');       // «کد 12345»
+  k = k.replace(/(?:^| )(?:[a-z]{1,4}\d{4,}|\d{4,}[a-z]{1,4})(?= |$)/g, ' ');                                              // AB12345
+  var toks = k.split(/\s+/).filter(Boolean), out = [];
+  toks.forEach(function (w) {
+    if (YEAR_RE.test(w)) return;                       // سالِ جدید/تبلیغاتی
+    if (/^\d{5,}$/.test(w)) return;                    // بارکد و کد
+    out.push(w);
+  });
+  var res = out.join(' ');
+  if (st && res.replace(/\s+/g, '') !== before.replace(/\s+/g, '')) st.n = (st.n || 0) + 1;
+  return res;
+}
+/* آیا نام (پس از پالایش) معنی دارد؟ باید حداقل یک واژه‌ی حرفیِ دو حرفی یا بیشتر داشته باشد؛ فقط عدد/حرفِ تک = بی‌معنی */
+function meaningful(toks) {
+  return toks.some(function (w) { return /^[؀-ۿa-z]{2,}$/.test(w); });
+}
+var CLEANSE = { n: 0, junk: 0 };
 function parseTitle(raw) {
   var t = normFa(String(raw == null ? '' : raw).replace(/<[^>]*>/g, ' '), true);
   t = t.replace(/[()\[\]{}]/g, ' ').replace(/[،؛؟٪٫٬٭]/g, ' ').replace(/\b(?:number|n ?°|n\.|no\.)\s*(\d)/g, 'no $1').replace(/(?:نامبر|نمبر|شماره)\s*(\d)/g, 'نامبر $1');
@@ -136,6 +158,7 @@ function parseTitle(raw) {
   CONC.forEach(function (x) { if (x[0] === 'پرفیوم' && conc !== 'پرفیوم') return; x[1].lastIndex = 0; k = k.replace(x[1], ' '); });
   k = k.replace(/\b(for|pour) (him|her|lui|elle|men|women|man|woman)\b/g, ' ').replace(/گارانتی ?دار|ساخت (فرانسه|امارات|آلمان|ایتالیا|اسپانیا|انگلیس)|ارسال رایگان|با (جعبه|کارتن)/g, ' ');
   k = k.replace(/[^؀-ۿa-z0-9\s]/g, ' ');
+  k = cleanseText(k, CLEANSE);
   var toks = k.split(/\s+/).filter(function (w, i, ar) { return w && !STOP[w] && !(w === 'd' && ar[i + 1] !== 'g'); });
   while (toks.length > 1 && (toks[0] === 'و' || toks[toks.length - 1] === 'و' || toks[toks.length - 1] === 'new')) toks = toks[0] === 'و' ? toks.slice(1) : toks.slice(0, -1);
   var fa = toks.filter(function (w) { return isFa(w) || /^\d+$/.test(w); });
@@ -153,8 +176,8 @@ function parseTitle(raw) {
     }
   }
   if (!shown.length) return null;
-  shown = cleanToks(shown);
-  if (!shown.length) return null;
+  shown = cleanToks(shown).filter(function (w) { return w.length > 1 || /[a-z0-9]/.test(w); });      // حرفِ تکِ فارسی = باقی‌مانده‌ی خراب
+  if (!shown.length || !meaningful(shown)) { CLEANSE.junk++; return null; }
   var lw = shown[shown.length - 1], pgn = '';
   if (shown.length > 2 && (lw === 'من' || lw === 'وومن' || lw === 'ومن')) { pgn = lw === 'من' ? 'm' : 'w'; shown = shown.slice(0, -1); lw = shown[shown.length - 1]; }
   if (shown.length > 2 && (lw === 'man' || lw === 'woman' || lw === 'مرد' || lw === 'زن')) {      // «Man/Woman» آخرِ عنوان = جنسیت؛ مگر اینکه نامِ خودِ عطر باشد (Jimmy Choo Man)
@@ -700,10 +723,15 @@ function canonBrand(key) {
   return key.slice(0, p0).concat(can, key.slice(p0 + n0));
 }
 /* برندِ یک گروه: ۱) دسته‌بندیِ سایت ۲) واژه‌های نام ۳) «سایر». خروجی: {id,name,strip:[واژه‌های برند داخل نام]} */
+function junkTok(w) { var n = normFa(w); return !n || YEAR_RE.test(n) || /^\d{5,}$/.test(n) || !!STOP[n]; }
+function cleanBrandName(h) {                      // نامِ برندِ گرفته‌شده از دسته‌بندیِ سایت: سال و واژه‌ی تبلیغاتی و کد نمی‌خواهد
+  return String(h).split(/\s+/).filter(function (w) { return w && !junkTok(w); }).join(' ').replace(/\s*&\s*/g, ' & ').trim();
+}
 function brandOf(key, hints) {
   var T = brandTable(), ent = null, unk = null;
   (hints || []).some(function (h) {
-    var tk = brandNorm(h); if (!tk.length) return false;
+    h = cleanBrandName(h);
+    var tk = brandNorm(h); if (!tk.length || !meaningful(tk)) return false;
     var e = T.byName[tk.join(' ')];
     if (!e) {                                           // «Dior (دیور)»: هر بخش (فارسی/لاتین) جدا امتحان شود
       var fp = tk.filter(function (w) { return /[؀-ۿ]/.test(w); }), lp = tk.filter(function (w) { return !/[؀-ۿ]/.test(w); });
@@ -714,7 +742,7 @@ function brandOf(key, hints) {
     if (!unk) {
       var ftk = tk.filter(function (w) { return /[؀-ۿ]/.test(w); }), ltk = tk.filter(function (w) { return !/[؀-ۿ]/.test(w); });
       if (ftk.length && ltk.length) unk = { id: 'h' + hash(tk.join(' ')), name: ftk.join(' '), en: titleEn(ltk), al: [ftk, ltk] };   // «Louis Vuitton | لویی ویتون»
-      else unk = { id: 'h' + hash(tk.join(' ')), name: String(h).replace(/\s*&\s*/g, ' & '), al: [tk] };
+      else unk = { id: 'h' + hash(tk.join(' ')), name: String(h), al: [tk] };
     }
     return false;
   });
@@ -1462,7 +1490,7 @@ var SOURCES = [
   { id: 'hiland', name: 'هایلند', run: function (net, rep, mode) { return wooOrHtml('https://hilandbeauty.com', 'https://hilandbeauty.com/fa/%D8%B9%D8%B7%D8%B1-%D9%88-%D8%A7%D8%AF%DA%A9%D9%84%D9%86', net, rep, mode); } }
 ];
 
-root.Core = { itemUrl: itemUrl, STALE_MIN: STALE_MIN, fa2en: fa2en, en2fa: en2fa, enTokens: enTokens, titleEn: titleEn, tree: tree, brandOf: brandOf, specInfo: specInfo, enrichTitle: enrichTitle, genderOf: genderOf, nameCmp: nameCmp, CFG: CFG, newDb: newDb, dbIndex: dbIndex, ingest: ingest, ingestAsync: ingestAsync, buildList: buildList, normFa: normFa, parseTitle: parseTitle, aggregate: aggregate, SOURCES: SOURCES, extractCards: extractCards,
+root.Core = { CLEANSE: CLEANSE, cleanseText: cleanseText, cleanBrandName: cleanBrandName, itemUrl: itemUrl, STALE_MIN: STALE_MIN, fa2en: fa2en, en2fa: en2fa, enTokens: enTokens, titleEn: titleEn, tree: tree, brandOf: brandOf, specInfo: specInfo, enrichTitle: enrichTitle, genderOf: genderOf, nameCmp: nameCmp, CFG: CFG, newDb: newDb, dbIndex: dbIndex, ingest: ingest, ingestAsync: ingestAsync, buildList: buildList, normFa: normFa, parseTitle: parseTitle, aggregate: aggregate, SOURCES: SOURCES, extractCards: extractCards,
   wooSource: wooSource, digikalaSource: digikalaSource, htmlSource: htmlSource, letterOf: letterOf, median: median, priceFromText: priceFromText, similar: similar };
 if (typeof module !== 'undefined') module.exports = root.Core;
 })(typeof window !== 'undefined' ? window : globalThis);

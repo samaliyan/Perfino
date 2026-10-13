@@ -42,4 +42,4 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release delete latest --yes --cleanup-tag || true
-          gh release create latest "$RUNNER_TEMP/PerfumePrice.apk" --target "$GITHUB_SHA" --title "PerfumePrice (latest)" --notes "Latest build"
+          gh release create latest "$RUNNER_TEMP/PerfumePrice.apk" --target "$GITHUB_SHA" --title "PerfumePrice (latest)" --notes "code=$((GITHUB_RUN_NUMBER + 100))"
