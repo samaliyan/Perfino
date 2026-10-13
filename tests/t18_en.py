@@ -52,7 +52,7 @@ async def main():
         chk(any(re.search(r'sauvage',n,re.I) for n in dior),'en: Dior has Sauvage model (name from site title_en): '+str(dior[:6]))
         chk(any(x['t']=='b' and x['n']=='Chanel' for x in A),'en: brand Chanel')
         chk(any(x['t']=='b' and x['n']=='Zorg Plam' for x in A),'en: mixed-script brand hint → Latin part')
-        chk(any(x['t']=='b' and x['n']=='Qaxel Brand' for x in A),'en: Latin-hint brand shown by its own name: '+str([x['n'] for x in A if x['t']=='b' and x['L']=='Q']))
+        chk(any(x['t']=='b' and x['n']=='Qaxel' for x in A),'en: Latin-hint brand shown by its own name: '+str([x['n'] for x in A if x['t']=='b' and x['L']=='Q']))
         chan=[x['n'] for x in A if x['t']=='m' and x['b']=='Chanel']
         chk(any(n.lower().startswith('bleu') for n in chan),'en: Chanel Bleu de (made from Persian by dictionary): '+str(chan[:8]))
         chk(any('zzqx' in x['n'].lower() for x in A),'en: latin-only item shown')
