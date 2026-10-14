@@ -9,6 +9,7 @@ async def main():
         b,ctx,pg,errs=await new_page(p)
         await pg.goto('file://'+ROOT+'/index.html'); await wait_ready(pg,180000); await pg.wait_for_timeout(1500)
         flat=await pg.evaluate("window.__pp.flat.slice(0,8).map(function(g){return {id:g.id,ml:g.sizes[0].ml,price:g.sizes[0].price,n:g.sizes[0].srcs.length}})")
+        mid0=await pg.evaluate("(function(){var id=window.__pp.flat[0].id,t=window.__pp.tree;for(var i=0;i<t.length;i++)for(var j=0;j<t[i].models.length;j++)for(var k=0;k<t[i].models[j].variants.length;k++)if(t[i].models[j].variants[k].id===id)return t[i].models[j].id;return ''})()")
         h0=await pg.evaluate("localStorage.getItem('pp.hist')")
         chk('first run created history',bool(h0) and len(json.loads(h0)['d'])>10,len(json.loads(h0)['d']) if h0 else 0)
         await b.close()
@@ -55,6 +56,15 @@ async def main():
             chk(tag+'back closes report',not await pg.evaluate("document.getElementById('mk').classList.contains('on')"))
             chk(tag+'no page errors',not errs,errs[:2])
             await b.close()
+        # عطرِ پنهان‌شده در گزارش نمی‌آید
+        pre="if(!sessionStorage.getItem('hh')){sessionStorage.setItem('hh','1');localStorage.setItem('pp.hist',%s);var s=JSON.parse(localStorage.getItem('pp.set')||'{}');s.hide={};s.hide[%s]='x | y';localStorage.setItem('pp.set',JSON.stringify(s));}"%(json.dumps(json.dumps(seed)),json.dumps(mid0))
+        b,ctx,pg,errs=await new_page(p,extra=pre)
+        await pg.goto('file://'+ROOT+'/index.html'); await wait_ready(pg,180000); await pg.wait_for_timeout(1500)
+        await pg.evaluate("document.getElementById('sr').click()"); await pg.evaluate("document.getElementById('mkOpen').click()"); await pg.wait_for_timeout(400)
+        nr=await pg.evaluate("[].map.call(document.querySelectorAll('#mkr .mkr'),function(r){return r.innerText})")
+        chk('hidden perfume is not in the report (rise row gone)',not any('گران‌تر' in r for r in nr) and any('ارزان‌تر' in r and 'قبلاً' in r for r in nr),len(nr))
+        chk('rows without a perfume page are not buttons',await pg.evaluate("document.querySelectorAll('#mkr div.mkr.nl').length>0 && document.querySelectorAll('#mkr button.mkr:not([data-m])').length==0"))
+        await b.close()
         # تاریخچهٔ خراب
         b,ctx,pg,errs=await new_page(p,extra="if(!sessionStorage.getItem('c')){sessionStorage.setItem('c','1');localStorage.setItem('pp.hist','{{{');}")
         await pg.goto('file://'+ROOT+'/index.html'); await wait_ready(pg,180000); await pg.wait_for_timeout(1200)

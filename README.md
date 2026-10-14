@@ -61,7 +61,7 @@ Online-shop titles are messy. A multi-stage pipeline keeps the list clean:
 - **Product photos** cached on the device, with a drawn bottle as fallback.
 
 ### Updates
-- On launch the app checks GitHub for a newer version and asks before installing.
+- On launch the app checks GitHub for a newer version, downloads it (about 20 MB; in manual mode only when you ask) and asks before installing.
 - During download the button is disabled and a progress bar is shown.
 - Automatic or manual update mode in Settings.
 
@@ -76,7 +76,7 @@ Online-shop titles are messy. A multi-stage pipeline keeps the list clean:
 3. If Android asks, allow installing apps from this source.
 4. Tap **Install**.
 
-Requires **Android 7.0 (API 24)** or newer and an internet connection for updates. The first launch downloads the catalogue and photos; later launches open instantly from stored data and refresh in the background.
+Requires **Android 7.0 (API 24)** or newer with a reasonably current Android System WebView (Chrome 62 or newer) and an internet connection for updates. The first launch downloads the catalogue and photos; later launches open instantly from stored data and refresh in the background.
 
 ## Build from source
 
@@ -180,7 +180,7 @@ Python tests need Playwright with Chromium. The Java code is compiled only by CI
 - **عکس محصول** روی گوشی نگه‌داری می‌شود و اگر نبود، یک بطری ترسیمی جایگزین می‌شود.
 
 ### به‌روزرسانی خود برنامه
-- هنگام باز شدن، برنامه از گیت‌هاب نسخهٔ جدید را بررسی می‌کند و قبل از نصب می‌پرسد.
+- هنگام باز شدن، برنامه از گیت‌هاب نسخهٔ جدید را بررسی و دانلود می‌کند (حدود ۲۰ مگابایت؛ در حالت دستی فقط وقتی بخواهید) و قبل از نصب می‌پرسد.
 - هنگام دانلود، دکمه غیرفعال می‌شود و نوار پیشرفت دیده می‌شود.
 - حالت خودکار یا دستی در تنظیمات.
 
@@ -195,7 +195,7 @@ Python tests need Playwright with Chromium. The Java code is compiled only by CI
 3. اگر اندروید پرسید، نصب برنامه از این منبع را اجازه بدهید.
 4. دکمهٔ «نصب» را بزنید.
 
-برنامه به **اندروید ۷ (API 24)** یا بالاتر نیاز دارد. اینترنت برای بروزرسانی لازم است. بار اول، فهرست و عکس‌ها دانلود می‌شود؛ دفعه‌های بعد برنامه فوری از اطلاعات ذخیره‌شده باز می‌شود و در پس‌زمینه بروز می‌شود.
+برنامه به **اندروید ۷ (API 24)** یا بالاتر و یک Android System WebView نسبتاً به‌روز (Chrome 62 یا جدیدتر) نیاز دارد. اینترنت برای بروزرسانی لازم است. بار اول، فهرست و عکس‌ها دانلود می‌شود؛ دفعه‌های بعد برنامه فوری از اطلاعات ذخیره‌شده باز می‌شود و در پس‌زمینه بروز می‌شود.
 
 ## ساخت از روی سورس
 

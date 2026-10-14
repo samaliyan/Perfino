@@ -1,7 +1,7 @@
 (function () {
 'use strict';
 var RM = !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
-var VERSION = '1.16';
+var VERSION = '1.17';
 function $(id) { return document.getElementById(id); }
 function fa(n) { return String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, '٬').replace(/\d/g, function (d) { return '۰۱۲۳۴۵۶۷۸۹'[d]; }); }
 function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
@@ -425,7 +425,7 @@ if (!Array.isArray(set.block)) set.block = [];                                  
 set.block = set.block.filter(function (x) { return typeof x === 'string' && x.trim().length >= 2; }).slice(0, 60);
 if (!(set.fs >= 0 && set.fs <= 3)) set.fs = 0;
 Core.setBlock(set.block);
-if (!MODELS[set.model]) set.model = 'a';
+if (!Object.prototype.hasOwnProperty.call(MODELS, set.model)) set.model = 'a';
 var db = ls.get('pp.db', null);
 if (!db || db.v !== 3 || db.fv !== 5 || !db.g || !db.it) db = Core.newDb();   // نسخه‌ی ۱.۳ همه چیز را یک‌بار از نو و کامل می‌گیرد
 db.fv = 5;
@@ -589,30 +589,33 @@ function setEntries() {
   struct = structOf(list);
 }
 /* ---------- تاریخچه و «گزارش بازار» ---------- */
-var VM = {}, hist = Core.histFix(ls.get('pp.hist', null)), mkOn = false;
+var VM = {}, VA = {}, hist = Core.histFix(ls.get('pp.hist', null)), mkOn = false;
 function histTake() {
   try {
     var now = Date.now(), a = actv();
     if (!db.ready || !a.length || !a.every(function (s) { return db.t[s.id] && now - db.t[s.id] < 12 * 3600e3; })) return;   // همه‌ی سایت‌های روشن باید تازه باشند؛ وگرنه کالاهای یک سایتِ خراب «ناموجود» دیده می‌شوند
-    Core.histSnap(hist, FLAT, order().join(','), now, function (g) { return [GN[g.gn], g.conc].filter(Boolean).join(' · '); });
+    Core.histSnap(hist, FLAT, order().join(','), now, function (g) { return [GN[g.gn], g.conc].filter(Boolean).join(' · '); }, set.block.join(','));
     if (!ls.set('pp.hist', hist)) {
       Object.keys(hist.d).forEach(function (k) { var e = hist.d[k]; if (e.p && e.p.length > 2) e.p = [e.p[0], e.p[e.p.length - 1]]; });
       if (!ls.set('pp.hist', hist)) { hist = Core.histNew(); ls.set('pp.hist', hist); }
     }
+    if (mkOn) { var sc = $('mkr').scrollTop; mkRender(); $('mkr').scrollTop = sc; }
   } catch (e) { console.error(e); }
 }
 function dayT(d) { return d < 1 ? 'امروز' : fa(d) + ' روز پیش'; }
 function srcName(id) { var r = ''; Core.SOURCES.forEach(function (s) { if (s.id === id) r = s.name; }); return r || id; }
 function mkRow(r, val, sub) {
   var m = VM[r.gid], lab = [r.l, fa(r.ml) + ' میل'].filter(Boolean).join(' · ');
-  return '<button type="button" class="mkr"' + (m ? ' data-m="' + esc(m) + '"' : '') + '><div class="mi"><b>' + esc(r.name) + '</b><small>' + esc(lab) + '</small>' + (sub ? '<small>' + sub + '</small>' : '') + '</div><div class="mv ' + val[0] + '"><b>' + val[1] + '</b>' + (val[2] ? '<small>' + val[2] + '</small>' : '') + '</div></button>';
+  return '<' + (m ? 'button type="button"' : 'div') + ' class="mkr' + (m ? '' : ' nl') + '"' + (m ? ' data-m="' + esc(m) + '"' : '') + '><div class="mi"><b>' + esc(r.name) + '</b><small>' + esc(lab) + '</small>' + (sub ? '<small>' + sub + '</small>' : '') + '</div><div class="mv ' + val[0] + '"><b>' + val[1] + '</b>' + (val[2] ? '<small>' + val[2] + '</small>' : '') + '</div></' + (m ? 'button' : 'div') + '>';
 }
 function mkSec(title, hint, rows, total) {
   return '<div class="mks">' + title + (total ? ' <span class="mkn">(' + fa(total) + ' مورد)</span>' : '') + '</div><div class="mkh">' + hint + '</div>'
     + (rows.length ? rows.join('') + (total > rows.length ? '<div class="mkn">و ' + fa(total - rows.length) + ' مورد دیگر که اینجا نشان داده نشد.</div>' : '') : '<div class="mkn">موردی نیست.</div>');
 }
 function mkRender() {
+  var vis = function (r) { var a = VA[r.gid]; return !(a && (set.hide[a.m] || (set.off || {})[a.b])); };      // پنهان‌شده‌ها و برندهای خاموش در گزارش نیایند
   var R = Core.histReport(hist, FLAT, Date.now(), { thr: 0.08, lab: function (g) { return [GN[g.gn], g.conc].filter(Boolean).join(' · '); } }), CAP = 20, T = function (a) { return a.slice(0, CAP); }, tm = function (n) { return fa(n) + ' تومان'; };
+  ['gap', 'up', 'down', 'gone', 'back', 'low', 'fresh'].forEach(function (k) { R[k] = R[k].filter(vis); });
   var span = R.span, intro = span < 1
     ? 'ثبت تاریخچه از همین امروز شروع شده است. گزارش‌های «تغییر قیمت» و «موجودی» بعد از چند روز پر می‌شود. «اختلاف قیمت فروشگاه‌ها» همین الان کار می‌کند.'
     : 'تاریخچه ' + fa(span) + ' روز است ثبت می‌شود و با هر بروزرسانی کامل‌تر می‌شود. روی هر عطر بزنید تا صفحه‌اش باز شود.';
@@ -634,7 +637,10 @@ function mkRender() {
     T(R.fresh).map(function (r) { return mkRow(r, ['dn', 'تازه', dayT(r.ago)], 'قیمت: ' + tm(r.price)); }), R.fresh.length);
   $('mkr').innerHTML = h;
 }
-function openReport() { mkOn = true; closeSearch(); if (open) closeSheet(); mkRender(); $('mk').classList.add('on'); $('mkr').scrollTop = 0; }
+function openReport() {
+  try { mkRender(); } catch (e) { console.error(e); toast('گزارش ساخته نشد', 3000); return; }      // تاریخچه‌ی سالم هرگز به‌خاطر یک خطا پاک نمی‌شود (داده‌ی خراب هنگام خواندن اصلاح می‌شود)
+  mkOn = true; closeSearch(); if (open) closeSheet(); $('mk').classList.add('on'); $('mkr').scrollTop = 0;
+}
 function closeReport() { mkOn = false; $('mk').classList.remove('on'); }
 $('mkOpen').onclick = openReport; $('sMk').onclick = openReport; $('mkx').onclick = closeReport;
 $('mkr').addEventListener('click', function (e) {
@@ -654,7 +660,8 @@ function rebuild(light) {
     return ms.length === b.models.length ? b : Object.assign({}, b, { models: ms });
   }).filter(function (b) { return b.models.length; });
   BR_BY = {}; MD_BY = {};
-  VM = {};
+  VM = {}; VA = {};
+  ALLB.forEach(function (b) { b.models.forEach(function (m) { m.variants.forEach(function (v) { VA[v.id] = { m: m.id, b: b.id }; }); }); });
   TREE.forEach(function (b) { BR_BY[b.id] = b; b.models.forEach(function (m) { m.brandId = b.id; MD_BY[m.id] = m; m.variants.forEach(function (v) { VM[v.id] = m.id; }); }); });
   if (nav.brand && !BR_BY[nav.brand]) { nav.lvl = 0; nav.brand = null; }
   var vis = []; TREE.forEach(function (b) { b.models.forEach(function (m) { m.variants.forEach(function (v) { vis.push(v); }); }); });
@@ -752,10 +759,11 @@ function renderDetail() {
   $('dtc').scrollTop = keep;
 }
 function openDetail(id) {
+  hideArm = 0;
   dtId = id; renderDetail(); $('dtc').scrollTop = 0;
   dtEl.classList.add('on');
 }
-function closeDetail() { dtId = null; dtEl.classList.remove('on'); }
+function closeDetail() { hideArm = 0; dtId = null; dtEl.classList.remove('on'); }
 $('dtx').onclick = closeDetail;
 $('dtc').addEventListener('click', function (e) {
   var ab = e.target.closest && e.target.closest('.dact button');
@@ -782,6 +790,11 @@ function viewImg(id) {
   if (!small && !im.big) box.innerHTML = '<div class="vfb">' + bottle(im.k, false) + '</div>';
   else {
     box.innerHTML = '<img id="vwi" alt="" referrerpolicy="no-referrer" src="' + esc(small || im.big) + '">';
+    var vTry = 0; $('vwi').onerror = function () {      // عکس باز نشد: ابتدا نسخه‌ی بزرگ، بعد بطریِ جایگزین (نه صفحه‌ی سیاه)
+      if (tok !== vwTok || vwId !== id) return;
+      if (!vTry++ && im.big && this.getAttribute('src') !== im.big) { this.src = im.big; return; }
+      box.innerHTML = '<div class="vfb">' + bottle(im.k, false) + '</div>';
+    };
     if (im.big && im.big !== small) {
       var pre = new Image(); pre.referrerPolicy = 'no-referrer';
       pre.onload = function () { if (tok === vwTok && vwId) { var el = $('vwi'); if (el) { el.src = im.big; el.classList.add('big'); } } };
@@ -902,7 +915,7 @@ function clock(t) { if (!t) return '—'; var d = new Date(t), p = function (n) 
 /* گزارش به‌روز: وضعیت دریافت هر سایت، فهرست، عکس‌ها و نام‌ها؛ تا تنظیمات باز است خودش تازه می‌شود */
 /* ---------- گزارش: هر بخش به زبان ساده می‌گوید «چه شد / چرا / چه باید کرد» ---------- */
 var RUN = ls.get('pp.run', null);
-if (!RUN || typeof RUN !== 'object' || !Array.isArray(RUN.src)) RUN = null;
+if (!RUN || typeof RUN !== 'object' || !Array.isArray(RUN.src) || !RUN.src.every(function (x) { return x && typeof x === 'object'; })) RUN = null;
 function sizeMap(l) { var o = {}; (l || []).forEach(function (g) { g.sizes.forEach(function (z) { o[g.id + '|' + z.ml] = z.price; }); }); return o; }
 function diffMaps(a, b) {
   var d = { up: 0, down: 0, nw: 0, gone: 0, same: 0 };
@@ -1074,7 +1087,7 @@ $('sCopy').onclick = function () {
   $('sCopy').textContent = 'کپی شد؛ در پیام برای سازنده بچسبانید';
 };
 window.__back = function () {
-  if ($('updBox').classList.contains('on')) { $('updBox').classList.remove('on'); return true; }
+  if ($('updBox').classList.contains('on')) { $('updBox').classList.remove('on'); updSt.dismissed = true; return true; }
   if (mkOn) { closeReport(); return true; }
   if (srOn) { closeSearch(); return true; }
   if (vwId) { closeViewer(); return true; }
@@ -1090,7 +1103,7 @@ function applyFs() { document.documentElement.style.setProperty('--zs', FS[set.f
 var srOn = false, srFavOnly = false, srIdx = [], srSig = '', srT = 0;
 function srNorm(x) { return Core.normFa(String(x || '')).toLowerCase().replace(/[^؀-ۿa-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim(); }
 function srBuild() {
-  var sig = TREE.length + ':' + treeSig + ':' + Object.keys(set.hide).length; if (sig === srSig) return; srSig = sig; srIdx = [];
+  var sig = TREE.length + ':' + treeSig + ':' + Object.keys(set.hide).join(',') + ':' + Object.keys(set.off || {}).join(','); if (sig === srSig) return; srSig = sig; srIdx = [];
   var hasFa = function (t) { return /[؀-ۿ]/.test(t); };
   TREE.forEach(function (b) {
     b.models.forEach(function (m) {
@@ -1136,7 +1149,7 @@ function srRender() {
   box.innerHTML = out.length ? out.map(function (r) { return row(r[1].m.name, r[1].b.name, false, r[1].m.id); }).join('') + (more ? '<div class="sremp">فقط ۶۰ مورد اول نشان داده شد؛ دقیق‌تر بنویسید.</div>' : '')
     : '<div class="sremp">چیزی پیدا نشد.<br>املای دیگری را امتحان کنید یا فقط بخشی از نام را بنویسید.</div>';
 }
-function openSearch() { srOn = true; $('srch').classList.add('on'); srRender(); setTimeout(function () { try { $('srq').focus(); } catch (e) { } }, 60); }
+function openSearch() { srOn = true; $('srch').classList.add('on'); srRender(); setTimeout(function () { try { $('srq').focus(); $('srq').select(); } catch (e) { } }, 60); }
 function closeSearch() { srOn = false; $('srch').classList.remove('on'); try { $('srq').blur(); } catch (e) { } }
 $('sr').onclick = openSearch; $('srx').onclick = closeSearch;
 $('srq').addEventListener('input', function () { clearTimeout(srT); srT = setTimeout(srRender, 120); });
@@ -1158,7 +1171,7 @@ function renderMine() {
 $('sFs').onclick = function (e) { var b = e.target.closest('button'); if (!b || b.dataset.v == null) return; set.fs = +b.dataset.v; ls.set('pp.set', set); applyFs(); renderMine(); };
 function addBlock() {
   var inp = $('bkIn'), w = inp.value.trim();
-  if (w.length < 2) { toast('حداقل دو حرف بنویسید', 2500); return; }
+  if (w.length < 3) { toast('حداقل سه حرف بنویسید؛ واژه‌ی کوتاه چیزهای زیادی را حذف می‌کند', 3500); return; }
   if (set.block.indexOf(w) >= 0) { inp.value = ''; return; }
   set.block.push(w); ls.set('pp.set', set); inp.value = '';
   Core.setBlock(set.block);
