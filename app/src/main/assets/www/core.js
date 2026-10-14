@@ -138,10 +138,24 @@ function meaningful(toks) {
   return toks.some(function (w) { return /^[؀-ۿa-z]{2,}$/.test(w); });
 }
 var CLEANSE = { n: 0, junk: 0 };
+/* کالای «به سبکِ» یک عطرِ معروف: «پرفیوم مردانه های نیوویش مدل ورساچه اروس» = ساخته‌ی شرکتِ دیگر، نه ورساچه.
+   نشانه: پیش از «مدل» نامِ سازنده‌ی ناشناخته هست و بعد از «مدل» نامِ برندِ شناخته‌شده. چنین کالایی قیمتِ عطرِ اصلی را خراب می‌کند و وارد فهرست نمی‌شود. */
+var CLONE_GEN = {}; 'عطر ادکلن ادکلون مردانه زنانه مردونه زنونه یونیسکس پرفیوم ادو ادوپرفیوم ادوتویلت پارفوم parfum perfume edp edt cologne men women مناسب خانم آقایان بانوان'.split(' ').forEach(function (w) { CLONE_GEN[w] = 1; });
+function isCloneTitle(t) {
+  var tk = t.split(/\s+/), i = tk.indexOf('مدل');
+  if (i < 0) i = tk.indexOf('model');
+  if (i < 1 || i >= tk.length - 1) return false;
+  var nk = function (w) { return w.replace(/آ/g, 'ا').replace(/ؤ/g, 'و').replace(/ئ/g, 'ی'); };
+  var before = tk.slice(0, i).filter(function (w) { return w && !STOP[w] && !CLONE_GEN[w] && !/^\d+$/.test(w); }).map(nk);
+  var after = tk.slice(i + 1).filter(function (w) { return w && !/^\d+$/.test(w); }).map(nk);
+  if (!before.length || !after.length) return false;
+  return brandOf(after, []).id !== 'other' && brandOf(before, []).id === 'other';
+}
 function parseTitle(raw) {
   var t = normFa(String(raw == null ? '' : raw).replace(/<[^>]*>/g, ' '), true);
   t = t.replace(/[()\[\]{}]/g, ' ').replace(/[،؛؟٪٫٬٭]/g, ' ').replace(/\b(?:number|n ?°|n\.|no\.)\s*(\d)/g, 'no $1').replace(/(?:نامبر|نمبر|شماره)\s*(\d)/g, 'نامبر $1');
   if (!t || EXCL.test(t)) return null;
+  if (isCloneTitle(t)) { CLEANSE.clone = (CLEANSE.clone || 0) + 1; return null; }
   var m, sizes = [];
   RE_SIZE.lastIndex = 0;
   while ((m = RE_SIZE.exec(t))) sizes.push(+m[1]);
@@ -1180,13 +1194,26 @@ function ingestChunk(C, list) {
     if (price > 0) (C.byG[gid] = C.byG[gid] || []).push({ ml: p.ml, p: price * ((db.sc && db.sc[src]) || 1) });
   });
 }
-var DEDUPE_V = 3;
+/* عنوان‌های ذخیره‌شده را با قاعده‌های فعلی دوباره می‌سنجد؛ آن‌هایی که حالا رد می‌شوند (مثل کالای «مدل ...») از گروه‌ها بیرون می‌روند */
+function purgeStored(db) {
+  var n = 0;
+  Object.keys(db.it || {}).forEach(function (src) {
+    var M = db.it[src];
+    Object.keys(M).forEach(function (pid) {
+      var e = M[pid];
+      if (e[2] && e[0]) { var c0 = CLEANSE.clone | 0; var pr = parseTitle(e[0]); var isC = !pr && (CLEANSE.clone | 0) > c0; CLEANSE.clone = c0; if (isC) { e[1] = 0; e[2] = 0; e[3] = 0; n++; } }
+    });
+  });
+  return n;
+}
+var DEDUPE_V = 4;
 function ingestEnd(C, complete) {
   if (complete) {                                      // فهرستِ ناگهان خیلی کوچک‌تر شده (صفحه‌ی خطا/کپچا): پاک‌سازی نکن
     var known = Object.keys(C.M).length, seenN = Object.keys(C.seen).length;
     if (known >= 20 && seenN < known * 0.7) { complete = false; C.st.suspect = true; }
   }
   if (complete) Object.keys(C.M).forEach(function (pid) { if (!C.seen[pid]) { delete C.M[pid]; C.st.removed++; } });
+  if (C.db.dv !== DEDUPE_V) C.st.purged = purgeStored(C.db);           // نسخه‌ی قاعده‌ها عوض شده: کالاهای ردشده‌ی قبلی از حافظه بیرون بروند
   if (C.st.added || C.db.dv !== DEDUPE_V) { C.st.merged = reconcile(C.db, C.idx); C.db.dv = DEDUPE_V; }      // نسخه‌ی قاعده‌ها عوض شده = یک‌بار کل حافظه دوباره بازرسی شود
   return C.st;
 }

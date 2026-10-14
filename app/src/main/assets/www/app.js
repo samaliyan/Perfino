@@ -1,7 +1,7 @@
 (function () {
 'use strict';
 var RM = !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
-var VERSION = '1.11';
+var VERSION = '1.12';
 function $(id) { return document.getElementById(id); }
 function fa(n) { return String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, '٬').replace(/\d/g, function (d) { return '۰۱۲۳۴۵۶۷۸۹'[d]; }); }
 function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
@@ -733,7 +733,7 @@ async function doSource(s) {
     if (r.complete || (db.fa[s.id] = (db.fa[s.id] || 0) + 1) >= 3) { db.full[s.id] = Date.now(); db.fa[s.id] = 0; }
   }
   var cnt = 0; Object.keys(db.it[s.id] || {}).forEach(function (k) { var e = db.it[s.id][k]; if (e[2] && e[1] > 0) cnt++; });
-  stt[s.id] = { ok: true, n: cnt, t: Date.now(), mode: mode, note: r.note || '', full: !!(db.full[s.id]), added: st.added, removed: st.removed | 0, merged: st.merged | 0 };
+  stt[s.id] = { ok: true, n: cnt, t: Date.now(), mode: mode, note: r.note || '', full: !!(db.full[s.id]), added: st.added, removed: st.removed | 0, merged: st.merged | 0, purged: st.purged | 0 };
   P.done = true;
 }
 async function refresh(manual) {
@@ -756,11 +756,11 @@ async function refresh(manual) {
   var ch = 0;
   try { ch = rebuild(); } catch (e3) { console.error(e3); }
   try {
-    var au2 = (ALLB && ALLB.audit) || {}, mg = 0, CL2 = Core.CLEANSE || {};
-    Core.SOURCES.forEach(function (s) { mg += (stt[s.id] && stt[s.id].merged) | 0; });
+    var au2 = (ALLB && ALLB.audit) || {}, mg = 0, pg = 0, CL2 = Core.CLEANSE || {};
+    Core.SOURCES.forEach(function (s) { mg += (stt[s.id] && stt[s.id].merged) | 0; pg += (stt[s.id] && stt[s.id].purged) | 0; });
     RUN = { t: Date.now(), dur: Date.now() - t0, manual: !!manual, chg: snap0 ? diffMaps(snap0, sizeMap(FLAT)) : null,
       src: Core.SOURCES.map(function (s) { var o = srcState(s); return { name: o.name, kind: o.kind, cnt: o.cnt }; }),
-      clean: { titles: CL2.n | 0, junk: CL2.junk | 0, merged: mg, names: au2.nmod | 0, brands: (au2.brands || []).length, sus: au2.nsus | 0 } };
+      clean: { clone: CL2.clone | 0, purged: pg, titles: CL2.n | 0, junk: CL2.junk | 0, merged: mg, names: au2.nmod | 0, brands: (au2.brands || []).length, sus: au2.nsus | 0 } };
     ls.set('pp.run', RUN);
   } catch (e4) { console.error(e4); }
   busy = false; lastTried = Date.now(); saveDb(); updPill(); overlay(); refBtn(); renderSheet();
@@ -863,6 +863,8 @@ function renderReport() {
   P.push('بازرسی‌شده: ' + B(au.checked || r.nm) + ' نام عطر در ' + B(r.nb) + ' برند');
   if (CL.n || (RUN && RUN.clean && RUN.clean.titles)) P.push('عنوان‌های تمیزشده (سال، کد و واژه‌ی اضافه برداشته شد): ' + B(CL.n || RUN.clean.titles));
   if (CL.junk || (RUN && RUN.clean && RUN.clean.junk)) P.push('عنوانِ بی‌معنی که کنار رفت: ' + B(CL.junk || RUN.clean.junk));
+  var cln = RUN && RUN.clean ? (RUN.clean.clone | 0) : 0, prg = RUN && RUN.clean ? (RUN.clean.purged | 0) : 0;
+  if (cln || prg) P.push('کالای «مدل ...» از سازنده‌ی دیگر (مثلاً «های نیوویش مدل ورساچه اروس») که وارد فهرست نشد: ' + B(Math.max(cln, prg)));
   if (merged) P.push('عطرِ تکراری که یکی شد (مثلاً فارسی و انگلیسیِ یک عطر): ' + B(merged));
   if (au.brands.length) P.push('برندِ تکراری که یکی شد: ' + B(au.brands.length));
   if (au.models.length) P.push('نامِ تکراری که یکی شد: ' + B(au.models.length));
