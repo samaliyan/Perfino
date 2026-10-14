@@ -1629,6 +1629,32 @@ function elOut(e) {                           // یک المان به‌تنها
   }
   return false;
 }
+/* سایت‌های Next.js (مثل سفیر): فهرستِ کامل محصول‌ها با حجم، قیمت و موجودی داخل __NEXT_DATA__ است؛ عنوانِ کارت حجم ندارد */
+function nextDataCards(doc, pageUrl) {
+  var el = doc.getElementById('__NEXT_DATA__'), j, out = [];
+  if (!el) return out;
+  try { j = JSON.parse(el.textContent); } catch (e) { return out; }
+  var lists = [];
+  (function walk(x, d) {
+    if (!x || d > 8 || typeof x !== 'object') return;
+    if (Array.isArray(x)) { x.forEach(function (y) { walk(y, d + 1); }); return; }
+    if (Array.isArray(x.productList) && x.productList.length) lists.push(x.productList);
+    else Object.keys(x).forEach(function (k) { if (k !== 'productComments') walk(x[k], d + 1); });
+  })(j, 0);
+  lists.forEach(function (L) {
+    L.forEach(function (p) {
+      if (!p || typeof p !== 'object' || !p.label) return;
+      var spec = {}; (Array.isArray(p.specifications) ? p.specifications : []).forEach(function (sp) { if (sp && sp.key && sp.value && !spec[sp.key]) spec[sp.key] = String(sp.value); });
+      var title = String(p.label).replace(/\s+/g, ' ').trim();
+      if (spec['حجم'] && !/\d\s*(میل|ml|cc)/i.test(title)) title += ' ' + spec['حجم'];
+      if (p.isTester) title = 'تستر ' + title;
+      var pr = +p.priceWithOffer > 0 ? +p.priceWithOffer : +p.price, out0 = p.isAvailable === false || p.canBuy === false || !(pr > 0);
+      var u = p.frontEndUrl ? urlJoin(pageUrl, p.frontEndUrl) : '';
+      out.push({ u: u, t: title, price: out0 ? 0 : pr, st: out0 ? 1 : 0, img: p.imageUrl ? urlJoin(pageUrl, p.imageUrl) : '' });
+    });
+  });
+  return out;
+}
 function extractCards(doc, pageUrl) {
   var out = [], seen = {}, idxByKey = {};
   function push(o) { var k = normUrl(o.u) || o.t; if (idxByKey[k] != null) { if (o.st === 1) { var z = out[idxByKey[k]]; z.price = 0; z.st = 1; } return; } idxByKey[k] = out.length; out.push(o); }
@@ -1747,7 +1773,8 @@ async function htmlSource(start, net, rep, mode) {
     if (r.status === 404 && i > 0) { natural = true; stop = 'صفحه‌ی ' + (i + 1) + ' وجود ندارد (پایان)'; break; }
     if (r.status !== 200) { if (i === 0) throw new Error(r.status ? 'HTTP ' + r.status : r.body); failed++; stop = 'صفحه ' + (i + 1) + ' نشد'; break; }
     var doc = new DOMParser().parseFromString(r.body, 'text/html');
-    var cards = extractCards(doc, url), fresh = 0;
+    var cards = nextDataCards(doc, url); if (!cards.length) cards = extractCards(doc, url);
+    var fresh = 0;
     if (i === 0) rawSample(doc, cards, r.body, url);
     pages++;
     cards.forEach(function (c) {
@@ -1903,7 +1930,7 @@ function marketStats(list) {
   Object.keys(R.bySrc).forEach(function (k) { var s = R.bySrc[k]; s.avg = s.idx.length ? s.idx.reduce(function (a, b) { return a + b; }, 0) / s.idx.length : 0; delete s.idx; });
   return R;
 }
-root.Core = { RAWC: RAWC, stripPriceTail: stripPriceTail, marketStats: marketStats, histNew: histNew, histFix: histFix, histSnap: histSnap, histReport: histReport, purgeStored: purgeStored, setBlock: setBlock, REJ: REJ, vetReason: vetReason, reconcile: reconcile, CLEANSE: CLEANSE, cleanseText: cleanseText, cleanBrandName: cleanBrandName, itemUrl: itemUrl, STALE_MIN: STALE_MIN, fa2en: fa2en, en2fa: en2fa, enTokens: enTokens, titleEn: titleEn, tree: tree, brandOf: brandOf, specInfo: specInfo, enrichTitle: enrichTitle, genderOf: genderOf, nameCmp: nameCmp, CFG: CFG, newDb: newDb, dbIndex: dbIndex, ingest: ingest, ingestAsync: ingestAsync, buildList: buildList, normFa: normFa, parseTitle: parseTitle, aggregate: aggregate, SOURCES: SOURCES, extractCards: extractCards,
+root.Core = { nextDataCards: nextDataCards, RAWC: RAWC, stripPriceTail: stripPriceTail, marketStats: marketStats, histNew: histNew, histFix: histFix, histSnap: histSnap, histReport: histReport, purgeStored: purgeStored, setBlock: setBlock, REJ: REJ, vetReason: vetReason, reconcile: reconcile, CLEANSE: CLEANSE, cleanseText: cleanseText, cleanBrandName: cleanBrandName, itemUrl: itemUrl, STALE_MIN: STALE_MIN, fa2en: fa2en, en2fa: en2fa, enTokens: enTokens, titleEn: titleEn, tree: tree, brandOf: brandOf, specInfo: specInfo, enrichTitle: enrichTitle, genderOf: genderOf, nameCmp: nameCmp, CFG: CFG, newDb: newDb, dbIndex: dbIndex, ingest: ingest, ingestAsync: ingestAsync, buildList: buildList, normFa: normFa, parseTitle: parseTitle, aggregate: aggregate, SOURCES: SOURCES, extractCards: extractCards,
   wooSource: wooSource, digikalaSource: digikalaSource, htmlSource: htmlSource, letterOf: letterOf, median: median, priceFromText: priceFromText, similar: similar };
 if (typeof module !== 'undefined') module.exports = root.Core;
 })(typeof window !== 'undefined' ? window : globalThis);
