@@ -1,15 +1,30 @@
 (function () {
 'use strict';
 var RM = !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
-var VERSION = '1.26';
+var VERSION = '1.27';
 function $(id) { return document.getElementById(id); }
 function fa(n) { return String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, '٬').replace(/\d/g, function (d) { return '۰۱۲۳۴۵۶۷۸۹'[d]; }); }
 function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
 function clamp(x, a, b) { return Math.max(a, Math.min(b, x)); }
 function mix(hex, t) { var n = parseInt(hex.slice(1), 16), r = n >> 16, g = (n >> 8) & 255, b = n & 255; function m(c) { return Math.round(c + (255 - c) * t); } return 'rgb(' + m(r) + ',' + m(g) + ',' + m(b) + ')'; }
+/* دادهٔ بزرگ (فهرست و تاریخچه) در فایلِ خودِ برنامه ذخیره می‌شود، چون localStorage حدود ۵ مگابایت بیشتر جا ندارد؛ بدون فایل (مرورگر) یا در خطا به localStorage برمی‌گردد */
+var BIGK = { 'pp.db': 1, 'pp.hist': 1 };
+function fileOk() { return !!(window.Native && window.Native.fileSet && window.Native.fileGet); }
 var ls = {
-  get: function (k, d) { try { var v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch (e) { return d; } },
-  set: function (k, v) { try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch (e) { return false; } }
+  get: function (k, d) {
+    try {
+      if (BIGK[k] && fileOk()) { var s = window.Native.fileGet(k); if (s) return JSON.parse(s); }
+      var v = localStorage.getItem(k); return v ? JSON.parse(v) : d;
+    } catch (e) { return d; }
+  },
+  set: function (k, v) {
+    var str; try { str = JSON.stringify(v); } catch (e) { return false; }
+    if (BIGK[k] && fileOk()) {
+      var ok = false; try { ok = !!window.Native.fileSet(k, str); } catch (e) { ok = false; }
+      if (ok) { try { localStorage.removeItem(k); } catch (e) { } return true; }
+    }
+    try { localStorage.setItem(k, str); return true; } catch (e) { return false; }
+  }
 };
 function themeNow() { return document.documentElement.getAttribute('data-th'); }
 
@@ -1153,7 +1168,8 @@ $('sSamp').onclick = function () {
     + '\n\nردشده (' + rej.length + '):\n' + rej.join('\n') + '\n\nبقیه (' + okk.length + '):\n' + okk.join('\n');
   var hdr = '\n\nوضعیت هر سایت در آخرین بروزرسانی:\n' + Core.SOURCES.map(function (x) { var q = stt[x.id] || {}; return x.name + ': ' + (q.ok ? 'ok ' + q.n + (q.mode ? ' (' + q.mode + ')' : '') + (q.note ? ' ' + q.note : '') : (q.raw || q.err || 'نامشخص')); }).join('\n')
     + '\nرد شده در آخرین بروزرسانی: ' + ((Core.REJ && Core.REJ.n) || 0) + ' ' + JSON.stringify((Core.REJ && Core.REJ.by) || {}) + '\nنمونهٔ ردشده‌ها:\n' + ((Core.REJ && Core.REJ.ex) || []).slice(0, 40).map(function (e) { return e[0] + ' | ' + e[1]; }).join('\n');
-  t += hdr;
+  var szs = ''; try { szs = '\nحجم داده‌ی ذخیره‌شده (نویسه): فهرست ' + JSON.stringify(db).length + ' ؛ تاریخچه ' + JSON.stringify(hist).length + ' ؛ ذخیره در فایل: ' + (fileOk() ? 'بله' : 'نه') + ' ؛ عطر: ' + Object.keys(db.g).length; } catch (e) { }
+  t += hdr + szs;
   var raw = Object.keys(Core.RAWC || {}).map(function (h) { return '\n\n===== نمونهٔ خام صفحه: ' + h + ' =====\n' + Core.RAWC[h]; }).join('');
   t += raw; window.__samp = t;
   var d = new Date(), pad = function (n) { return (n < 10 ? '0' : '') + n; };

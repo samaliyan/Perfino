@@ -26,6 +26,7 @@ import org.json.JSONObject;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -360,6 +361,42 @@ public class MainActivity extends Activity {
                 }
             });
             return true;
+        }
+
+        /** دادهٔ بزرگ را در فایلِ خودِ برنامه می‌نویسد (بدون سقفِ ۵ مگابایتیِ localStorage). نوشتن اتمیک: اول فایل موقت، بعد جایگزینی. */
+        @JavascriptInterface
+        public boolean fileSet(final String key, final String text) {
+            try {
+                String safe = key.replaceAll("[^A-Za-z0-9._-]", "_");
+                File dir = getFilesDir();
+                File tmp = new File(dir, safe + ".tmp");
+                FileOutputStream fo = new FileOutputStream(tmp);
+                try { fo.write(text.getBytes("UTF-8")); fo.getFD().sync(); } finally { fo.close(); }
+                File f = new File(dir, safe + ".json");
+                if (!tmp.renameTo(f)) { f.delete(); if (!tmp.renameTo(f)) return false; }
+                return true;
+            } catch (Exception e) {
+                return false;
+            }
+        }
+
+        /** فایلِ ذخیره‌شده را برمی‌گرداند؛ نبودن یا خطا = رشته‌ی خالی. */
+        @JavascriptInterface
+        public String fileGet(final String key) {
+            try {
+                String safe = key.replaceAll("[^A-Za-z0-9._-]", "_");
+                File f = new File(getFilesDir(), safe + ".json");
+                if (!f.exists()) return "";
+                FileInputStream in = new FileInputStream(f);
+                try {
+                    ByteArrayOutputStream bo = new ByteArrayOutputStream((int) Math.min(f.length() + 16, 64L * 1024 * 1024));
+                    byte[] buf = new byte[65536]; int n;
+                    while ((n = in.read(buf)) > 0) bo.write(buf, 0, n);
+                    return bo.toString("UTF-8");
+                } finally { in.close(); }
+            } catch (Exception e) {
+                return "";
+            }
         }
 
         @JavascriptInterface
