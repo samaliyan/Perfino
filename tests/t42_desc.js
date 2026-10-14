@@ -28,4 +28,8 @@ var db2 = C.newDb(), ix2 = C.dbIndex(db2); C.ingest(db2, ix2, 'liliome', [{ id: 
 var gid = db2.it.liliome[5][2]; db2.g[gid].k = ['افنان', 'با', 'ساختار', 'ترش']; db2.dv = 1;
 db2.it.liliome[5][0] = 'عطر ادکلن افنان 9pm 100 میل';
 var n = C.purgeStored(db2); chk(db2.it.liliome[5][0] === '' , 'stored item whose key changed is queued for re-ingest');
+// عنوان واقعی دیجی‌کالا (بدون الفِ «ادو»)
+var RT='دوپرفیوم مردانه افنان مدل 9pm night out حجم 100 میلی‌لیتر با ساختار رایحه ترش مناسب فصل بهار';
+chk(key(RT)==='افنان 9pm night out'&&P(RT).conc==='ادوپرفیوم'&&P(RT).ml===100,'real digikala title: '+key(RT));
+chk(key('دوتویلت زنانه شنل مدل چنس 100 میلی لیتر')!==null&&P('دوتویلت زنانه شنل مدل چنس 100 میلی لیتر').conc==='ادوتویلت','دوتویلت typo');
 console.log(ok + ' ok ' + failed + ' bad'); process.exit(failed ? 1 : 0);
