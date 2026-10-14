@@ -42,7 +42,7 @@ async def main():
         await pg.evaluate("document.getElementById('dtx').click()"); await pg.wait_for_timeout(300)
         await pg.evaluate("document.getElementById('gear').click()"); await pg.wait_for_timeout(500)
         rep=await pg.evaluate("document.getElementById('sRep').innerText")
-        chk('پایش اطلاعات' in rep,'report has audit row: '+rep.replace('\\n',' | ')[:400])
+        chk('پالایش نام‌ها' in rep,'report has audit row: '+rep.replace('\\n',' | ')[:400])
         await pg.evaluate("document.querySelector('.aud-t').click()"); await pg.wait_for_timeout(200)
         chk(await pg.evaluate("!!document.querySelector('.audl')"),'examples expand')
         chk(not [e for e in errs if 'Failed to load' not in e],'no js errors '+str(errs[:2]))
