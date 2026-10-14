@@ -180,12 +180,16 @@ function isCloneTitle(t) {
 }
 /* توضیحِ تبلیغاتی داخل عنوان نامِ عطر نیست: «با رایحه‌ی خنک»، «با ساختار ترش»، «مناسب فصل بهار» ... تا اندازه/غلظت یا آخر عنوان */
 var DESC_END = '(?= \\d| ادو| دوپرفیوم| دوتویلت| ادکلن| ادوپرفیوم| edp| edt| parfum| eau|$)';
-var RE_DESC = new RegExp('(?:^| )(?:همراه )?(?:با|دارای|حاوی) (?:ساختار|رایحه|رایحه ی|بوی|بو|نت|نوت|نت ها|نت های|نوت ها|نوت های|ترکیب|طعم|حس|فضای|پایه|اسانس|عطر|ماندگاری|پخش|کیفیت|تم|ته ?مایه|عصاره|مواد|آروما|رنگ)(?: [^\\d]*?)?' + DESC_END, 'g');
+var RE_DESC = new RegExp('(?:^| )(?:همراه )?(?:با|دارای|حاوی) ?(?:ساختار|رایحه|رایجه|رایحه ی|بوی|بو|نت|نوت|نت ها|نت های|نوت ها|نوت های|ترکیب|طعم|حس|فضای|پایه|اسانس|عطر|ماندگاری|پخش|کیفیت|تم|ته ?مایه|عصاره|مواد|آروما|رنگ)(?: [^\\d]*?)?' + DESC_END, 'g');
 var RE_SEASON = new RegExp('(?:^| )(?:مناسب|ویژه|مخصوص|برای)(?: ی)? (?:فصل|روزهای|روز|شب|تابستان|زمستان|بهار|پاییز)(?: [^\\d]*?)?' + DESC_END, 'g');
-function stripDesc(t) { return t.replace(RE_DESC, ' ').replace(RE_SEASON, ' ').replace(/ فصل (?:بهار|تابستان|پاییز|زمستان)(?= |$)/g, ' ').replace(/\s+/g, ' ').trim(); }
+var SMELL = 'گرم|خنک|شیرین|تلخ|ترش|تند|ملایم|سرد|شرقی|چوبی|گلی|میوه ?ای|ادویه ?ای|تازه|مرکباتی|پودری|وانیلی|خوش|دودی|عنبری';
+var RE_SMELL = new RegExp('(?:^| )(?:رایحه|رایجه|ساختار)(?: ی)?(?: (?:رایحه|و|با))*(?: (?:' + SMELL + '))(?: (?:و|' + SMELL + '))*(?= |$)', 'g');
+function stripDesc(t) { t = t.replace(/([a-z])(?=[آ-ی])/g, '$1 '); return t.replace(RE_DESC, ' ').replace(RE_SMELL, ' ').replace(/ با مجسمه(?= |$)/g, ' ').replace(RE_SEASON, ' ').replace(/ فصل (?:بهار|تابستان|پاییز|زمستان)(?= |$)/g, ' ').replace(/\s+/g, ' ').trim(); }
 function isNameless(p) { var e = brandOf(p.key, []); return e.id !== 'other' && !stripBrand(p.key, e).length; }      // فقط نامِ برند؛ نامِ عطر پیدا نشد
+var RE_PTAIL = /\s*(?=[\d۰-۹,٬٫.%\s]*[,٬%])[\d۰-۹][\d۰-۹,٬٫.%\s]*(?:تومان|تومن|ریال)\s*$/;
+function stripPriceTail(t) { return String(t).replace(RE_PTAIL, '').trim(); }      // «نام عطر10,230,000%1 58,695,500 تومان»: قیمتِ چسبیده به آخر عنوان نام نیست
 function parseTitle(raw) {
-  var t = normFa(String(raw == null ? '' : raw).replace(/<[^>]*>/g, ' '), true);
+  var t = normFa(stripPriceTail(String(raw == null ? '' : raw).replace(/<[^>]*>/g, ' ')), true);
   t = t.replace(/(\d)[,٫](\d{1,2})(?=\s*(?:fl|oz|میل(?!یون)|ml))/g, '$1.$2');          // «3,4 oz» = 3.4 oz
   t = t.replace(/[()\[\]{}]/g, ' ').replace(/[،؛؟٪٫٬٭]/g, ' ').replace(/\b(?:number|n ?°|n\.|no\.)\s*(\d)/g, 'no $1').replace(/(?:نامبر|نمبر|شماره)\s*(\d)/g, 'نامبر $1');
   if (!t) return null;
@@ -221,7 +225,8 @@ function parseTitle(raw) {
     var fc = cleanToks(fa), fcn = fc.map(NK0), fe = brandOf(fcn, []);
     var latin = toks.filter(function (w) { return !isFa(w) && !/^\d+$/.test(w); });
     var le0 = latin.length ? brandOf(cleanToks(latin), [], true) : { id: 'other' };
-    if (fe.id !== 'other' && !stripBrand(fcn, fe).length) shown = toks;
+    if (/(^| )مدل [a-z]/.test(k) && latin.length) shown = toks;                      // «داویدف مدل Zino»: واژه‌ی لاتینِ بعد از «مدل» نامِ خودِ عطر است
+    else if (fe.id !== 'other' && !stripBrand(fcn, fe).length) shown = toks;
     else if (fe.id === 'other' && le0.id !== 'other') shown = toks;                      // «Lattafa خمره»: برندِ لاتین + نامِ فارسی؛ برند نباید گم شود                 // نامِ برند فارسی و نامِ عطر لاتین («دیور مدل Sauvage»)
     else {                                                                              // «اروس Flame»: واژه‌ی خطِ محصول (لاتین) جزو نام است
       var D = nameDict(), extra = [];
@@ -1354,7 +1359,7 @@ function purgeStored(db) {      // بیرون‌بردنِ کالاهای ذخی
   if (rk) db.full = {};                       // بروزرسانیِ بعدی «کامل» باشد تا عنوانِ پاک‌شده‌ها دوباره تحلیل شود
   return n;
 }
-var DEDUPE_V = 7;
+var DEDUPE_V = 8;
 function ingestEnd(C, complete) {
   if (complete) {                                      // فهرستِ ناگهان خیلی کوچک‌تر شده (صفحه‌ی خطا/کپچا): پاک‌سازی نکن
     var known = Object.keys(C.M).length, seenN = Object.keys(C.seen).length;
@@ -1708,7 +1713,7 @@ function extractCards(doc, pageUrl) {
     var h = card.querySelector('h1,h2,h3,h4,h5,[class*="title"],[class*="name"]');
     if (h) title = (h.textContent || '').replace(/\s+/g, ' ').trim();
     if (title.length < 6) { var alt = (img && img.getAttribute('alt')) || a.getAttribute('title') || ''; if (alt.length >= 6 && !/^(تصویر|عکس|image|photo|picture|thumbnail)/i.test(alt.trim())) title = alt; }
-    title = (title || '').replace(/\s+/g, ' ').trim();
+    title = stripPriceTail((title || '').replace(/\s+/g, ' ').trim());
     if (!title) return;
     var src = ''; if (img) ['src', 'data-src', 'data-lazy-src', 'data-original'].some(function (at) { var v2 = img.getAttribute(at) || ''; if (v2 && !/^data:/i.test(v2)) { src = v2; return true; } });      // «src» اغلب یک تصویرِ جایگزین (data:) است؛ نشانیِ واقعی در data-src
     push({ u: url, t: title, price: outFlag ? 0 : v, st: outFlag ? 1 : 0, img: src ? urlJoin(pageUrl, src) : '' });
@@ -1724,6 +1729,17 @@ function findNext(doc, url, i) {
   return u;
 }
 var BOTWALL = /captcha|just a moment|access denied|attention required|verify you are human|are you a robot|checking your browser|کپچا|ربات نیستید|دسترسی (شما )?مسدود/i;      // روی متنِ دیدنیِ صفحه (بدون اسکریپت/تگ) سنجیده می‌شود
+var RAWC = {};      // نمونه‌ی خامِ صفحه‌ی اول هر سایتِ HTML؛ فقط برای تشخیص (در فایل پشتیبان)
+function rawSample(doc, cards, body, url) {
+  try {
+    var s = [], priceEls = [];
+    Array.prototype.forEach.call(doc.querySelectorAll('body *'), function (n) { if (priceEls.length < 3 && !n.children.length && /تومان|ریال/.test(n.textContent || '') && n.parentElement && n.parentElement.parentElement) priceEls.push(n.parentElement.parentElement); });
+    var seen = []; priceEls.forEach(function (n) { if (seen.indexOf(n) < 0) { seen.push(n); s.push('--قیمت--\n' + n.outerHTML.slice(0, 2500)); } });
+    cards.slice(0, 3).forEach(function (c) { s.push('--کارت تشخیص‌داده‌شده: ' + c.t + ' | ' + c.price + ' | ' + c.u); });
+    var host = (/^https?:\/\/([^\/]+)/.exec(url) || [])[1] || url;
+    RAWC[host] = 'طول صفحه ' + body.length + '\nتعداد کارت ' + cards.length + '\n' + s.join('\n');
+  } catch (e) { }
+}
 async function htmlSource(start, net, rep, mode) {
   var out = [], seen = {}, url = start, pages = 0, natural = false, failed = 0, stop = '';
   for (var i = 0; i < 40 && url; i++) {
@@ -1732,6 +1748,7 @@ async function htmlSource(start, net, rep, mode) {
     if (r.status !== 200) { if (i === 0) throw new Error(r.status ? 'HTTP ' + r.status : r.body); failed++; stop = 'صفحه ' + (i + 1) + ' نشد'; break; }
     var doc = new DOMParser().parseFromString(r.body, 'text/html');
     var cards = extractCards(doc, url), fresh = 0;
+    if (i === 0) rawSample(doc, cards, r.body, url);
     pages++;
     cards.forEach(function (c) {
       var k = c.t + '|' + c.price + '|' + (c.u || '');
@@ -1886,7 +1903,7 @@ function marketStats(list) {
   Object.keys(R.bySrc).forEach(function (k) { var s = R.bySrc[k]; s.avg = s.idx.length ? s.idx.reduce(function (a, b) { return a + b; }, 0) / s.idx.length : 0; delete s.idx; });
   return R;
 }
-root.Core = { marketStats: marketStats, histNew: histNew, histFix: histFix, histSnap: histSnap, histReport: histReport, purgeStored: purgeStored, setBlock: setBlock, REJ: REJ, vetReason: vetReason, reconcile: reconcile, CLEANSE: CLEANSE, cleanseText: cleanseText, cleanBrandName: cleanBrandName, itemUrl: itemUrl, STALE_MIN: STALE_MIN, fa2en: fa2en, en2fa: en2fa, enTokens: enTokens, titleEn: titleEn, tree: tree, brandOf: brandOf, specInfo: specInfo, enrichTitle: enrichTitle, genderOf: genderOf, nameCmp: nameCmp, CFG: CFG, newDb: newDb, dbIndex: dbIndex, ingest: ingest, ingestAsync: ingestAsync, buildList: buildList, normFa: normFa, parseTitle: parseTitle, aggregate: aggregate, SOURCES: SOURCES, extractCards: extractCards,
+root.Core = { RAWC: RAWC, stripPriceTail: stripPriceTail, marketStats: marketStats, histNew: histNew, histFix: histFix, histSnap: histSnap, histReport: histReport, purgeStored: purgeStored, setBlock: setBlock, REJ: REJ, vetReason: vetReason, reconcile: reconcile, CLEANSE: CLEANSE, cleanseText: cleanseText, cleanBrandName: cleanBrandName, itemUrl: itemUrl, STALE_MIN: STALE_MIN, fa2en: fa2en, en2fa: en2fa, enTokens: enTokens, titleEn: titleEn, tree: tree, brandOf: brandOf, specInfo: specInfo, enrichTitle: enrichTitle, genderOf: genderOf, nameCmp: nameCmp, CFG: CFG, newDb: newDb, dbIndex: dbIndex, ingest: ingest, ingestAsync: ingestAsync, buildList: buildList, normFa: normFa, parseTitle: parseTitle, aggregate: aggregate, SOURCES: SOURCES, extractCards: extractCards,
   wooSource: wooSource, digikalaSource: digikalaSource, htmlSource: htmlSource, letterOf: letterOf, median: median, priceFromText: priceFromText, similar: similar };
 if (typeof module !== 'undefined') module.exports = root.Core;
 })(typeof window !== 'undefined' ? window : globalThis);

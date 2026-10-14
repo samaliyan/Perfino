@@ -1,7 +1,7 @@
 (function () {
 'use strict';
 var RM = !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
-var VERSION = '1.22';
+var VERSION = '1.23';
 function $(id) { return document.getElementById(id); }
 function fa(n) { return String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, '٬').replace(/\d/g, function (d) { return '۰۱۲۳۴۵۶۷۸۹'[d]; }); }
 function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
@@ -1151,13 +1151,18 @@ $('sSamp').onclick = function () {
   }); });
   var t = 'نمونه عنوان‌ها ' + VERSION + ' (فروشگاه | عنوان اصلی | نام ساخته‌شده | میل)\n\nمشکوک (' + bad.length + '):\n' + bad.join('\n')
     + '\n\nردشده (' + rej.length + '):\n' + rej.join('\n') + '\n\nبقیه (' + okk.length + '):\n' + okk.join('\n');
-  window.__samp = t;
+  var raw = Object.keys(Core.RAWC || {}).map(function (h) { return '\n\n===== نمونهٔ خام صفحه: ' + h + ' =====\n' + Core.RAWC[h]; }).join('');
+  t += raw; window.__samp = t;
   var d = new Date(), pad = function (n) { return (n < 10 ? '0' : '') + n; };
   var fn = 'perfume-titles-' + d.getFullYear() + pad(d.getMonth() + 1) + pad(d.getDate()) + '-' + pad(d.getHours()) + pad(d.getMinutes()) + '.txt', where = '';
   try { if (window.Native && window.Native.saveText) where = window.Native.saveText(fn, t) || ''; } catch (e) { where = ''; }
-  if (where) { $('sSamp').textContent = 'فایل ذخیره شد: ' + fn; toast('فایل ذخیره شد؛ از برگهٔ باز‌شده بفرستید', 3500); return; }
+  if (where) { $('sSamp').textContent = 'پشتیبان ذخیره شد: ' + fn; $('sSend').disabled = false; toast('پشتیبان در پوشهٔ دانلود ذخیره شد', 3500); return; }
   if (window.Native && window.Native.copy) window.Native.copy(t); else if (navigator.clipboard) navigator.clipboard.writeText(t).catch(function () {});
   toast('ذخیرهٔ فایل نشد؛ متن کپی شد', 3500);
+};
+$('sSend').onclick = function () {
+  var ok = false; try { ok = !!(window.Native && window.Native.shareBackup && window.Native.shareBackup()); } catch (e) { ok = false; }
+  if (!ok) toast('اول پشتیبان را ذخیره کنید', 2500);
 };
 window.__back = function () {
   if ($('updBox').classList.contains('on')) { $('updBox').classList.remove('on'); updSt.dismissed = true; return true; }

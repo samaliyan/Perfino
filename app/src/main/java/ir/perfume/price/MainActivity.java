@@ -41,6 +41,7 @@ import java.util.concurrent.Executors;
 public class MainActivity extends Activity {
     private WebView web;
     private FrameLayout root;
+    private volatile Uri lastBackup;
     private final ExecutorService pool = Executors.newFixedThreadPool(8);
     private final ExecutorService imgPool = Executors.newFixedThreadPool(3);
     private File imgDir;
@@ -312,7 +313,7 @@ public class MainActivity extends Activity {
         @JavascriptInterface public void updDownload() { if (upd != null) upd.download(); }
         @JavascriptInterface public boolean updInstall() { return upd != null && upd.install(); }
 
-        /** متن را در یک فایل ذخیره می‌کند (Downloads) و برگه‌ی اشتراک‌گذاری را باز می‌کند. مسیر/نام جا را برمی‌گرداند؛ در خطا رشته‌ی خالی. */
+        /** متن را در یک فایل ذخیره می‌کند (Downloads)؛ ارسال جدا با shareBackup. مسیر/نام جا را برمی‌گرداند؛ در خطا رشته‌ی خالی. */
         @JavascriptInterface
         public String saveText(final String name, final String text) {
             try {
@@ -328,17 +329,7 @@ public class MainActivity extends Activity {
                     OutputStream os = getContentResolver().openOutputStream(uri);
                     if (os == null) return "";
                     try { os.write(data); } finally { os.close(); }
-                    runOnUiThread(new Runnable() {
-                        @Override public void run() {
-                            try {
-                                Intent send = new Intent(Intent.ACTION_SEND);
-                                send.setType("text/plain");
-                                send.putExtra(Intent.EXTRA_STREAM, uri);
-                                send.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-                                startActivity(Intent.createChooser(send, "ارسال فایل"));
-                            } catch (Exception ignore) { }
-                        }
-                    });
+                    lastBackup = uri;
                     return "Downloads/" + safe;
                 }
                 File dir = getExternalFilesDir(null);
@@ -350,6 +341,25 @@ public class MainActivity extends Activity {
             } catch (Exception e) {
                 return "";
             }
+        }
+
+        /** آخرین پشتیبان ذخیره‌شده را از برگه‌ی اشتراک‌گذاری می‌فرستد. */
+        @JavascriptInterface
+        public boolean shareBackup() {
+            final Uri u = lastBackup;
+            if (u == null) return false;
+            runOnUiThread(new Runnable() {
+                @Override public void run() {
+                    try {
+                        Intent send = new Intent(Intent.ACTION_SEND);
+                        send.setType("text/plain");
+                        send.putExtra(Intent.EXTRA_STREAM, u);
+                        send.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                        startActivity(Intent.createChooser(send, "ارسال پشتیبان"));
+                    } catch (Exception ignore) { }
+                }
+            });
+            return true;
         }
 
         @JavascriptInterface
