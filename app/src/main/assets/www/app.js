@@ -1,7 +1,7 @@
 (function () {
 'use strict';
 var RM = !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
-var VERSION = '1.20';
+var VERSION = '1.21';
 function $(id) { return document.getElementById(id); }
 function fa(n) { return String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, '٬').replace(/\d/g, function (d) { return '۰۱۲۳۴۵۶۷۸۹'[d]; }); }
 function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
@@ -1137,6 +1137,24 @@ $('sCopy').onclick = function () {
     + '\n\nخطاها:\n' + netBad.concat(netLog).map(function (l) { return l.s + ' ' + l.u + '\n' + l.b; }).join('\n---\n');
   if (window.Native && window.Native.copy) window.Native.copy(t); else if (navigator.clipboard) navigator.clipboard.writeText(t).catch(function () {});
   $('sCopy').textContent = 'کپی شد؛ در پیام برای سازنده بچسبانید';
+};
+$('sSamp').onclick = function () {
+  var srcN = {}; Core.SOURCES.forEach(function (x) { srcN[x.id] = x.name; });
+  var bad = [], rej = [], okk = [], SUS = /(^| )(با|مناسب|ویژه|مخصوص|فصل|رایحه|ساختار|همراه|دارای)( |$)/;
+  Object.keys(db.it || {}).forEach(function (sr) { var m = db.it[sr] || {}; Object.keys(m).forEach(function (pid) {
+    var e = m[pid]; if (!e || !e[0]) return;
+    var g = e[2] && db.g[e[2]], nm = g ? (g.k || []).join(' ') : '';
+    var line = (srcN[sr] || sr) + ' | ' + e[0] + ' | ' + (g ? nm : 'رد شد') + ' | ' + (e[3] || '');
+    if (!g) rej.push(line);
+    else if (nm.split(' ').length > 5 || nm.split(' ').length < 2 || SUS.test(nm)) bad.push(line);
+    else okk.push(line);
+  }); });
+  function pick(a, n) { var r = []; if (a.length <= n) return a.slice(); var st = a.length / n; for (var i = 0; i < n; i++) r.push(a[Math.floor(i * st)]); return r; }
+  var t = 'نمونه عنوان‌ها ' + VERSION + ' (فروشگاه | عنوان اصلی | نام ساخته‌شده | میل)\n\nمشکوک (' + bad.length + '):\n' + pick(bad, 150).join('\n')
+    + '\n\nردشده (' + rej.length + '):\n' + pick(rej, 70).join('\n') + '\n\nعادی (' + okk.length + '):\n' + pick(okk, 70).join('\n');
+  if (window.Native && window.Native.copy) window.Native.copy(t); else if (navigator.clipboard) navigator.clipboard.writeText(t).catch(function () {});
+  window.__samp = t;
+  $('sSamp').textContent = 'کپی شد؛ در پیام برای سازنده بچسبانید';
 };
 window.__back = function () {
   if ($('updBox').classList.contains('on')) { $('updBox').classList.remove('on'); updSt.dismissed = true; return true; }
