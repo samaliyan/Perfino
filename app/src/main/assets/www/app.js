@@ -1,7 +1,7 @@
 (function () {
 'use strict';
 var RM = !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
-var VERSION = '1.14';
+var VERSION = '1.15';
 function $(id) { return document.getElementById(id); }
 function fa(n) { return String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, '٬').replace(/\d/g, function (d) { return '۰۱۲۳۴۵۶۷۸۹'[d]; }); }
 function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
@@ -419,6 +419,12 @@ var set = ls.get('pp.set', { theme: 'auto', model: 'a' });
 if (!set || typeof set !== 'object' || Array.isArray(set)) set = {};                      // ذخیره‌ی خراب یا قدیمی نباید برنامه را از کار بیندازد
 if (!/^(auto|light|dark)$/.test(set.theme)) set.theme = 'auto';
 if (!set.soff || typeof set.soff !== 'object' || Array.isArray(set.soff)) set.soff = {};
+if (!set.fav || typeof set.fav !== 'object' || Array.isArray(set.fav)) set.fav = {};          // لیست مغازه
+if (!set.hide || typeof set.hide !== 'object' || Array.isArray(set.hide)) set.hide = {};      // عطرهای پنهان‌شده
+if (!Array.isArray(set.block)) set.block = [];                                               // واژه‌های ممنوع
+set.block = set.block.filter(function (x) { return typeof x === 'string' && x.trim().length >= 2; }).slice(0, 60);
+if (!(set.fs >= 0 && set.fs <= 3)) set.fs = 0;
+Core.setBlock(set.block);
 if (!MODELS[set.model]) set.model = 'a';
 var db = ls.get('pp.db', null);
 if (!db || db.v !== 3 || db.fv !== 5 || !db.g || !db.it) db = Core.newDb();   // نسخه‌ی ۱.۳ همه چیز را یک‌بار از نو و کامل می‌گیرد
@@ -590,7 +596,11 @@ function rebuild(light) {
   var sig = (set.lang === 'en' ? 'en' : 'fa') + '|' + l.length + '|' + Object.keys(db.wd || {}).length + '|' + l.map(function (g) { return g.id + '~' + g.name + '~' + g.img + g.sizes.map(function (z) { return z.ml + ':' + z.price + ':' + z.srcs.map(function (r) { return r.s + r.pid + r.price + (r.used ? 1 : 0); }).join('/'); }).join(','); }).join(';');
   if (sig !== treeSig || !ALLB.length) { ALLB = Core.tree(l, set.lang === 'en' ? 'en' : 'fa', db.wd); treeSig = sig; }   // درخت فقط وقتی دوباره ساخته می‌شود که داده/زبان عوض شده باشد
   set.off = set.off || {};
-  TREE = ALLB.filter(function (b) { return !set.off[b.id]; }); BR_BY = {}; MD_BY = {};
+  TREE = ALLB.filter(function (b) { return !set.off[b.id]; }).map(function (b) {
+    var ms = b.models.filter(function (m) { return !set.hide[m.id]; });      // عطرهایی که کاربر پنهان کرده
+    return ms.length === b.models.length ? b : Object.assign({}, b, { models: ms });
+  }).filter(function (b) { return b.models.length; });
+  BR_BY = {}; MD_BY = {};
   TREE.forEach(function (b) { BR_BY[b.id] = b; b.models.forEach(function (m) { m.brandId = b.id; MD_BY[m.id] = m; }); });
   if (nav.brand && !BR_BY[nav.brand]) { nav.lvl = 0; nav.brand = null; }
   var vis = []; TREE.forEach(function (b) { b.models.forEach(function (m) { m.variants.forEach(function (v) { vis.push(v); }); }); });
@@ -640,7 +650,7 @@ function goUp() {
   if (nav.lvl === 0) return false;
   var b = nav.brand; nav.lvl = 0; nav.brand = null; swap(b); return true;
 }
-function navUi() { var b = $('bk'); if (b) b.classList.toggle('on', nav.lvl === 1 && !!db.ready); }
+function navUi() { var b = $('bk'); if (b) b.classList.toggle('on', nav.lvl === 1 && !!db.ready); var q = $('sr'); if (q) q.style.display = db.ready && !(nav.lvl === 1) ? '' : 'none'; }
 $('bk').onclick = function () { goUp(); };
 $('stage').addEventListener('click', function (e) {
   var h = e.target.closest && e.target.closest('.rw,.pn'); if (!h || !h.dataset.id) return;
@@ -662,6 +672,11 @@ function entryImg(id) {
   var o = BR_BY[id] || MD_BY[id]; if (!o) return null;
   return { img: o.img, big: o.big || o.img, loc: imgLoc[o.imgId] || '', k: parseInt(String(o.imgId).replace(/^b/, ''), 36) % 64 || 0, name: o.name };
 }
+var hideArm = 0;
+function dact(id) {
+  var fv = !!set.fav[id], armed = hideArm && Date.now() - hideArm < 5000;
+  return '<div class="dact"><button type="button" class="' + (fv ? 'on' : '') + '" data-a="fav">' + (fv ? '★ در لیست مغازه' : '☆ افزودن به لیست مغازه') + '</button><button type="button" class="warn" data-a="hide">' + (armed ? 'مطمئنید؟ دوباره بزنید' : 'درست نیست؛ پنهانش کن') + '</button></div>';
+}
 function renderDetail() {
   var m = MD_BY[dtId]; if (!m) return;
   var im = entryImg(dtId);
@@ -677,7 +692,7 @@ function renderDetail() {
     }).join('') + '</div>';
   }).join('');
   var keep = $('dtc').scrollTop;
-  $('dtc').innerHTML = '<div class="dtop"><div class="dpic" data-vw="1">' + tile({ loc: im.loc, img: im.img, k: im.k }) + '<em>بزرگ‌نمایی</em></div><div class="dti"><div class="dbn">' + esc(BR_BY[m.brandId].name) + '</div><div class="dnm">' + esc(m.name) + '</div></div></div>' + vs
+  $('dtc').innerHTML = '<div class="dtop"><div class="dpic" data-vw="1">' + tile({ loc: im.loc, img: im.img, k: im.k }) + '<em>بزرگ‌نمایی</em></div><div class="dti"><div class="dbn">' + esc(BR_BY[m.brandId].name) + '</div><div class="dnm">' + esc(m.name) + '</div></div></div>' + dact(dtId) + vs
     + '<div class="dnote">روی هر اندازه بزنید تا قیمتِ هر سایت و دکمه‌ی دیدن در سایت بیاید. نقطه‌ی کوچک یعنی فقط یک سایت آن را داشته.</div>';
   var nm = $('dtc').querySelector('.dnm'); fitLines(nm, 3, 16);
   $('dtc').scrollTop = keep;
@@ -689,6 +704,16 @@ function openDetail(id) {
 function closeDetail() { dtId = null; dtEl.classList.remove('on'); }
 $('dtx').onclick = closeDetail;
 $('dtc').addEventListener('click', function (e) {
+  var ab = e.target.closest && e.target.closest('.dact button');
+  if (ab && dtId) {
+    var m0 = MD_BY[dtId];
+    if (ab.dataset.a === 'fav') { if (set.fav[dtId]) delete set.fav[dtId]; else set.fav[dtId] = BR_BY[m0.brandId].name + ' | ' + m0.name; ls.set('pp.set', set); hideArm = 0; renderDetail(); }
+    else if (ab.dataset.a === 'hide') {
+      if (hideArm && Date.now() - hideArm < 5000) { set.hide[dtId] = BR_BY[m0.brandId].name + ' | ' + m0.name; hideArm = 0; ls.set('pp.set', set); closeDetail(); rebuild(); renderSheet(); toast('پنهان شد. برگرداندن: تنظیمات، «عطرهای پنهان‌شده»', 4000); }
+      else { hideArm = Date.now(); renderDetail(); setTimeout(function () { if (dtId) renderDetail(); }, 5100); }
+    }
+    return;
+  }
   if (e.target.closest('.dpic') && dtId) { viewImg(dtId); return; }
   var g = e.target.closest('.go'); if (g) { openLink(g.dataset.u); return; }
   var z = e.target.closest('.sz'); if (z && z.dataset.k) { var on = !z.classList.contains('on'); szOpen[z.dataset.k] = on; z.classList.toggle('on', on); if (z.nextElementSibling) z.nextElementSibling.classList.toggle('on', on); }
@@ -760,6 +785,7 @@ async function doSource(s) {
 async function refresh(manual) {
   if (busy) return;
   if (Core.CLEANSE) { Core.CLEANSE.n = 0; Core.CLEANSE.junk = 0; }
+  if (Core.REJ) { Core.REJ.n = 0; Core.REJ.by = {}; Core.REJ.ex = []; }
   busy = true; prog = {}; updPill(); overlay(); refBtn(); if (open) renderSheet();
   var ok = 0, bad = 0, t0 = Date.now(), snap0 = FLAT.length ? sizeMap(FLAT) : null;
   await Promise.all(actv().map(async function (s) {
@@ -781,7 +807,7 @@ async function refresh(manual) {
     Core.SOURCES.forEach(function (s) { mg += (stt[s.id] && stt[s.id].merged) | 0; pg += (stt[s.id] && stt[s.id].purged) | 0; });
     RUN = { t: Date.now(), dur: Date.now() - t0, manual: !!manual, chg: snap0 ? diffMaps(snap0, sizeMap(FLAT)) : null,
       src: actv().map(function (s) { var o = srcState(s); return { name: o.name, kind: o.kind, cnt: o.cnt }; }),
-      clean: { clone: CL2.clone | 0, purged: pg, titles: CL2.n | 0, junk: CL2.junk | 0, merged: mg, names: au2.nmod | 0, brands: (au2.brands || []).length, sus: au2.nsus | 0 } };
+      clean: { rej: (Core.REJ || {}).n | 0, rejBy: (Core.REJ || {}).by || {}, rejEx: ((Core.REJ || {}).ex || []).slice(0, 12), unk: au2.nunk | 0, unkS: (au2.unk || []).slice(0, 12), clone: CL2.clone | 0, purged: pg, titles: CL2.n | 0, junk: CL2.junk | 0, merged: mg, names: au2.nmod | 0, brands: (au2.brands || []).length, sus: au2.nsus | 0 } };
     ls.set('pp.run', RUN);
   } catch (e4) { console.error(e4); }
   busy = false; lastTried = Date.now(); lastTry = lastTried; ls.set('pp.try', lastTry); saveDb(); updPill(); overlay(); refBtn(); renderSheet();
@@ -811,6 +837,7 @@ function renderSheet() {
     return '<div class="' + cls + '"><span>' + s.name + '</span><span class="st">' + (busy && P && !P.done && on ? txt : esc(txt)) + '</span><button type="button" class="sw' + (on ? ' on' : '') + '" data-s="' + s.id + '" role="switch" aria-checked="' + (on ? 'true' : 'false') + '" aria-label="' + esc(s.name) + '"><i></i></button></div>';
   }).join('') + '<div style="border:0;color:var(--mu);font-size:12px;padding-top:8px"><span>با کلیدِ کنار هر سایت می‌توانید آن را خاموش کنید. نقطه‌ی کوچک کنار قیمت یعنی فقط یک سایت آن را داشته.</span></div>';
   var sEl = $('sSrc'); if (sEl._h !== srcHtml) { sEl._h = srcHtml; sEl.innerHTML = srcHtml; }      // محتوا عوض نشده = دست نزن (وگرنه لمسِ کلید وسطِ بازسازی گم می‌شد)
+  renderMine();
   renderReport();
   $('sCopy').style.display = bad || adv ? '' : 'none'; $('sFull').style.display = bad || adv ? '' : 'none';
   $('sVer').textContent = 'نسخه ' + VERSION;
@@ -889,8 +916,12 @@ function renderReport() {
   P.push('بازرسی‌شده: ' + B(au.checked || r.nm) + ' نام عطر در ' + B(r.nb) + ' برند');
   if (CL.n || (RUN && RUN.clean && RUN.clean.titles)) P.push('عنوان‌های تمیزشده (سال، کد و واژه‌ی اضافه برداشته شد): ' + B(CL.n || RUN.clean.titles));
   if (CL.junk || (RUN && RUN.clean && RUN.clean.junk)) P.push('عنوانِ بی‌معنی که کنار رفت: ' + B(CL.junk || RUN.clean.junk));
-  var cln = RUN && RUN.clean ? (RUN.clean.clone | 0) : 0, prg = RUN && RUN.clean ? (RUN.clean.purged | 0) : 0;
-  if (cln || prg) P.push('کالای «مدل ...» از سازنده‌ی دیگر (مثلاً «های نیوویش مدل ورساچه اروس») که وارد فهرست نشد: ' + B(Math.max(cln, prg)));
+  var rc = RUN && RUN.clean ? RUN.clean : {}, rejN = Math.max(rc.rej | 0, rc.purged | 0);
+  if (rejN) {
+    var why = Object.keys(rc.rejBy || {}).map(function (k) { return (k === 'clone' ? 'مدلِ برندِ دیگر' : k) + ' ' + fa(rc.rejBy[k]); }).join('، ');
+    P.push('عنوانِ ردشده در بازرسیِ نام (شماره‌ی تلفن، قیمت یا آیدی داخل نام، سازنده‌ی تقلیدی، «مدل ...»، واژه‌ی ممنوع): ' + B(rejN) + (why ? ' — ' + esc(why) : ''));
+  }
+  if (rc.unk) P.push('عطر با برندِ ناشناخته (زیر «سایر برندها»): ' + B(rc.unk) + '. اگر عطرِ معروفی بود یا درست به نظر نمی‌رسید، از «نمونه‌ها» ببینید و در صفحه‌ی عطر «پنهانش کن» یا در تنظیمات «واژه‌های ممنوع» را بزنید.');
   if (merged) P.push('عطرِ تکراری که یکی شد (مثلاً فارسی و انگلیسیِ یک عطر): ' + B(merged));
   if (au.brands.length) P.push('برندِ تکراری که یکی شد: ' + B(au.brands.length));
   if (au.models.length) P.push('نامِ تکراری که یکی شد: ' + B(au.models.length));
@@ -899,6 +930,8 @@ function renderReport() {
   P.push('<button class="aud-t" type="button">نمونه‌ها</button>');
   if (audOpen) {
     var ex = [];
+    ((RUN && RUN.clean && RUN.clean.rejEx) || []).slice(0, 8).forEach(function (x) { ex.push('ردشد (' + x[0] + '): ' + x[1]); });
+    ((RUN && RUN.clean && RUN.clean.unkS) || []).slice(0, 10).forEach(function (x) { ex.push('برند ناشناخته: ' + x); });
     (au.sus || []).slice(0, 8).forEach(function (x) { ex.push('مشکوک: ' + x); });
     (au.junk || []).slice(0, 5).forEach(function (x) { ex.push('بی‌معنی: ' + x); });
     au.bare.slice(0, 6).forEach(function (x) { ex.push('حذف (بی‌نام): ' + x); });
@@ -988,10 +1021,110 @@ $('sCopy').onclick = function () {
 };
 window.__back = function () {
   if ($('updBox').classList.contains('on')) { $('updBox').classList.remove('on'); return true; }
+  if (srOn) { closeSearch(); return true; }
   if (vwId) { closeViewer(); return true; }
   if (open) { closeSheet(); return true; }
   if (dtId) { closeDetail(); return true; }
   return goUp();
+};
+
+/* ---------- اندازه‌ی نوشته ---------- */
+var FS = [1, 1.15, 1.3, 1.5];
+function applyFs() { document.documentElement.style.setProperty('--zs', FS[set.fs | 0] || 1); }
+/* ---------- جستجو و لیست مغازه ---------- */
+var srOn = false, srFavOnly = false, srIdx = [], srSig = '', srT = 0;
+function srNorm(x) { return Core.normFa(String(x || '')).toLowerCase().replace(/[^؀-ۿa-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim(); }
+function srBuild() {
+  var sig = TREE.length + ':' + treeSig + ':' + Object.keys(set.hide).length; if (sig === srSig) return; srSig = sig; srIdx = [];
+  var hasFa = function (t) { return /[؀-ۿ]/.test(t); };
+  TREE.forEach(function (b) {
+    b.models.forEach(function (m) {
+      var parts = [b.name, m.name];
+      if (hasFa(b.name)) parts.push(Core.fa2en(b.name.split(' '), db.wd));
+      m.variants.forEach(function (v) {
+        if (v.key) { parts.push(v.key.join(' ')); if (hasFa(v.key.join(' '))) parts.push(Core.fa2en(v.key, db.wd)); }
+        if (typeof v.en === 'string') parts.push(v.en);
+      });
+      srIdx.push({ m: m, b: b, h: ' ' + srNorm(parts.join(' ')) + ' ' });
+    });
+  });
+}
+function srMatch(h, toks) {
+  return toks.every(function (t) {
+    if (h.indexOf(t) >= 0) return true;
+    if (/[؀-ۿ]/.test(t)) { var en = srNorm(Core.fa2en([t], db.wd)); if (en && en.length >= 3 && h.indexOf(' ' + en) >= 0) return true; }      // «ساواج» ← sauvage
+    return false;
+  });
+}
+function srRender() {
+  var q = srNorm($('srq').value), toks = q ? q.split(' ') : [], out = [], box = $('srr'), nf = Object.keys(set.fav).length;
+  $('srFc').textContent = nf ? '(' + fa(nf) + ')' : ''; $('srFav').classList.toggle('on', srFavOnly);
+  srBuild();
+  function row(m, b, gone, id, lab) {
+    var fv = !!set.fav[id];
+    return '<div class="srr' + (gone ? ' gone' : '') + '"><button type="button" class="sn1" data-id="' + esc(id) + '"' + (gone ? ' disabled' : '') + '><b>' + esc(m) + '</b><small>' + esc(b) + (gone ? ' · الان در سایت‌ها نیست' : '') + '</small></button><button type="button" class="sf" data-f="' + esc(id) + '" aria-label="لیست مغازه">' + (fv ? '★' : '☆') + '</button></div>';
+  }
+  if (srFavOnly) {
+    Object.keys(set.fav).forEach(function (id) {
+      var m = MD_BY[id], lab = String(set.fav[id]).split(' | ');
+      if (m && (!toks.length || srMatch(' ' + srNorm(BR_BY[m.brandId].name + ' ' + m.name) + ' ', toks))) out.push([BR_BY[m.brandId].name, m.name, row(m.name, BR_BY[m.brandId].name, false, id)]);
+      else if (!m && !toks.length) out.push([lab[0] || '', lab[1] || '', row(lab[1] || lab[0], lab[0] || '', true, id)]);
+    });
+    out.sort(function (a, c) { return (a[0] + a[1]).localeCompare(c[0] + c[1], 'fa'); });
+    box.innerHTML = out.length ? out.map(function (x) { return x[2]; }).join('') : '<div class="sremp">لیست مغازه خالی است.<br>در صفحه‌ی هر عطر یا همین‌جا روی ستاره بزنید تا عطرهای مغازه را جدا نگه دارید.</div>';
+    return;
+  }
+  if (!toks.length) { box.innerHTML = '<div class="sremp">نام عطر یا برند را بنویسید؛ فارسی یا انگلیسی.<br>مثلاً «ساواج» یا «sauvage» یا «ورساچه».</div>'; return; }
+  srIdx.forEach(function (x) { if (srMatch(x.h, toks)) out.push([x.m.name.toLowerCase().indexOf(toks[0]) === 0 ? 0 : 1, x]); });
+  out.sort(function (a, c) { return a[0] - c[0]; });
+  var more = out.length > 60; out = out.slice(0, 60);
+  box.innerHTML = out.length ? out.map(function (r) { return row(r[1].m.name, r[1].b.name, false, r[1].m.id); }).join('') + (more ? '<div class="sremp">فقط ۶۰ مورد اول نشان داده شد؛ دقیق‌تر بنویسید.</div>' : '')
+    : '<div class="sremp">چیزی پیدا نشد.<br>املای دیگری را امتحان کنید یا فقط بخشی از نام را بنویسید.</div>';
+}
+function openSearch() { srOn = true; $('srch').classList.add('on'); srRender(); setTimeout(function () { try { $('srq').focus(); } catch (e) { } }, 60); }
+function closeSearch() { srOn = false; $('srch').classList.remove('on'); try { $('srq').blur(); } catch (e) { } }
+$('sr').onclick = openSearch; $('srx').onclick = closeSearch;
+$('srq').addEventListener('input', function () { clearTimeout(srT); srT = setTimeout(srRender, 120); });
+$('srFav').onclick = function () { srFavOnly = !srFavOnly; srRender(); };
+$('srr').addEventListener('click', function (e) {
+  var f = e.target.closest('button.sf');
+  if (f) { var id = f.dataset.f; if (set.fav[id]) delete set.fav[id]; else { var m = MD_BY[id]; if (m) set.fav[id] = BR_BY[m.brandId].name + ' | ' + m.name; } ls.set('pp.set', set); var sc = $('srr').scrollTop; srRender(); $('srr').scrollTop = sc; return; }
+  var b = e.target.closest('button.sn1'); if (b && b.dataset.id && MD_BY[b.dataset.id]) { closeSearch(); openDetail(b.dataset.id); }
+});
+/* ---------- تنظیمات: اندازه‌ی نوشته، واژه‌های ممنوع، عطرهای پنهان ---------- */
+function renderMine() {
+  Array.prototype.forEach.call($('sFs').children, function (b) { b.classList.toggle('on', +b.dataset.v === (set.fs | 0)); });
+  var bl = set.block.map(function (w, i) { return '<button type="button" class="ch" data-i="' + i + '"><bdi>' + esc(w) + '</bdi></button>'; }).join('');
+  if ($('bkList')._h !== bl) { $('bkList')._h = bl; $('bkList').innerHTML = bl; }
+  var hk = Object.keys(set.hide), hl = hk.map(function (id) { return '<button type="button" class="ch" data-id="' + esc(id) + '"><bdi>' + esc(String(set.hide[id]).replace(' | ', ' ، ')) + '</bdi></button>'; }).join('');
+  if ($('hdList')._h !== hl) { $('hdList')._h = hl; $('hdList').innerHTML = hl; }
+  $('hdHint').textContent = hk.length ? 'برای برگرداندنِ هر عطر روی نامش بزنید.' : 'عطری پنهان نکرده‌اید. در صفحه‌ی هر عطر دکمه‌ی «درست نیست؛ پنهانش کن» هست.';
+}
+$('sFs').onclick = function (e) { var b = e.target.closest('button'); if (!b || b.dataset.v == null) return; set.fs = +b.dataset.v; ls.set('pp.set', set); applyFs(); renderMine(); };
+function addBlock() {
+  var inp = $('bkIn'), w = inp.value.trim();
+  if (w.length < 2) { toast('حداقل دو حرف بنویسید', 2500); return; }
+  if (set.block.indexOf(w) >= 0) { inp.value = ''; return; }
+  set.block.push(w); ls.set('pp.set', set); inp.value = '';
+  Core.setBlock(set.block);
+  var n = Core.purgeStored(db); saveDb();
+  try { rebuild(); } catch (e) { console.error(e); }
+  renderSheet(); toast(n ? fa(n) + ' کالا از فهرست برداشته شد' : 'ثبت شد؛ از این به بعد این واژه وارد فهرست نمی‌شود', 3500);
+}
+$('bkAdd').onclick = addBlock;
+$('bkIn').addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); addBlock(); } });
+$('bkList').onclick = function (e) {
+  var b = e.target.closest('button.ch'); if (!b) return;
+  set.block.splice(+b.dataset.i, 1); ls.set('pp.set', set); Core.setBlock(set.block);
+  db.full = {}; saveDb();                                    // دریافتِ کاملِ بعدی کالاهای برداشته‌شده را دوباره می‌سنجد
+  renderSheet(); toast('برداشته شد؛ با بروزرسانیِ بعدی کالاهایش برمی‌گردد', 3500);
+  if (!busy) refresh(true);
+};
+$('hdList').onclick = function (e) {
+  var b = e.target.closest('button.ch'); if (!b) return;
+  delete set.hide[b.dataset.id]; ls.set('pp.set', set);
+  try { rebuild(); } catch (e2) { console.error(e2); }
+  renderSheet(); toast('عطر برگشت', 2200);
 };
 /* ---------- بروزرسانی خودِ برنامه از گیت‌هاب ---------- */
 var updSt = { code: 0, ready: 0, phase: '', pct: null, dismissed: false, checking: false, manual: false }, UPD_EVERY = 3 * 3600000;
@@ -1060,7 +1193,7 @@ window.addEventListener('beforeunload', function () { if (curModel && nav.lvl ==
 window.__pp = { get allBrands() { return ALLB; }, open: openEntry, up: goUp, view: viewImg, closeView: closeViewer, get nav() { return nav; }, get tree() { return TREE; }, get gate() { var ps = photoStat(); return { need: ps.need, have: ps.have, ready: !!db.ready, tot: imgTot, left: imgLeft(), ok: imgOk, bad: imgBad }; }, mount: function (m) { var t = performance.now(); set.model = m; mountModel(curModel ? curModel.getAnchor() : null); return performance.now() - t; }, get model() { return curModel; }, get list() { return list; }, get flat() { return FLAT; }, get state() { return { db: db, st: stt, busy: busy, imgLoc: imgLoc }; }, refresh: refresh, net: net };
 
 /* شروع */
-applyTheme();
+applyTheme(); applyFs();
 loadImgs();
 try { rebuild(); } catch (e) { console.error(e); }
 updPill(); overlay(); renderSheet();

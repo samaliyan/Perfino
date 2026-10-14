@@ -156,6 +156,39 @@ svg{display:block}
 @keyframes ind{from{transform:translateX(0)}to{transform:translateX(-150%)}}
 #toast{position:absolute;left:16px;right:16px;bottom:calc(22px + env(safe-area-inset-bottom,0px));z-index:95;margin:0 auto;max-width:420px;padding:12px 16px;border-radius:16px;background:var(--tx);color:var(--bg);font-size:14px;font-weight:600;line-height:1.7;text-align:center;box-shadow:0 10px 30px rgba(0,0,0,.3);opacity:0;transform:translateY(20px);pointer-events:none;transition:opacity .25s,transform .25s}
 #sBrBtn{min-height:44px}
+
+#sr{position:absolute;top:6px;left:10px;z-index:41;width:44px;height:44px;border-radius:50%;border:1px solid var(--gb);background:var(--pill);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);display:flex;align-items:center;justify-content:center;color:var(--tx);cursor:pointer;padding:0}
+#sr:active{transform:scale(.9)}
+:root{--zs:1}
+#dtc .dti,#dtc .dact,#dtc .vr,#dtc .dnote,#srr,#sheet>*:not(.gr){zoom:var(--zs)}
+#dtc .sz{flex-wrap:wrap;gap:2px 12px}
+#dtc .zp{margin-inline-start:auto}
+#srch{position:absolute;top:0;left:0;right:0;bottom:0;z-index:48;background:var(--bg);display:none;flex-direction:column;padding:calc(8px + env(safe-area-inset-top,0px)) 14px 0}
+#srch.on{display:flex}
+.srh{display:flex;gap:8px;align-items:center;margin-bottom:10px}
+#srq{flex:1;min-width:0;height:48px;border-radius:24px;border:1.5px solid var(--gb);background:var(--pill);color:var(--tx);font:inherit;font-size:17px;padding:0 18px;outline:none}
+#srq:focus{border-color:var(--ac)}
+#srx{height:48px;min-width:64px;padding:0 14px;border-radius:24px;border:1px solid var(--gb);background:var(--pill);color:var(--tx);font:inherit;font-size:14px;font-weight:700;cursor:pointer}
+.srchips{display:flex;gap:8px;margin-bottom:8px}
+.srchips button{min-height:44px;padding:0 16px;border-radius:22px;border:1.5px solid var(--gb);background:none;color:var(--tx);font:inherit;font-size:14px;font-weight:700;cursor:pointer}
+.srchips button.on{background:var(--ac);color:#0c0f1f;border-color:var(--ac)}
+#srr{flex:1;overflow-y:auto;padding-bottom:30px;-webkit-overflow-scrolling:touch}
+.srr{display:flex;align-items:center;width:100%;min-height:56px;border-bottom:1px solid var(--cb)}
+.srr .sn1{flex:1;min-width:0;min-height:56px;padding:8px 4px;border:0;background:none;color:var(--tx);font:inherit;text-align:right;cursor:pointer}
+.srr .sf{border:0;background:none;cursor:pointer}.srr b{display:block;font-size:16px;overflow-wrap:anywhere;unicode-bidi:plaintext}.srr small{display:block;color:var(--mu);font-size:12px;unicode-bidi:plaintext}
+.srr .sf{flex:none;width:44px;height:44px;display:flex;align-items:center;justify-content:center;font-size:22px;color:var(--ac)}
+.srr.gone{opacity:.55}
+.sremp{padding:30px 10px;text-align:center;color:var(--mu);line-height:2}
+.dact{display:flex;gap:10px;margin:0 0 14px}
+.dact button{flex:1;min-height:46px;border-radius:23px;border:1.5px solid var(--gb);background:none;color:var(--tx);font:inherit;font-size:14px;font-weight:700;cursor:pointer}
+.dact button.on{background:var(--ac);color:#0c0f1f;border-color:var(--ac)}
+.dact button.warn{border-color:#ef5b5b;color:#ef5b5b}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0}
+.chips .ch{display:inline-flex;align-items:center;min-height:44px;padding:0 14px;border-radius:22px;border:1px solid var(--gb);background:var(--pill);font-size:13px;cursor:pointer;color:var(--tx)}
+.chips .ch::after{content:'×';margin-inline-start:10px;font-size:18px;color:var(--mu)}
+.bkrow{display:flex;gap:8px}
+#bkIn{flex:1;min-width:0;height:48px;border-radius:24px;border:1.5px solid var(--gb);background:var(--pill);color:var(--tx);font:inherit;font-size:16px;padding:0 16px;outline:none}
+#bkAdd{height:48px;min-width:76px;border-radius:24px;border:0;background:var(--ac);color:#0c0f1f;font:inherit;font-weight:800;cursor:pointer}
 #toast.on{opacity:1;transform:none}
 #updBox{position:absolute;left:16px;right:16px;bottom:calc(22px + env(safe-area-inset-bottom,0px));z-index:90;margin:0 auto;max-width:420px;padding:16px;border-radius:20px;background:var(--sheet);border:1.5px solid var(--ac);box-shadow:0 12px 40px rgba(0,0,0,.45);display:none}
 #updBox.on{display:block}
@@ -259,7 +292,9 @@ svg{display:block}
   <div id="ov"></div>
   <div id="upd"><i></i><span id="updt"></span></div>
   <button id="gear" aria-label="تنظیمات"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.2"/><path d="M19.4 13a7.6 7.6 0 0 0 0-2l2-1.6-2-3.4-2.4 1a7.4 7.4 0 0 0-1.7-1L15 3.4h-4l-.4 2.6a7.4 7.4 0 0 0-1.7 1l-2.4-1-2 3.4 2 1.6a7.6 7.6 0 0 0 0 2l-2 1.6 2 3.4 2.4-1c.5.4 1.1.7 1.7 1l.4 2.6h4l.4-2.6c.6-.3 1.2-.6 1.7-1l2.4 1 2-3.4z"/></svg></button>
+  <button id="sr" aria-label="جستجو"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg></button>
   <button id="bk" aria-label="بازگشت"><svg width="13" height="20" viewBox="0 0 10 16" aria-hidden="true" style="transform:scaleX(-1)"><path d="M8 1L2 8l6 7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+  <div id="srch" role="dialog" aria-label="جستجو"><div class="srh"><input id="srq" type="search" placeholder="نام عطر یا برند را بنویسید" autocomplete="off" enterkeyhint="search"><button id="srx">بستن</button></div><div class="srchips"><button id="srFav">لیست مغازه ★ <span id="srFc"></span></button></div><div id="srr"></div></div>
   <div id="dt" role="dialog" aria-label="جزئیات"><button id="dtx">بستن</button><div id="dtc"></div></div>
   <div id="vw" role="dialog" aria-label="عکس بزرگ"><div id="vwb"></div><div class="vh2">برای بستن، روی صفحه بزنید</div></div>
   <div id="scm"></div>
@@ -280,6 +315,16 @@ svg{display:block}
     <h3>زبان نام‌ها و حروف</h3>
     <div class="seg mods" id="sLang"><button data-l="fa">فارسی<small>الف ب پ</small></button><button data-l="en">English<small>A B C</small></button></div>
     <div class="hint2">نام عطرها و حروف کنار فهرست به همین زبان نشان داده می‌شود. اگر سایت‌ها نام انگلیسی نداشته باشند، برنامه خودش از روی فارسی می‌سازد.</div>
+    <h3>اندازه‌ی نوشته</h3>
+    <div class="seg mods" id="sFs"><button data-v="0">معمولی<small>الف</small></button><button data-v="1">کمی بزرگ<small>الف</small></button><button data-v="2">بزرگ<small>الف</small></button><button data-v="3">خیلی بزرگ<small>الف</small></button></div>
+    <div class="hint2">روی صفحه‌ی جزئیات، جستجو و تنظیمات اثر می‌کند.</div>
+    <h3>واژه‌های ممنوع</h3>
+    <div class="bkrow"><input id="bkIn" type="text" placeholder="مثلاً نام یک فروشنده یا برندِ تقلیدی" autocomplete="off"><button id="bkAdd">اضافه</button></div>
+    <div class="chips" id="bkList"></div>
+    <div class="hint2">هر عنوانی که این واژه را داشته باشد وارد فهرست نمی‌شود و همین الان هم از فهرست برداشته می‌شود. برای برگرداندن، روی واژه بزنید.</div>
+    <h3>عطرهای پنهان‌شده</h3>
+    <div class="chips" id="hdList"></div>
+    <div class="hint2" id="hdHint"></div>
     <h3>برندها</h3>
     <button class="btn ghost" id="sBrBtn" style="margin-top:0"></button>
     <div id="sBrList" style="display:none"></div>

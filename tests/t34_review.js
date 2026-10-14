@@ -5,7 +5,8 @@ p = C.parseTitle('Jean Paul Gaultier Ultra Male EDT 125ml'); chk(p && p.key.join
 p = C.parseTitle('Prada Candy Ladies EDP 80ml'); chk(p && p.gn === 'w' && p.key.indexOf('ladies') < 0, 'Ladies removed, gender w');
 p = C.parseTitle('ورساچه اروس آقایان ادو تویلت 100 میل'); chk(p && p.key.join(' ') === 'ورساچه اروس' && p.gn === 'm', 'Persian men word removed');
 p = C.parseTitle('Dior Sauvage EDT 3,4 oz'); chk(p && p.ml === 100, 'oz comma');
-p = C.parseTitle('عطر ورساچه اروس 100 میل قیمت 2,5 میلیون'); chk(p && p.ml === 100, 'میلیون not size');
+chk(C.parseTitle('عطر ورساچه اروس 100 میل قیمت 2,5 میلیون') === null, 'price phrase in name rejected');
+p = C.parseTitle('پاکو رابان 1 میلیون 100 میل'); chk(p !== null, 'One Million (1 میلیون) kept');
 var db = C.newDb(), ix = C.dbIndex(db);
 C.ingest(db, ix, 'liliome', [{ id: 1, t: 'ورساچه اروس ادو تویلت 100 میل', price: 5e6, st: 0 }], true);
 var gid = db.it.liliome[1][2]; db.g[gid].k = ['ورساچه', 'اروس', 'آقایان']; db.dv = 4; db.full = { liliome: Date.now() };

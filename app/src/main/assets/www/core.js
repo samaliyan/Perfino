@@ -138,6 +138,27 @@ function meaningful(toks) {
   return toks.some(function (w) { return /^[؀-ۿa-z]{2,}$/.test(w); });
 }
 var CLEANSE = { n: 0, junk: 0 };
+var REJ = { n: 0, by: {}, ex: [] };      // عنوان‌هایی که «بازرسیِ نام» ردشان کرد: شمارش به تفکیکِ دلیل و چند نمونه
+/* ---------- بازرسیِ نام (مرحله‌ی ثابتِ خط پالایش) ----------
+   هر عنوان پیش از ورود به فهرست سنجیده می‌شود: شماره‌ی تماس، قیمت یا آدرس/آیدی داخل نام، سازنده‌ی تقلیدی، «مدل <برند>» و واژه‌های ممنوعِ خودِ کاربر. */
+var BLOCK_RE = null;
+function setBlock(words) {
+  var w = (words || []).map(function (x) { return normFa(String(x), true).replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, ' ?'); }).filter(function (x) { return x.length >= 2; });
+  BLOCK_RE = w.length ? new RegExp(w.join('|')) : null;
+}
+var CLONE_MAKERS = /نیوویش|new ?wish|اسمارت ?کالکشن|smart ?collection|ریو ?کالکشن|rio ?collection|جانوین|johnwin|اسکلاسیک|esclassic/;
+var RE_PHONE = /(?:^|[^\d])(?:\+?98|0)?9\d{2}[ -]?\d{3}[ -]?\d{4}(?!\d)|(?:^|[^\d])0[1-8]\d[ -]?\d{8}(?!\d)/;
+var RE_PRICE = /\d[\d.,]*\s*(?:تومان|تومن|ریال|تومانی|هزار|دلار|درهم|\$|usd|aed|toman|rial)|(?<![\d.,])(?:[2-9]|\d{2,})[\d.,]*\s*میلیون|(?:قیمت|فقط|تنها|مبلغ)\s*:?\s*\d{3,}/;
+var RE_CONTACT = /https?:|www\.|\.(?:com|ir|net|org)\b|@[a-z0-9_.]{3,}|تلگرام|واتس ?اپ|واتساپ|اینستاگرام|instagram|telegram|whatsapp|دایرکت|شماره تماس|تماس بگیرید|\bdm\b/;
+function vetReason(t) {
+  if (RE_PHONE.test(t)) return 'شماره‌ی تلفن در نام';
+  if (RE_PRICE.test(t)) return 'قیمت داخل نام';
+  if (RE_CONTACT.test(t)) return 'آدرس/آیدی/تماس در نام';
+  if (CLONE_MAKERS.test(t)) return 'سازنده‌ی تقلیدی';
+  if (BLOCK_RE && BLOCK_RE.test(t)) return 'واژه‌ی ممنوعِ شما';
+  if (isCloneTitle(t)) { CLEANSE.clone = (CLEANSE.clone || 0) + 1; return 'clone'; }
+  return '';
+}
 /* کالای «به سبکِ» یک عطرِ معروف: «پرفیوم مردانه های نیوویش مدل ورساچه اروس» = ساخته‌ی شرکتِ دیگر، نه ورساچه.
    نشانه: پیش از «مدل» نامِ سازنده‌ی ناشناخته هست و بعد از «مدل» نامِ برندِ شناخته‌شده. چنین کالایی قیمتِ عطرِ اصلی را خراب می‌کند و وارد فهرست نمی‌شود. */
 var CLONE_GEN = {}; 'عطر ادکلن ادکلون مردانه زنانه مردونه زنونه یونیسکس پرفیوم ادو ادوپرفیوم ادوتویلت پارفوم parfum perfume edp edt cologne men women مناسب خانم آقایان بانوان'.split(' ').forEach(function (w) { CLONE_GEN[w] = 1; });
@@ -155,8 +176,9 @@ function parseTitle(raw) {
   var t = normFa(String(raw == null ? '' : raw).replace(/<[^>]*>/g, ' '), true);
   t = t.replace(/(\d)[,٫](\d{1,2})(?=\s*(?:fl|oz|میل(?!یون)|ml))/g, '$1.$2');          // «3,4 oz» = 3.4 oz
   t = t.replace(/[()\[\]{}]/g, ' ').replace(/[،؛؟٪٫٬٭]/g, ' ').replace(/\b(?:number|n ?°|n\.|no\.)\s*(\d)/g, 'no $1').replace(/(?:نامبر|نمبر|شماره)\s*(\d)/g, 'نامبر $1');
-  if (!t || EXCL.test(t)) return null;
-  if (isCloneTitle(t)) { CLEANSE.clone = (CLEANSE.clone || 0) + 1; return null; }
+  if (!t) return null;
+  if (EXCL.test(t)) { REJ.n++; return null; }
+  var vr = vetReason(t); if (vr) { REJ.n++; REJ.by[vr] = (REJ.by[vr] || 0) + 1; if (REJ.ex.length < 40 && vr !== 'clone') REJ.ex.push([vr, String(raw).slice(0, 90)]); return null; }
   var m, sizes = [];
   RE_SIZE.lastIndex = 0;
   while ((m = RE_SIZE.exec(t))) sizes.push(+m[1]);
@@ -705,8 +727,100 @@ var BRAND_LIST = [
 ['استی لودر', 'استی لودر|استی لاودر|estee lauder'], ['کلینیک', 'کلینیک|clinique'], ['سالوادور دالی', 'سالوادور دالی|salvador dali'], ['آنتونیو باندراس', 'آنتونیو باندراس|antonio banderas'],
 ['شکیرا', 'شکیرا|shakira'], ['بیانسه', 'بیانسه|beyonce'], ['ریحانا', 'ریحانا|rihanna'], ['پاریس هیلتون', 'پاریس هیلتون|paris hilton'], ['کیم کارداشیان', 'کیم کارداشیان|kim kardashian'],
 ['لیدی گاگا', 'لیدی گاگا|lady gaga'], ['ژاکومو', 'ژاکومو|jacomo'], ['چروتی', 'چروتی|cerruti'], ['روشاس', 'روشاس|rochas'], ['زادیگ و ولتر', 'زادیگ و ولتر|zadig voltaire|zadig and voltaire'],
-['تام تیلور', 'تام تیلور|tom tailor']
+['تام تیلور', 'تام تیلور|tom tailor'],
+['کارون', 'کارون|caron'],
+['گی لاروش', 'گی لاروش|guy laroche'],
+['پلیس', 'police'],
+['اورینتیکا', 'اورینتیکا|orientica'],
+['امپر', 'امپر|emper'],
+['برات', 'brut'],
+['اولد اسپایس', 'اولد اسپایس|old spice'],
+['فلوریس', 'فلوریس|floris'],
+['هوبیگان', 'هوبیگان|houbigant'],
+['فرگرنس ورلد', 'فرگرنس ورلد|fragrance world'],
+['آیگنر', 'آیگنر|aigner'],
+['جگوار', 'جگوار|jaguar'],
+['مکس', 'mexx'],
+['دوپونت', 'اس تی دوپونت|دوپونت|st dupont|dupont'],
+['یاردلی', 'یاردلی|yardley'],
+['وینس کامتو', 'وینس کامتو|vince camuto'],
+['فراری', 'فراری|ferrari'],
+['لامبورگینی', 'لامبورگینی|lamborghini'],
+['بوگاتی', 'بوگاتی|bugatti'],
+['شوپارد', 'شوپارد|chopard'],
+['کورژ', 'کورژ|courreges'],
+['اترو', 'اترو|etro'],
+['کوچ', 'coach'],
+['دیزل', 'دیزل|diesel'],
+['دی اسکوئرد', 'دی اسکوئرد|دیاسکوئرد|dsquared2|dsquared'],
+['بنتون', 'بنتون|benetton'],
+['شیسیدو', 'شیسیدو|shiseido'],
+['زگنا', 'زگنا|ermenegildo zegna|zegna'],
+['توس', 'tous'],
+['پری الیس', 'پری الیس|perry ellis'],
+['جیانفرانکو فره', 'جیانفرانکو فره|gianfranco ferre|ferre'],
+['کایالی', 'کایالی|kayali'],
+['عربیان عود', 'عربیان عود|arabian oud'],
+['گیسادا', 'گیسادا|gisada'],
+['زیمایا', 'زیمایا|zimaya'],
+['پاریس کورنر', 'پاریس کورنر|paris corner'],
+['نوسوک', 'نوسوک|nusuk'],
+['احمد المغربی', 'احمد المغربی|ahmed al maghribi'],
+['بی دی کی', 'بی دی کی|bdk parfums|bdk'],
+['اورموند جین', 'اورموند جین|ormonde jayne'],
+['میکالف', 'میکالف|m micallef|micallef'],
+['کریولی', 'کریولی|maison crivelli|crivelli'],
+['لورنزو ویلورسی', 'لورنزو ویلورسی|lorenzo villoresi'],
+['گولدفیلد اند بنکس', 'گولدفیلد اند بنکس|goldfield banks'],
+['دوسیتا', 'دوسیتا|parfums dusita|dusita'],
+['فرانک بوکله', 'فرانک بوکله|franck boclet'],
+['ریان', 'reyane tradition'],
+['جیاردینی دی توسکانا', 'جیاردینی دی توسکانا|giardini di toscana']
 ];
+/* ---------- «خطِ عطر → برند»: عنوانی که برند ندارد ولی نامِ عطرِ معروف دارد («ساواج»، «Acqua di Gio»، «پور اون هوم») زیر «سایر برندها» نرود ---------- */
+var LINE_BRAND = [
+['دیور', 'sauvage|ساواج|ساوج|ساوژ|eau sauvage|fahrenheit|فارنهایت|فرنهایت|j\'adore|جادور|ژادور|hypnotic poison|هیپنوتیک پویزن|dune|دون|homme intense|هوم اینتنس'],
+['شنل', 'coco mademoiselle|کوکو مادمازل|کوکو مادموازل|coco noir|کوکو نویر|allure homme|الور هوم|egoiste|اگویست|bleu de chanel|بلو دو شنل|n5|no 5|نامبر 5|نامبر پنج'],
+['ایو سن لوران', 'black opium|بلک اپیوم|بلک اوپیوم|libre|لیبر|la nuit de l\'homme|لا نویت د لهوم|کوروس|kouros|mon paris|مون پاریس|y le parfum|opium|اپیوم'],
+['لانکوم', 'la vie est belle|لا وی است بل|لاویه است بل|لا ویه است بل|idole|ایدول|tresor|ترزور|hypnose|هیپنوز|miracle|میراکل'],
+['جورجیو آرمانی', 'acqua di gio|aqua di gio|acqua di gioia|آکوا دی جیو|اکوا دی جیو|آکوا دی جو|اکوا دی جو|stronger with you|استرانگر ویت یو|armani code|آرمانی کد|my way|مای وی'],
+['ورساچه', 'eros|اروس|dylan blue|دیلان بلو|دیلن بلو|bright crystal|بریت کریستال|برایت کریستال|yellow diamond|یلو دایموند|crystal noir|کریستال نویر|man eau fraiche|من او فرش|pour homme'],
+['پاکو رابان', '1 million|one million|وان میلیون|وان میلیون|invictus|اینویکتوس|اینویکتس|lady million|لیدی میلیون|olympea|المپیا|phantom|فانتوم|black xs|بلک ایکس اس|pure xs|پیور ایکس اس'],
+['کارولینا هررا', 'good girl|گود گرل|bad boy|بد بوی|very good girl|وری گود گرل|212 vip|212 وی آی پی|212 men|212 sexy|212 سکسی'],
+['دولچه و گابانا', 'light blue|لایت بلو|the one|دوان|د وان|devotion|دیووشن'],
+['کرید', 'aventus|اونتوس|اوینتوس|اونتس|آونتوس|silver mountain water|سیلور مانتین واتر|green irish tweed|گرین ایریش توید|viking|وایکینگ'],
+['تام فورد', 'oud wood|عود وود|tobacco vanille|توباکو وانیل|lost cherry|لاست چری|black orchid|بلک ارکید|ombre leather|امبر لدر|نویر د نویر|noir de noir|fucking fabulous|فاکینگ فبولوس|soleil blanc|سولیل بلان'],
+['مزون فرانسیس کورکجان', 'baccarat rouge 540|باکارات روژ 540|باکارات روژ|باکارات|baccarat'],
+['پارفومز د مارلی', 'layton|لایتون|herod|هرود|pegasus|پگاسوس|delina|دلینا|galloway|گالووی|percival|پرسیوال'],
+['کارون', 'pour un homme|پور اون هوم|پور ان هوم|پور آن هوم|پور اون هوم'],
+['گوچی', 'gucci guilty|گیلتی|flora|فلورا گورجس|bloom|بلوم'],
+['پرادا', 'luna rossa|لونا روسا|candy|کندی|infusion d iris|اینفیوژن دی ایریس'],
+['ژان پل گوتیه', 'le male|لو میل|له میل|لومیل|ultra male|اولترا میل|scandal|اسکندال|so scandal'],
+['تیری موگلر', 'alien|الین|angel|انجل|اینجل|aura mugler'],
+['مونت بلانک', 'legend|لجند|explorer|اکسپلورر'],
+['آزارو', 'azzaro chrome|chrome|کروم|wanted|وانتد'],
+['دیویدوف', 'cool water|کول واتر'],
+['کالوین کلین', 'ck one|سی کی وان|eternity|اترنیتی|اترنتی|euphoria|یوفوریا|obsession|آبسشن'],
+['ژیوانشی', 'gentleman|جنتلمن|l interdit|لانتردی|irresistible|ایرزیستیبل'],
+['بولگاری', 'aqva|آکوا بولگاری|man in black|من این بلک|omnia|امنیا'],
+['ویکتور اند رولف', 'flowerbomb|فلاوربمب|فلاور بمب|spicebomb|اسپایس بمب|bonbon|بن بن'],
+['آمواج', 'interlude|اینترلود|اینترلید|reflection|ریفلکشن|jubilation|جوبیلیشن|memoir|میموآر|epic|ایپیک'],
+['اینیتیو', 'oud for greatness|عود فور گریتنس|side effect|ساید افکت|atomic rose|اتمیک رز|rehab|ریهب'],
+['نیشانه', 'hacivat|هاجیوات|هجیوات|fan your flames|ethereal|اترال'],
+['کیلیان', 'angels share|انجلز شیر|love don t be shy|لاو دونت بی شای'],
+['مزون مارجیلا', 'replica|ریپلیکا|jazz club|جز کلاب|by the fireplace|بای د فایرپلیس|lazy sunday morning|لیزی سانی مورنینگ'],
+['کالوین کلین', 'ck be|سی کی بی']
+];
+var LB = null;
+function lineTable() {
+  if (LB) return LB; LB = []; var T = brandTable();
+  LINE_BRAND.forEach(function (r) {
+    var b = T.byName[brandNorm(r[0]).join(' ')]; if (!b) return;
+    r[1].split('|').forEach(function (l) { var tk = brandNorm(l); if (tk.length) LB.push({ b: b, tk: tk }); });
+  });
+  LB.sort(function (x, y) { return y.tk.length - x.tk.length; });
+  return LB;
+}
 function brandNorm(s) {
   var t = normFa(s, true).replace(/[^؀-ۿa-z0-9\s]/g, ' ');
   return t.split(/\s+/).filter(Boolean).map(function (w) { return w.replace(/آ/g, 'ا').replace(/ؤ/g, 'و').replace(/ئ/g, 'ی'); });
@@ -813,6 +927,7 @@ function brandOf(key, hints) {
     });
     if (best) ent = best.b;
   }
+  if (!ent && !unk) { var LT = lineTable(); for (var li = 0; li < LT.length; li++) if (seqAt(key, LT[li].tk) >= 0) { ent = LT[li].b; break; } }      // نامِ عطرِ معروف بدونِ نامِ برند
   if (!ent && unk) ent = unk;
   if (!ent) return { id: 'other', name: 'سایر برندها', al: [] };
   return ent;
@@ -952,6 +1067,7 @@ function tree(groups, lang, lex) {
 function inspectBrand(b, AUD) {
   var ms = b.models, i, j;
   AUD.checked = (AUD.checked | 0) + ms.length;
+  if (b.id === 'other') { AUD.nunk = ms.length; AUD.unk = ms.slice(0, 14).map(function (m) { return m.name; }); }      // برندِ ناشناخته: تعداد و نمونه برای بازبینی
   for (i = 0; i < ms.length; i++) {
     var nm = ms[i].name || '';
     if (!nm || /^[\d\s]+$/.test(nm) && nm.replace(/\s/g, '').length > 3) { AUD.njunk = (AUD.njunk | 0) + 1; if ((AUD.junk = AUD.junk || []).length < 20) AUD.junk.push(b.name + ': ' + nm); }
@@ -1200,20 +1316,20 @@ function ingestChunk(C, list) {
   });
 }
 /* عنوان‌های ذخیره‌شده را با قاعده‌های فعلی دوباره می‌سنجد؛ آن‌هایی که حالا رد می‌شوند (مثل کالای «مدل ...») از گروه‌ها بیرون می‌روند */
-function purgeStored(db) {
+function purgeStored(db) {      // بیرون‌بردنِ کالاهای ذخیره‌شده‌ای که با قاعده‌های فعلی ردّ می‌شوند
   var n = 0, rk = 0;
   Object.keys(db.it || {}).forEach(function (src) {
     var M = db.it[src];
     Object.keys(M).forEach(function (pid) {
       var e = M[pid];
       if (e[2] && e[0] && db.g[e[2]] && db.g[e[2]].k.some(function (w) { return STOP[w]; })) { e[0] = ''; rk++; }      // گروهی که با قاعده‌ی قدیمی‌تر ساخته شده و واژه‌ی اضافه (آقایان/بانوان...) در کلیدش مانده: عنوان در دریافتِ کامل بعدی دوباره تحلیل می‌شود
-      if (e[2] && e[0]) { var c0 = CLEANSE.clone | 0; var pr = parseTitle(e[0]); var isC = !pr && (CLEANSE.clone | 0) > c0; CLEANSE.clone = c0; if (isC) { e[1] = 0; e[2] = 0; e[3] = 0; n++; } }
+      if (e[2] && e[0]) { var r0 = REJ.n, c0 = CLEANSE.clone | 0; var pr = parseTitle(e[0]); var isC = !pr && REJ.n > r0; CLEANSE.clone = c0; if (isC) { e[1] = 0; e[2] = 0; e[3] = 0; e[0] = ''; n++; } }      // عنوان پاک می‌شود تا اگر قاعده برداشته شد، دریافتِ کامل دوباره تحلیلش کند
     });
   });
   if (rk) db.full = {};                       // بروزرسانیِ بعدی «کامل» باشد تا عنوانِ پاک‌شده‌ها دوباره تحلیل شود
   return n;
 }
-var DEDUPE_V = 5;
+var DEDUPE_V = 6;
 function ingestEnd(C, complete) {
   if (complete) {                                      // فهرستِ ناگهان خیلی کوچک‌تر شده (صفحه‌ی خطا/کپچا): پاک‌سازی نکن
     var known = Object.keys(C.M).length, seenN = Object.keys(C.seen).length;
@@ -1624,7 +1740,7 @@ var SOURCES = [
   { id: 'hiland', name: 'هایلند', run: function (net, rep, mode) { return wooOrHtml('https://hilandbeauty.com', 'https://hilandbeauty.com/fa/%D8%B9%D8%B7%D8%B1-%D9%88-%D8%A7%D8%AF%DA%A9%D9%84%D9%86', net, rep, mode); } }
 ];
 
-root.Core = { reconcile: reconcile, CLEANSE: CLEANSE, cleanseText: cleanseText, cleanBrandName: cleanBrandName, itemUrl: itemUrl, STALE_MIN: STALE_MIN, fa2en: fa2en, en2fa: en2fa, enTokens: enTokens, titleEn: titleEn, tree: tree, brandOf: brandOf, specInfo: specInfo, enrichTitle: enrichTitle, genderOf: genderOf, nameCmp: nameCmp, CFG: CFG, newDb: newDb, dbIndex: dbIndex, ingest: ingest, ingestAsync: ingestAsync, buildList: buildList, normFa: normFa, parseTitle: parseTitle, aggregate: aggregate, SOURCES: SOURCES, extractCards: extractCards,
+root.Core = { purgeStored: purgeStored, setBlock: setBlock, REJ: REJ, vetReason: vetReason, reconcile: reconcile, CLEANSE: CLEANSE, cleanseText: cleanseText, cleanBrandName: cleanBrandName, itemUrl: itemUrl, STALE_MIN: STALE_MIN, fa2en: fa2en, en2fa: en2fa, enTokens: enTokens, titleEn: titleEn, tree: tree, brandOf: brandOf, specInfo: specInfo, enrichTitle: enrichTitle, genderOf: genderOf, nameCmp: nameCmp, CFG: CFG, newDb: newDb, dbIndex: dbIndex, ingest: ingest, ingestAsync: ingestAsync, buildList: buildList, normFa: normFa, parseTitle: parseTitle, aggregate: aggregate, SOURCES: SOURCES, extractCards: extractCards,
   wooSource: wooSource, digikalaSource: digikalaSource, htmlSource: htmlSource, letterOf: letterOf, median: median, priceFromText: priceFromText, similar: similar };
 if (typeof module !== 'undefined') module.exports = root.Core;
 })(typeof window !== 'undefined' ? window : globalThis);
