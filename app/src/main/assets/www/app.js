@@ -1,7 +1,7 @@
 (function () {
 'use strict';
 var RM = !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
-var VERSION = '1.17';
+var VERSION = '1.18';
 function $(id) { return document.getElementById(id); }
 function fa(n) { return String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, '٬').replace(/\d/g, function (d) { return '۰۱۲۳۴۵۶۷۸۹'[d]; }); }
 function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
@@ -393,20 +393,26 @@ var MODELS = {
 /* ================= شبکه ================= */
 var pend = {}, seq = 0, netLog = [], netBad = [];
 window.__nat = function (id, status, body) {
-  var p = pend[id]; if (!p) return; delete pend[id]; clearTimeout(p.t);
+  var p = pend[id]; if (!p) return; delete pend[id]; clearTimeout(p.t); if (p.rel) p.rel();
   var le = { u: p.u, s: status, b: String(body || '').slice(0, 300) };
   netLog.push(le); if (netLog.length > 6) netLog.shift();
   if (status !== 200) { netBad.push(le); if (netBad.length > 12) netBad.shift(); }
   if (status === 0) p.rej(new Error(String(body || 'اینترنت وصل نیست')));
   else p.res({ status: status, body: body });
 };
+var netQ = [], netBusy = 0;
+function netPump() { while (netBusy < 6 && netQ.length) { netBusy++; var job = netQ.shift(); try { job(); } catch (e) { netBusy--; } } }
 var net = {
   get: function (url, headers) {
     return new Promise(function (res, rej) {
       if (window.Native && window.Native.fetch) {
-        var id = 'r' + (++seq);
-        pend[id] = { res: res, rej: rej, u: url, t: setTimeout(function () { delete pend[id]; rej(new Error('زمان انتظار تمام شد')); }, 30000) };
-        window.Native.fetch(id, url, JSON.stringify(headers || {}));
+        netQ.push(function () {                       // حداکثر ۶ درخواست هم‌زمان؛ بقیه در صف می‌مانند و زمانِ انتظارشان از ۳۰ ثانیه حساب نمی‌شود
+          var id = 'r' + (++seq), done = false;
+          function rel() { if (done) return; done = true; netBusy--; netPump(); }
+          pend[id] = { res: res, rej: rej, u: url, rel: rel, t: setTimeout(function () { delete pend[id]; rel(); rej(new Error('زمان انتظار تمام شد')); }, 30000) };
+          window.Native.fetch(id, url, JSON.stringify(headers || {}));
+        });
+        netPump();
       } else {
         fetch(url, { headers: headers }).then(function (r) { return r.text().then(function (b) { var le = { u: url, s: r.status, b: b.slice(0, 300) }; netLog.push(le); if (netLog.length > 6) netLog.shift(); if (r.status !== 200) { netBad.push(le); if (netBad.length > 12) netBad.shift(); } res({ status: r.status, body: b }); }); }).catch(rej);
       }
@@ -1074,7 +1080,7 @@ $('updGo').onclick = function () {
   if ($('updGo').disabled) return;
   updSt.phase = 'inst'; updSt.installing = true; updRender();
   var ok = false; try { ok = window.Native.updInstall(); } catch (e) { }
-  if (!ok) window.__updErr('start');
+  if (!ok) { updSt.ready = 0; window.__updErr('start'); setTimeout(function () { updSt.dismissed = false; updCheck(true); }, 600); }      // فایلِ دانلودشده از بین رفته (کمبود حافظه): دوباره دانلود شود، نه گیر کردن تا باز شدنِ بعدی
 };
 $('sAuto').onclick = function (e) { var b = e.target.closest('button'); if (!b || b.dataset.m == null) return; set.auto = +b.dataset.m; ls.set('pp.set', set); renderSheet(); updPill(); if (set.auto > 0 && !busy && autoDue()) refresh(false); };
 $('sRef').onclick = function () { if (busy) { toast('همین حالا در حال بروزرسانی است…', 2200); return; } refresh(true); };

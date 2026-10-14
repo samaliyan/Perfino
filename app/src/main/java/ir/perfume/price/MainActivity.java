@@ -53,6 +53,29 @@ public class MainActivity extends Activity {
     }
 
     @SuppressLint({"SetJavaScriptEnabled", "AddJavascriptInterface"})
+    /** حافظه‌ی عکس‌ها از ۲۰۰ مگابایت بیشتر نشود: قدیمی‌ترین فایل‌ها تا رسیدن به ۱۶۰ مگابایت پاک می‌شوند (عکسِ لازم دوباره دانلود می‌شود) */
+    private void pruneImgs() {
+        try {
+            File[] fs = imgDir.listFiles();
+            if (fs == null) return;
+            long total = 0;
+            final long[] age = new long[fs.length];
+            for (int i = 0; i < fs.length; i++) { total += fs[i].length(); age[i] = fs[i].lastModified(); }
+            final long cap = 200L * 1024 * 1024;
+            if (total <= cap) return;
+            Integer[] ix = new Integer[fs.length];
+            for (int i = 0; i < ix.length; i++) ix[i] = i;
+            java.util.Arrays.sort(ix, new java.util.Comparator<Integer>() {
+                @Override public int compare(Integer a, Integer b) { return Long.compare(age[a], age[b]); }
+            });
+            for (int i = 0; i < ix.length && total > cap * 8 / 10; i++) {
+                File f = fs[ix[i]];
+                long len = f.length();
+                if (f.delete()) total -= len;
+            }
+        } catch (Exception ignore) { }
+    }
+
     @Override
     protected void onCreate(Bundle b) {
         super.onCreate(b);
@@ -61,6 +84,7 @@ public class MainActivity extends Activity {
         imgDir = new File(getFilesDir(), "img");
         imgDir.mkdirs();
         try { File[] old = imgDir.listFiles(); if (old != null) for (File of : old) if (of.getName().endsWith(".tmp")) of.delete(); } catch (Exception ignore) { }      // فایل‌های نیمه‌کاره‌ی دانلودِ قبلی
+        new Thread(new Runnable() { @Override public void run() { pruneImgs(); } }).start();      // حافظه‌ی عکس بی‌نهایت بزرگ نشود
         root = new FrameLayout(this);
         root.setBackgroundColor(Color.parseColor("#0c0f1f"));
         root.setFitsSystemWindows(true);
