@@ -1,0 +1,34 @@
+import asyncio,sys
+sys.path.insert(0,'/home/claude/PerfumePrice/tests')
+from harness import *
+OK=[];BAD=[]
+def chk(n,c,i=''):
+    (OK if c else BAD).append(n); print(('PASS ' if c else 'FAIL ')+n+(' '+str(i)[:200] if i!='' else ''))
+SIMPLE=['sMk','sRef','sTheme','sModel','sLang','sFs','sUpd']
+ADV=['sSamp','sSend','sRep','bkIn','bkList','hdList','sBrBtn','sAuto','sSrc','sUpdA']
+async def main():
+    async with async_playwright() as p:
+        for fs in (0,3):
+            b,ctx,pg,errs=await new_page(p,mobile=True)
+            await pg.set_viewport_size({'width':360,'height':700})
+            await pg.goto('file://'+ROOT+'/index.html'); await wait_ready(pg,120000)
+            if fs: await pg.evaluate("document.getElementById('gear').click()"); await pg.wait_for_timeout(300); await pg.evaluate("document.querySelector('#sFs button[data-v=\"%d\"]').click()"%fs); await pg.evaluate("document.getElementById('gear').click()"); await pg.wait_for_timeout(300)
+            await pg.evaluate("document.getElementById('gear').click()"); await pg.wait_for_timeout(500)
+            vis=await pg.evaluate("(ids)=>ids.map(i=>{var e=document.getElementById(i);var r=e.getBoundingClientRect();return [i,r.width>0&&r.height>0]})",SIMPLE+ADV)
+            d=dict(vis)
+            chk('fs%d simple settings visible'%fs,all(d[i] for i in SIMPLE),[i for i in SIMPLE if not d[i]])
+            chk('fs%d advanced hidden at first'%fs,not any(d[i] for i in ADV),[i for i in ADV if d[i]])
+            await pg.evaluate("document.getElementById('sAdvBtn').click()"); await pg.wait_for_timeout(500)
+            vis=dict(await pg.evaluate("(ids)=>ids.map(i=>{var e=document.getElementById(i);var r=e.getBoundingClientRect();return [i,r.width>0&&r.height>0]})",ADV))
+            chk('fs%d advanced visible after tap'%fs,sum(vis.values())>=8,vis)
+            lab=await pg.evaluate("document.getElementById('sAdvBtn').textContent")
+            chk('fs%d button label changes'%fs,'بستن' in lab,lab)
+            ov=await pg.evaluate("document.documentElement.scrollWidth<=document.documentElement.clientWidth+1")
+            chk('fs%d no horizontal overflow'%fs,ov)
+            await pg.evaluate("document.getElementById('sAdvBtn').click()")
+            h=await pg.evaluate("document.getElementById('sAdv').style.display")
+            chk('fs%d collapses again'%fs,h=='none',h)
+            chk('fs%d no js errors'%fs,not errs,errs)
+            await b.close()
+    print(len(OK),'pass',len(BAD),'fail')
+asyncio.run(main())

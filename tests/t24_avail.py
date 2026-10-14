@@ -26,7 +26,7 @@ async()=>{
  var D=[{id:1,title_fa:'عطر ادکلن دیور ساواج 100 میل',default_variant:{price:{selling_price:50000000}},status:'marketable'},
         {id:2,title_fa:'عطر ادکلن قدیمی 100 میل',price:{selling_price:40000000},status:'marketable'},
         {id:3,title_fa:'عطر ادکلن متوقف 100 میل',default_variant:{price:{selling_price:40000000}},status:'stopped_production'}];
- var d=await Core.digikalaSource(net({'digikala':function(){return {status:200,body:JSON.stringify({data:{products:D,pager:{total_pages:100}}})}}}),function(){},'full');
+ var d=await Core.digikalaSource(net({'digikala':function(){return {status:200,body:JSON.stringify({data:{products:D,pager:{total_pages:150}}})}}}),function(){},'full');
  R.dk=d.items.map(function(i){return [i.id,i.st,i.price]}); R.dkc=d.complete;
  // HTML
  function card(n,cls,body,alt){return '<li class="'+(cls||'')+'"><a href="/p/'+n+'"><img src="/i'+n+'.jpg" alt="'+(alt||('عطر شماره '+n+' ادو پرفیوم 100 میل'))+'"></a><h3>عطر شماره '+n+' ادو پرفیوم 100 میل</h3>'+body+'</li>'}
@@ -106,7 +106,7 @@ async def main():
         T(woo[6][2]==6000000 and woo[6][1]==0,'woo price_html fallback ok',woo[6])
         dk={r[0]:r for r in R['dk']}
         T(dk[1][1]==0 and dk[1][2]==5000000,'dk ok',dk[1]); T(dk[2][1]==1 and dk[2][2]==0,'dk no default_variant',dk[2]); T(dk[3][1]==1,'dk stopped status',dk[3])
-        T(R['dkc'] is False,'dk >80 pages is not complete')
+        T(R['dkc'] is False,'dk >100 pages is not complete')
         c={x[0][-3:]:x for x in (R['cards'] or [])}
         for n in (1,): pass
         cs=R['cards'] or []

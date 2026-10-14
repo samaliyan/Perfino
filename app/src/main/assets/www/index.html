@@ -332,8 +332,8 @@ svg{display:block}
     <div class="gr"></div>
     <h2>تنظیمات</h2>
     <button class="btn" id="sMk"><span>گزارش بازار: تغییر قیمت و موجودی</span></button>
-    <button class="btn ghost" id="sSamp"><span>ذخیرهٔ پشتیبان همهٔ عنوان‌ها</span></button>
-    <button class="btn ghost" id="sSend" disabled><span>ارسال پشتیبان (در صورت نیاز)</span></button>
+    <h3>قیمت‌ها</h3>
+    <button class="btn" id="sRef"><span>بروزرسانی قیمت‌ها همین حالا</span></button>
     <h3>رنگ صفحه</h3>
     <div class="seg" id="sTheme"><button data-v="light">روشن</button><button data-v="dark">تاریک</button><button data-v="auto">خودکار</button></div>
     <h3>شکل لیست</h3>
@@ -349,6 +349,18 @@ svg{display:block}
     <h3>اندازه‌ی نوشته</h3>
     <div class="seg mods" id="sFs"><button data-v="0">معمولی<small>الف</small></button><button data-v="1">کمی بزرگ<small>الف</small></button><button data-v="2">بزرگ<small>الف</small></button><button data-v="3">خیلی بزرگ<small>الف</small></button></div>
     <div class="hint2">روی صفحه‌ی جزئیات، جستجو و تنظیمات اثر می‌کند.</div>
+    <h3>نسخه‌ی برنامه</h3>
+    <button class="btn" id="sUpd"><span>بررسی نسخه‌ی جدید</span></button>
+    <div class="hint2" id="sUpdT"></div>
+    <button class="btn ghost" id="sAdvBtn" aria-expanded="false"><span>تنظیمات پیشرفته</span></button>
+    <div id="sAdv" style="display:none">
+    <h3>پشتیبان و مشکلات</h3>
+    <button class="btn ghost" id="sSamp" style="margin-top:0"><span>ذخیرهٔ پشتیبان همهٔ عنوان‌ها</span></button>
+    <button class="btn ghost" id="sSend" disabled><span>ارسال پشتیبان (در صورت نیاز)</span></button>
+    <h3>گزارش به‌روز</h3>
+    <div id="sRep"></div>
+    <button class="btn ghost" id="sFull" style="display:none">دریافت کامل از اول</button>
+    <button class="btn ghost" id="sCopy" style="display:none">کپی گزارش خطا برای ارسال به سازنده</button>
     <h3>واژه‌های ممنوع</h3>
     <div class="bkrow"><input id="bkIn" type="text" placeholder="مثلاً نام یک فروشنده یا برندِ تقلیدی" autocomplete="off"><button id="bkAdd">اضافه</button></div>
     <div class="chips" id="bkList"></div>
@@ -360,19 +372,13 @@ svg{display:block}
     <button class="btn ghost" id="sBrBtn" style="margin-top:0"></button>
     <div id="sBrList" style="display:none"></div>
     <div class="hint2">برندی که خاموش کنید در فهرست دیده نمی‌شود و عکسش دانلود نمی‌شود.</div>
-    <h3>قیمت‌ها</h3>
-    <button class="btn" id="sRef"><span>بروزرسانی قیمت‌ها همین حالا</span></button>
-    <div class="hint2" style="margin-top:12px">بروزرسانی خودکار</div>
+    <h3>بروزرسانی خودکار قیمت‌ها</h3>
     <div class="seg mods" id="sAuto"><button data-m="0">خاموش<small>دستی</small></button><button data-m="15">۱۵<small>دقیقه</small></button><button data-m="30">۳۰<small>دقیقه</small></button><button data-m="60">۱<small>ساعت</small></button><button data-m="180">۳<small>ساعت</small></button></div>
-    <div class="srcs" id="sSrc" style="margin-top:12px"></div>
-    <h3>نسخه‌ی برنامه</h3>
+    <h3>سایت‌های قیمت</h3>
+    <div class="srcs" id="sSrc"></div>
+    <h3>بروزرسانی خودِ برنامه</h3>
     <div class="seg mods" id="sUpdA"><button data-v="1">خودکار<small>پیدا و دانلود می‌کند</small></button><button data-v="0">دستی<small>فقط وقتی بخواهم</small></button></div>
-    <button class="btn" id="sUpd" style="margin-top:8px"><span>بررسی نسخه‌ی جدید</span></button>
-    <div class="hint2" id="sUpdT"></div>
-    <h3>گزارش به‌روز</h3>
-    <div id="sRep"></div>
-    <button class="btn ghost" id="sFull" style="display:none">دریافت کامل از اول</button>
-    <button class="btn ghost" id="sCopy" style="display:none">کپی گزارش خطا برای ارسال به سازنده</button>
+    </div>
     <div class="ver" id="sVer"></div>
   </div>
 </div>

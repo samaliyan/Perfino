@@ -1,7 +1,7 @@
 (function () {
 'use strict';
 var RM = !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
-var VERSION = '1.28';
+var VERSION = '1.29';
 function $(id) { return document.getElementById(id); }
 function fa(n) { return String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, '٬').replace(/\d/g, function (d) { return '۰۱۲۳۴۵۶۷۸۹'[d]; }); }
 function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
@@ -1152,6 +1152,12 @@ $('sCopy').onclick = function () {
     + '\n\nخطاها:\n' + netBad.concat(netLog).map(function (l) { return l.s + ' ' + l.u + '\n' + l.b; }).join('\n---\n');
   if (window.Native && window.Native.copy) window.Native.copy(t); else if (navigator.clipboard) navigator.clipboard.writeText(t).catch(function () {});
   $('sCopy').textContent = 'کپی شد؛ در پیام برای سازنده بچسبانید';
+};
+$('sAdvBtn').onclick = function () {
+  var box = $('sAdv'), on = box.style.display === 'none';
+  box.style.display = on ? '' : 'none'; $('sAdvBtn').setAttribute('aria-expanded', on ? 'true' : 'false');
+  $('sAdvBtn').firstChild.textContent = on ? 'بستن تنظیمات پیشرفته' : 'تنظیمات پیشرفته';
+  if (on) setTimeout(function () { try { box.scrollIntoView({ block: 'start', behavior: 'smooth' }); } catch (e) { } }, 50);
 };
 $('sSamp').onclick = function () {
   var srcN = {}; Core.SOURCES.forEach(function (x) { srcN[x.id] = x.name; });
