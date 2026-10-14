@@ -6,3 +6,4 @@ local.properties
 tests/shots/
 tests/fixtures.json
 __pycache__/
+tests/fx_*.html

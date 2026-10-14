@@ -1750,6 +1750,10 @@ function findNext(doc, url, i) {
   var n = doc.querySelector('link[rel="next"],a[rel="next"],a.next,.next.page-numbers');
   var nh = n && n.getAttribute('href');
   if (nh && nh.charAt(0) !== '#' && !/^javascript:/i.test(nh)) return urlJoin(url, nh);
+  if (doc.querySelector('.pager a[href*="pagenumber="]')) {                       // nopCommerce (هایلند): ?pagenumber=N
+    var base = url.replace(/[?&]pagenumber=\d+/i, '').replace(/[?&]$/, '');
+    return base + (base.indexOf('?') >= 0 ? '&' : '?') + 'pagenumber=' + (i + 2);
+  }
   var u = url.replace(/([?&])page=\d+/, '$1page=' + (i + 2));
   if (u === url) u = url + (url.indexOf('?') >= 0 ? '&' : '?') + 'page=' + (i + 2);
   return u;
@@ -1767,9 +1771,9 @@ function rawSample(doc, cards, body, url) {
   } catch (e) { }
 }
 async function htmlSource(start, net, rep, mode) {
-  var out = [], seen = {}, url = start, pages = 0, natural = false, failed = 0, stop = '';
-  for (var i = 0; i < 40 && url; i++) {
-    var r = await getR(net, url, { Accept: 'text/html' });
+  var out = [], seen = {}, url = start, pages = 0, natural = false, failed = 0, stop = '', maxP = 40, lastN = 0, pre = {}, preU = {}, nopBase = '';
+  for (var i = 0; i < maxP && url; i++) {
+    var r = (pre[i + 1] && url === preU[i + 1]) ? await pre[i + 1] : await getR(net, url, { Accept: 'text/html' });
     if (r.status === 404 && i > 0) { natural = true; stop = 'صفحه‌ی ' + (i + 1) + ' وجود ندارد (پایان)'; break; }
     if (r.status !== 200) { if (i === 0) throw new Error(r.status ? 'HTTP ' + r.status : r.body); failed++; stop = 'صفحه ' + (i + 1) + ' نشد'; break; }
     var doc = new DOMParser().parseFromString(r.body, 'text/html');
@@ -1777,6 +1781,8 @@ async function htmlSource(start, net, rep, mode) {
     var fresh = 0;
     if (i === 0) rawSample(doc, cards, r.body, url);
     pages++;
+    if (i === 0) { var lp = doc.querySelector('.pager .last-page a[data-page]'); lastN = lp ? (+lp.getAttribute('data-page') || 0) : 0; if (lastN > 40) maxP = Math.min(lastN, 300); }      // فهرستِ بلند (هایلند ≈ ۲۰۰ صفحه)
+    cards = cards.filter(function (c) { return !/^(سبد خرید|مقایسه|علاقه ?مندی|ورود|ثبت ?نام)/.test(c.t); });
     cards.forEach(function (c) {
       var k = c.t + '|' + c.price + '|' + (c.u || '');
       if (seen[k]) return; seen[k] = 1; fresh++;
@@ -1788,6 +1794,9 @@ async function htmlSource(start, net, rep, mode) {
       if (i === 1 && cards.length) { stop = 'صفحه‌بندی کار نکرد (صفحه‌ی ۲ تکراری است)'; break; }     // پایانِ واقعی نیست؛ فهرست ناقص است
       natural = true; stop = 'صفحه ' + (i + 1) + ' کارت تازه نداشت'; break;
     }
+    if (i === 0 && lastN > 1 && doc.querySelector('.pager a[href*="pagenumber="]')) nopBase = url.replace(/[?&]pagenumber=\d+/i, '').replace(/[?&]$/, '');
+    if (nopBase) for (var k = i + 1; k <= i + 4 && k < lastN; k++) if (!pre[k + 1]) { preU[k + 1] = nopBase + (nopBase.indexOf('?') >= 0 ? '&' : '?') + 'pagenumber=' + (k + 1); pre[k + 1] = getR(net, preU[k + 1], { Accept: 'text/html' }); }      // ۴ صفحه‌ی بعدی از پیش و هم‌زمان گرفته می‌شود
+    if (lastN && i + 1 >= lastN) { natural = true; stop = 'همه‌ی ' + lastN + ' صفحه'; break; }
     url = findNext(doc, url, i);
   }
   if (!out.length) throw new Error('محصولی پیدا نشد');

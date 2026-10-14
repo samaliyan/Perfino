@@ -1,7 +1,7 @@
 (function () {
 'use strict';
 var RM = !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
-var VERSION = '1.24';
+var VERSION = '1.25';
 function $(id) { return document.getElementById(id); }
 function fa(n) { return String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, '٬').replace(/\d/g, function (d) { return '۰۱۲۳۴۵۶۷۸۹'[d]; }); }
 function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
