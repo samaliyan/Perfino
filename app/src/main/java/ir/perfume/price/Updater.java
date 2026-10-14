@@ -43,6 +43,8 @@ class Updater {
     private volatile File apk;
     private volatile int apkCode = 0;
     private BroadcastReceiver rx;
+    private volatile int sessId = -1;
+    private volatile boolean installing = false;
 
     Updater(Activity a, Js j) {
         act = a;
@@ -99,11 +101,14 @@ class Updater {
             @Override public void run() {
                 try {
                     HttpURLConnection c = open(API, 15000);
-                    InputStream in = c.getInputStream();
                     java.io.ByteArrayOutputStream bo = new java.io.ByteArrayOutputStream();
-                    byte[] buf = new byte[4096]; int n, tot = 0;
-                    while ((n = in.read(buf)) > 0 && tot < 300000) { bo.write(buf, 0, n); tot += n; }
-                    in.close(); c.disconnect();
+                    try {
+                        InputStream in = c.getInputStream();
+                        try {
+                            byte[] buf = new byte[4096]; int n, tot = 0;
+                            while ((n = in.read(buf)) > 0 && tot < 300000) { bo.write(buf, 0, n); tot += n; }
+                        } finally { try { in.close(); } catch (Exception ignore) { } }
+                    } finally { c.disconnect(); }
                     JSONObject j = new JSONObject(bo.toString("UTF-8"));
                     Matcher m = Pattern.compile("code=(\\d{1,9})").matcher(j.optString("body", ""));
                     int code = m.find() ? Integer.parseInt(m.group(1)) : 0;
@@ -126,18 +131,24 @@ class Updater {
                 try {
                     dir.mkdirs();
                     HttpURLConnection c = open(APK_URL, 30000);
-                    InputStream in = c.getInputStream();
-                    OutputStream out = new FileOutputStream(tmp);
                     byte[] buf = new byte[16384]; int n, tot = 0; boolean head = true; boolean pk = false;
                     final long len = c.getContentLengthLong(); int lastPct = -1;
-                    while ((n = in.read(buf)) > 0) {
-                        if (head && n >= 4) { pk = buf[0] == 'P' && buf[1] == 'K'; head = false; if (!pk) break; }
-                        tot += n;
-                        if (tot > MAX_APK) { pk = false; break; }
-                        out.write(buf, 0, n);
-                        if (len > 0) { int pc = (int) (tot * 100L / len); if (pc >= lastPct + 3 && pc < 100) { lastPct = pc; call("__updProg", String.valueOf(pc)); } }
+                    InputStream in = null; OutputStream out = null;
+                    try {
+                        in = c.getInputStream();
+                        out = new FileOutputStream(tmp);
+                        while ((n = in.read(buf)) > 0) {
+                            if (head && n >= 4) { pk = buf[0] == 'P' && buf[1] == 'K'; head = false; if (!pk) break; }
+                            tot += n;
+                            if (tot > MAX_APK) { pk = false; break; }
+                            out.write(buf, 0, n);
+                            if (len > 0) { int pc = (int) (tot * 100L / len); if (pc >= lastPct + 3 && pc < 100) { lastPct = pc; call("__updProg", String.valueOf(pc)); } }
+                        }
+                    } finally {
+                        if (out != null) { try { out.close(); } catch (Exception ignore) { } }
+                        if (in != null) { try { in.close(); } catch (Exception ignore) { } }
+                        c.disconnect();
                     }
-                    out.close(); in.close(); c.disconnect();
                     if (!pk || tot < 20000) throw new java.io.IOException("bad file");
                     PackageInfo pi = act.getPackageManager().getPackageArchiveInfo(tmp.getAbsolutePath(), 0);
                     if (pi == null || !act.getPackageName().equals(pi.packageName)) throw new java.io.IOException("package");
@@ -160,11 +171,18 @@ class Updater {
     /** نصب فایل دانلودشده؛ اندروید پنجره‌ی تأییدِ خودش را نشان می‌دهد */
     boolean install() {
         final File f = apk;
-        if (f == null || !f.exists()) return false;
+        if (f == null || !f.exists() || installing) return false;
+        installing = true;
+        new Thread(new Runnable() { @Override public void run() { doInstall(f); } }).start();      // کپی ۲۰ مگابایتی روی نخِ پس‌زمینه تا صفحه نایستد
+        return true;
+    }
+
+    private void doInstall(final File f) {
         try {
             if (rx == null) {
                 rx = new BroadcastReceiver() {
                     @Override public void onReceive(Context ctx, Intent it) {
+                        if (it.getIntExtra(PackageInstaller.EXTRA_SESSION_ID, -2) != sessId) return;      // فقط پاسخِ نصبِ خودِ ما (برنامه‌ی دیگر نتواند پیام جعلی بفرستد)
                         int st = it.getIntExtra(PackageInstaller.EXTRA_STATUS, -999);
                         if (st == PackageInstaller.STATUS_PENDING_USER_ACTION) {
                             Intent c = it.getParcelableExtra(Intent.EXTRA_INTENT);
@@ -183,6 +201,7 @@ class Updater {
             p.setAppPackageName(act.getPackageName());
             if (Build.VERSION.SDK_INT >= 31) p.setRequireUserAction(PackageInstaller.SessionParams.USER_ACTION_NOT_REQUIRED);
             int id = pi.createSession(p);
+            sessId = id;
             PackageInstaller.Session s = pi.openSession(id);
             try {
                 OutputStream o = s.openWrite("PerfumePrice.apk", 0, f.length());
@@ -200,10 +219,10 @@ class Updater {
             } finally {
                 s.close();
             }
-            return true;
         } catch (Exception e) {
             call("__updErr", JSONObject.quote("start"));
-            return false;
+        } finally {
+            installing = false;
         }
     }
 

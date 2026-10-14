@@ -109,7 +109,8 @@ async def main():
         # کش ۱۳ ساعته دور ریخته شود
         await pg.evaluate("(function(){var d=JSON.parse(localStorage.getItem('pp.db'));Object.keys(d.t).forEach(function(k){d.t[k]-=13*3600e3});localStorage.setItem('pp.db',JSON.stringify(d))})()")
         await pg.reload(); await pg.wait_for_function("window.__pp&&!window.__pp.state.busy",timeout=20000)
-        chk('13h-old cache discarded -> overlay',await pg.evaluate("window.__pp.list.length")==0 and await pg.evaluate("document.getElementById('ov').className")=='on')
+        pill2=await pg.evaluate("document.getElementById('updt').textContent+'|'+document.getElementById('upd').className")
+        chk('13h-old cache (offline): old prices still shown with red "old" pill, not a blank screen',await pg.evaluate("window.__pp.flat.length")>1000 and await pg.evaluate("document.getElementById('ov').className")=='' and 'stale' in pill2,pill2)
         await b.close()
         # ---- ۶) تغییر قیمت هنگام بروزرسانی
         b,ctx,pg,errs=await load(p,360,780,'dark',"localStorage.getItem('pp.set')||localStorage.setItem('pp.set',JSON.stringify({theme:'dark',model:'z'}));"); await ready(pg)

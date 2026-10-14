@@ -60,6 +60,7 @@ public class MainActivity extends Activity {
         if (CookieHandler.getDefault() == null) CookieHandler.setDefault(new CookieManager());
         imgDir = new File(getFilesDir(), "img");
         imgDir.mkdirs();
+        try { File[] old = imgDir.listFiles(); if (old != null) for (File of : old) if (of.getName().endsWith(".tmp")) of.delete(); } catch (Exception ignore) { }      // فایل‌های نیمه‌کاره‌ی دانلودِ قبلی
         root = new FrameLayout(this);
         root.setBackgroundColor(Color.parseColor("#0c0f1f"));
         root.setFitsSystemWindows(true);
@@ -108,7 +109,7 @@ public class MainActivity extends Activity {
                     String body;
                     HttpURLConnection c = null;
                     try {
-                        if (url == null || !(url.startsWith("https://") || url.startsWith("http://"))) throw new java.io.IOException("bad url");
+                        if (url == null || !url.startsWith("https://")) throw new java.io.IOException("bad url");      // فقط https
                         URL u0 = new URL(url);
                         if (!allowedHost(u0.getHost())) throw new java.io.IOException("host not allowed");
                         c = (HttpURLConnection) u0.openConnection();
@@ -128,7 +129,7 @@ public class MainActivity extends Activity {
                             String loc = c.getHeaderField("Location");
                             if (loc == null) break;
                             URL nu = new URL(u0, loc);
-                            if (!(nu.getProtocol().equals("https") || nu.getProtocol().equals("http")) || !allowedHost(nu.getHost())) throw new java.io.IOException("redirect not allowed");
+                            if (!nu.getProtocol().equals("https") || !allowedHost(nu.getHost())) throw new java.io.IOException("redirect not allowed");
                             c.disconnect();
                             u0 = nu;
                             c = (HttpURLConnection) u0.openConnection();
@@ -193,7 +194,7 @@ public class MainActivity extends Activity {
                 @Override
                 public void run() {
                     File dst = new File(imgDir, id + ".img");
-                    File tmp = new File(imgDir, id + ".tmp");
+                    File tmp = new File(imgDir, id + "." + Thread.currentThread().getId() + ".tmp");      // هر نخ فایل موقتِ خودش را دارد
                     boolean ok = dst.exists() && dst.length() > 0;
                     if (!ok) {
                         HttpURLConnection c = null;
@@ -212,6 +213,7 @@ public class MainActivity extends Activity {
                                 byte[] buf = new byte[8192];
                                 int n, total = 0;
                                 boolean big = false, magicOk = false;
+                                try {
                                 while ((n = in.read(buf)) > 0) {
                                     if (total == 0 && n >= 4) {      // فقط عکسِ واقعی (JPEG/PNG/GIF/WebP) ذخیره شود، نه صفحه‌ی خطای HTML
                                         int b0 = buf[0] & 255, b1 = buf[1] & 255, b2 = buf[2] & 255;
@@ -222,8 +224,10 @@ public class MainActivity extends Activity {
                                     if (total > 3 * 1024 * 1024) { big = true; break; }
                                     out.write(buf, 0, n);
                                 }
-                                out.close();
-                                in.close();
+                                } finally {
+                                    try { out.close(); } catch (Exception ignore) { }
+                                    try { in.close(); } catch (Exception ignore) { }
+                                }
                                 if (!big && magicOk && total > 200) ok = tmp.renameTo(dst);
                                 if (!ok) tmp.delete();
                             }

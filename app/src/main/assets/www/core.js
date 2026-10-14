@@ -36,9 +36,9 @@ function normFa0(s, keepAlef) {
   s = s.replace(/[\s\u00a0]+/g, ' ').trim();
   return s;
 }
-var EXCL = /تستر|tester|نمونه|سمپل|sample|گیفت|gift ?set|ست هدیه|مینیاتور|miniature|دکانت|decant|اسانس|تکه ای|ریفیل|refill|بادی ?اسپری|body ?(spray|mist|lotion|wash)|لوسیون|شمع|خوشبو ?کننده|اسپری بدن|دئودورانت|دیودورانت|deodorant|ژل دوش|shower|کرم |اسپری مو|هیر ?میست|hair ?mist|شامپو|روغن عطر|عطر روغنی|رول ?ان|roll ?on|صابون|(^| )پک |(^| )ست( |$)|\bset\b|\bkit\b|(^| )کیت( |$)|مجموعه|جا ?عطری|\d+ ?تایی|\d+ ?عددی|عمده|بدون ?(جعبه|پلمب)|پلمب شکسته|دست دوم|کارکرده|اکسسوری|مشابه|کپی|الهام ?گرفته|\binspired\b|\bclone\b|ایمیتیشن|imitation|هم ?رایحه|افتر ?شیو|آفتر ?شیو|after ?shave|body ?splash|بادی ?اسپلش|hair ?perfume|عطر مو|perfume ?oil|\bcandle\b|\bsoap\b|\bunboxed\b|without ?box|\bused\b|بدون ?کارتن|یدک|\d ?pack\b|\d+ ?عدد\b|تقسیمی|بدون ?برچسب|فاقد ?جعبه|استوک|(^| )طرح( |$)|عطر ماشین|خوشبو ?کننده|room ?spray|\bcar\b|\bcream\b|کرم|\bshampoo\b|\blotion\b|\bdupe\b|similar to|gift ?pack|gift ?box|پک هدیه|\bpack\b|ماسک (صورت|مو|پوست)|(صورت|مو) ماسک|(face|hair|sheet) ?mask|بادی ?میست|fragrance ?mist|\bmist\b|body ?(butter|scrub|oil|crem|creme)|\bbutter\b|\bscrub\b|hair ?oil|gel ?douche|\bcr[eè]me\b|diffuser|\bdeo\b|دئو|coffret|\bduo\b|بخور|\d ?x ?\d|روغن (مو|بدن)|معادل|الهامی|با رایحه|\balternative\b|\bequivalent\b|\bimpression\b/;
+var EXCL = /تستر|tester|نمونه|سمپل|sample|گیفت|gift ?set|ست هدیه|مینیاتور|miniature|دکانت|decant|اسانس|تکه ای|ریفیل|refill|بادی ?اسپری|body ?(spray|mist|lotion|wash)|لوسیون|شمع|خوشبو ?کننده|اسپری بدن|دئودورانت|دیودورانت|deodorant|ژل دوش|shower|کرم |اسپری مو|هیر ?میست|hair ?mist|شامپو|روغن عطر|عطر روغنی|رول ?ان|roll ?on|صابون|(^| )پک |(^| )ست( |$)|\bset\b|\bkit\b|(^| )کیت( |$)|مجموعه|جا ?عطری|\d+ ?تایی|\d+ ?عددی|عمده|بدون ?(جعبه|پلمب)|پلمب شکسته|دست دوم|کارکرده|اکسسوری|مشابه|کپی|الهام ?گرفته|\binspired\b|\bclone\b|ایمیتیشن|imitation|هم ?رایحه|افتر ?شیو|آفتر ?شیو|after ?shave|body ?splash|بادی ?اسپلش|hair ?perfume|عطر مو|perfume ?oil|\bcandle\b|\bsoap\b|\bunboxed\b|without ?box|\bused\b|بدون ?کارتن|یدک|\d ?pack\b|\d+ ?عدد(?![؀-ۿ])|تقسیمی|بدون ?برچسب|فاقد ?جعبه|استوک|(^| )طرح( |$)|عطر ماشین|خوشبو ?کننده|room ?spray|\bcar\b|\bcream\b|کرم|\bshampoo\b|\blotion\b|\bdupe\b|similar to|gift ?pack|gift ?box|پک هدیه|\bpack\b|ماسک (صورت|مو|پوست)|(صورت|مو) ماسک|(face|hair|sheet) ?mask|بادی ?میست|fragrance ?mist|\bmist\b|body ?(butter|scrub|oil|crem|creme)|\bbutter\b|\bscrub\b|hair ?oil|gel ?douche|\bcr[eè]me\b|diffuser|\bdeo\b|دئو|coffret|\bduo\b|بخور|\d ?x ?\d|روغن (مو|بدن)|معادل|الهامی|با رایحه|\balternative\b|\bequivalent\b|\bimpression\b/;
 var STOP = {};
-('عطر ادکلن ادکلون مردانه زنانه مردونه زنونه یونیسکس یونی اورجینال اصل اصلی original حجم میلی لیتر لیتری برند مدل مناسب خرید قیمت فروش اسپری spray for men women unisex ml oz by ادو cc fl نسخه جدید پرفروش ارجینال تضمینی ویژه رایگان ارسال گارانتی پلمپ پلمب کارتن جعبه باکس box عطرادکلن وارداتی اروپایی ایتالیایی تخفیف موجود هدیه فوری نمایندگی رسمی لوکس کیفیت کوالیتی perfume fragrance genuine authentic sale shipping france mens womens stock instock ضمانت اصالت عالی انبار سریع نوروز عددی brand box damaged vintage ترین بهترین برتر پرطرفدار محبوب تازه محصول کالا نیش niche luxury ایرانی اوریجینال اورجینال ارجینال آنلاین فروشگاه batch بارکد barcode').split(' ').forEach(function (w) { STOP[w] = 1; });
+('عطر ادکلن ادکلون مردانه زنانه مردونه زنونه یونیسکس یونی اورجینال اصل اصلی original حجم میلی لیتر لیتری برند مدل مناسب خرید قیمت فروش اسپری spray for men women unisex ml oz by ادو cc fl نسخه جدید پرفروش ارجینال تضمینی ویژه رایگان ارسال گارانتی پلمپ پلمب کارتن جعبه باکس box عطرادکلن وارداتی اروپایی ایتالیایی تخفیف موجود هدیه فوری نمایندگی رسمی لوکس کیفیت کوالیتی perfume fragrance genuine authentic sale shipping france mens womens stock instock ضمانت اصالت عالی انبار سریع نوروز عددی brand box damaged vintage ترین بهترین برتر پرطرفدار محبوب تازه محصول کالا نیش niche luxury ایرانی اقایان اقایون آقایان آقایون بانوان خانم خانمها female ladies اوریجینال اورجینال ارجینال آنلاین فروشگاه batch بارکد barcode').split(' ').forEach(function (w) { STOP[w] = 1; });
 var RE_SIZE = /(\d+(?:\.\d+)?)\s*(?:میلی ?لیتر|میلی|میل|مل|ml|cc)(?![a-zا-ی])/g;
 var RE_OZ = /(\d+(?:\.\d+)?)\s*(?:fl\.? ?)?oz(?![a-z])/g;
 var CONC = [
@@ -55,7 +55,7 @@ function cap(w) { return w.charAt(0).toUpperCase() + w.slice(1); }
 function genderOf(t) {
   if (/یونیسکس|یونی ?سکس|unisex|مردانه ?(و|\/|&) ?زنانه|زنانه ?(و|\/|&) ?مردانه|men ?(and|&|\/) ?women|women ?(and|&|\/) ?men/.test(t)) return 'u';
   var m = /مردانه|مردونه|آقایان|آقایون|\bmens?\b|\bman\b|\bmale\b|for him|pour lui/.test(t);
-  var w = /زنانه|زنونه|بانوان|\bwomens?\b|\bwoman\b|\bfemale\b|\bladies\b|for her|pour elle/.test(t);
+  var w = /زنانه|زنونه|بانوان|خانم|\bwomens?\b|\bwoman\b|\bfemale\b|\bladies\b|for her|pour elle/.test(t);
   return m && w ? 'u' : m ? 'm' : w ? 'w' : '';
 }
 
@@ -153,6 +153,7 @@ function isCloneTitle(t) {
 }
 function parseTitle(raw) {
   var t = normFa(String(raw == null ? '' : raw).replace(/<[^>]*>/g, ' '), true);
+  t = t.replace(/(\d)[,٫](\d{1,2})(?=\s*(?:fl|oz|میل(?!یون)|ml))/g, '$1.$2');          // «3,4 oz» = 3.4 oz
   t = t.replace(/[()\[\]{}]/g, ' ').replace(/[،؛؟٪٫٬٭]/g, ' ').replace(/\b(?:number|n ?°|n\.|no\.)\s*(\d)/g, 'no $1').replace(/(?:نامبر|نمبر|شماره)\s*(\d)/g, 'نامبر $1');
   if (!t || EXCL.test(t)) return null;
   if (isCloneTitle(t)) { CLEANSE.clone = (CLEANSE.clone || 0) + 1; return null; }
@@ -287,12 +288,12 @@ function letterOf(name, lang) {
 /* ---------- یکی‌کردن نام‌ها ---------- */
 function dels(w) { var o = [w]; for (var i = 0; i < w.length; i++) o.push(w.slice(0, i) + w.slice(i + 1)); return o; }   // همسایگیِ «حذف یک حرف» برای یافتنِ سریعِ واژه‌های یک‌ویرایشی
 function Index() { this.m = {}; this.fz = {}; this.xm = {}; }
-var XK = {};
+var XK = {}, XK_N = 0;
 function xk(w) {      // کلیدِ مستقل از خط (فارسی/لاتین): اسکلتِ همخوان‌ها
   var h = XK[w]; if (h !== undefined) return h;
   var k = null;
   if (!/\d/.test(w) && w.length >= 3) { var l = HAS_FA.test(w) ? fa2en([w], LEX).toLowerCase().replace(/[^a-z']/g, '') : w; k = skel(l) || null; if (k && k.length < 2) k = null; }
-  if (Object.keys(XK).length > 40000) XK = {};
+  if (++XK_N > 40000) { XK = {}; XK_N = 0; }
   return (XK[w] = k);
 }
 Index.prototype.add = function (g) {
@@ -418,6 +419,9 @@ function priceGroups(groups, srcOrder, trusted, prior) {
     if (md > 7.5 && md < 13) scale[s] = 0.1;                       // ریال → تومان
     else if (anyTrusted && md > 0.075 && md < 0.133) scale[s] = 10; // فقط وقتی منبع مطمئن هست
   });
+  groups.forEach(function (g) { g.items.forEach(function (it) {         // سایتی که الان با سایت دیگری هم‌پوشانی ندارد هم مقیاسِ شناخته‌شده‌ی قبلی‌اش را نگه می‌دارد (وگرنه قیمتِ ریالی ۱۰ برابر دیده می‌شد)
+    if (scale[it.src] === undefined && prior && prior[it.src] && !trusted[it.src]) scale[it.src] = prior[it.src];
+  }); });
 
   var out = [];
   groups.forEach(function (g) {
@@ -1129,8 +1133,8 @@ function ingestStart(db, idx, src) {
 }
 /* عکس (کوچک و بزرگ) و برندِ پیشنهادیِ سایت را به گروه اضافه می‌کند؛ چیزی که هست بازنویسی نمی‌شود */
 function putExtra(g, src, x) {
-  if (x.img) { g.im = g.im || {}; if (!g.im[src]) g.im[src] = x.img; }
-  if (x.big) { g.bi = g.bi || {}; if (!g.bi[src]) g.bi[src] = x.big; }
+  if (x.img) { g.im = g.im || {}; if (!g.im[src]) g.im[src] = String(x.img).replace(/^http:\/\//i, 'https://'); }      // برنامه فقط https می‌پذیرد
+  if (x.big) { g.bi = g.bi || {}; if (!g.bi[src]) g.bi[src] = String(x.big).replace(/^http:\/\//i, 'https://'); }
   if (x.b && x.b.length) { g.br = g.br || []; x.b.forEach(function (h) { if (g.br.indexOf(h) < 0 && g.br.length < 4) g.br.push(h); }); }
 }
 function stripBrandEn(tk, ent) {
@@ -1166,6 +1170,7 @@ function addEn(db, gg, p, x) {
 function ingestChunk(C, list) {
   var db = C.db, idx = C.idx, src = C.src, M = C.M, G = C.G, seen = C.seen, st = C.st;
   list.forEach(function (x) {
+    if (!x || x.id == null) return;                       // ردیفِ خراب یا بی‌شناسه کل تکه را نمی‌اندازد
     var pid = String(x.id); seen[pid] = 1;
     var cur = M[pid], nowMin = Math.floor(Date.now() / 60000);
     var price = x.st === 1 || !(x.price > 0) ? 0 : x.price;
@@ -1196,17 +1201,19 @@ function ingestChunk(C, list) {
 }
 /* عنوان‌های ذخیره‌شده را با قاعده‌های فعلی دوباره می‌سنجد؛ آن‌هایی که حالا رد می‌شوند (مثل کالای «مدل ...») از گروه‌ها بیرون می‌روند */
 function purgeStored(db) {
-  var n = 0;
+  var n = 0, rk = 0;
   Object.keys(db.it || {}).forEach(function (src) {
     var M = db.it[src];
     Object.keys(M).forEach(function (pid) {
       var e = M[pid];
+      if (e[2] && e[0] && db.g[e[2]] && db.g[e[2]].k.some(function (w) { return STOP[w]; })) { e[0] = ''; rk++; }      // گروهی که با قاعده‌ی قدیمی‌تر ساخته شده و واژه‌ی اضافه (آقایان/بانوان...) در کلیدش مانده: عنوان در دریافتِ کامل بعدی دوباره تحلیل می‌شود
       if (e[2] && e[0]) { var c0 = CLEANSE.clone | 0; var pr = parseTitle(e[0]); var isC = !pr && (CLEANSE.clone | 0) > c0; CLEANSE.clone = c0; if (isC) { e[1] = 0; e[2] = 0; e[3] = 0; n++; } }
     });
   });
+  if (rk) db.full = {};                       // بروزرسانیِ بعدی «کامل» باشد تا عنوانِ پاک‌شده‌ها دوباره تحلیل شود
   return n;
 }
-var DEDUPE_V = 4;
+var DEDUPE_V = 5;
 function ingestEnd(C, complete) {
   if (complete) {                                      // فهرستِ ناگهان خیلی کوچک‌تر شده (صفحه‌ی خطا/کپچا): پاک‌سازی نکن
     var known = Object.keys(C.M).length, seenN = Object.keys(C.seen).length;
@@ -1341,7 +1348,7 @@ async function wooSource(base, net, rep, mode) {
   }
   async function one(p) {
     var r = await getR(net, url(p), { Accept: 'application/json' });
-    if (r.status === 200) { var a = parseJson(r.body); if (Array.isArray(a)) return { k: 'ok', a: a }; return { k: p === 1 ? 'bad' : 'end', a: [] }; }
+    if (r.status === 200) { var a = parseJson(r.body); if (Array.isArray(a)) return { k: 'ok', a: a }; return p === 1 ? { k: 'bad', a: [] } : { k: 'fail', s: 200, b: 'صفحه‌ی غیرعادی' }; }   // ۲۰۰ بدونِ فهرست وسطِ کار = کپچا/خطا، نه پایانِ فهرست
     if (p > 1 && r.status === 400) return { k: 'end', a: [] };
     return { k: 'fail', s: r.status, b: r.body };
   }
@@ -1571,6 +1578,7 @@ function findNext(doc, url, i) {
   if (u === url) u = url + (url.indexOf('?') >= 0 ? '&' : '?') + 'page=' + (i + 2);
   return u;
 }
+var BOTWALL = /captcha|just a moment|access denied|attention required|verify you are human|are you a robot|checking your browser|کپچا|ربات نیستید|دسترسی (شما )?مسدود/i;      // روی متنِ دیدنیِ صفحه (بدون اسکریپت/تگ) سنجیده می‌شود
 async function htmlSource(start, net, rep, mode) {
   var out = [], seen = {}, url = start, pages = 0, natural = false, failed = 0, stop = '';
   for (var i = 0; i < 40 && url; i++) {
@@ -1586,6 +1594,7 @@ async function htmlSource(start, net, rep, mode) {
       out.push({ id: c.u || c.t, t: c.t, price: c.price, img: c.img, big: c.img, st: c.st === 1 ? 1 : (titleLooksPerfume(c.t) || parseTitle(c.t)) ? 0 : 2 });
     });
     rep(out.length);
+    if (!fresh && !cards.length && i > 0 && BOTWALL.test(r.body.slice(0, 40000).replace(/<(script|style|head)[\s\S]*?<\/\1>|<[^>]*>/gi, ' '))) { failed++; stop = 'صفحه ' + (i + 1) + ' کپچا/مسدود بود'; break; }     // صفحه‌ی کپچا پایانِ فهرست نیست؛ قیمت‌های قبلی حذف نشود
     if (!fresh) {
       if (i === 1 && cards.length) { stop = 'صفحه‌بندی کار نکرد (صفحه‌ی ۲ تکراری است)'; break; }     // پایانِ واقعی نیست؛ فهرست ناقص است
       natural = true; stop = 'صفحه ' + (i + 1) + ' کارت تازه نداشت'; break;

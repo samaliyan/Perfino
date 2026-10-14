@@ -1,7 +1,7 @@
 (function () {
 'use strict';
 var RM = !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
-var VERSION = '1.13';
+var VERSION = '1.14';
 function $(id) { return document.getElementById(id); }
 function fa(n) { return String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, '٬').replace(/\d/g, function (d) { return '۰۱۲۳۴۵۶۷۸۹'[d]; }); }
 function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
@@ -416,6 +416,9 @@ var net = {
 
 /* ================= وضعیت برنامه ================= */
 var set = ls.get('pp.set', { theme: 'auto', model: 'a' });
+if (!set || typeof set !== 'object' || Array.isArray(set)) set = {};                      // ذخیره‌ی خراب یا قدیمی نباید برنامه را از کار بیندازد
+if (!/^(auto|light|dark)$/.test(set.theme)) set.theme = 'auto';
+if (!set.soff || typeof set.soff !== 'object' || Array.isArray(set.soff)) set.soff = {};
 if (!MODELS[set.model]) set.model = 'a';
 var db = ls.get('pp.db', null);
 if (!db || db.v !== 3 || db.fv !== 5 || !db.g || !db.it) db = Core.newDb();   // نسخه‌ی ۱.۳ همه چیز را یک‌بار از نو و کامل می‌گیرد
@@ -423,13 +426,16 @@ db.fv = 5;
 db.full = db.full || {}; db.t = db.t || {}; db.fa = db.fa || {}; db.sc = db.sc || {};
 try { localStorage.removeItem('pp.raw'); } catch (e) {}
 var idx = Core.dbIndex(db);
-var stt = ls.get('pp.st', {}), prog = {}, busy = false, curModel = null, list = [], struct = '', psig = '', mq = window.matchMedia ? matchMedia('(prefers-color-scheme: dark)') : null;
+var stt = ls.get('pp.st', {});
+if (!stt || typeof stt !== 'object' || Array.isArray(stt)) stt = {};
+var prog = {}, busy = false, curModel = null, list = [], struct = '', psig = '', mq = window.matchMedia ? matchMedia('(prefers-color-scheme: dark)') : null;
 var ORDER = [], TRUSTED = {}, imgLoc = {}, imgAsked = {};
 Core.SOURCES.forEach(function (s) { if (s.trusted) TRUSTED[s.id] = true; });
 /* سایت‌هایی که کاربر خاموش کرده (set.soff) نه دریافت می‌شوند و نه در فهرست می‌آیند؛ حداقل یک سایت همیشه روشن می‌ماند */
 function srcOn(id) { return !(set.soff && set.soff[id]); }
 function actv() { return Core.SOURCES.filter(function (s) { return srcOn(s.id); }); }
 function order() { return actv().map(function (s) { return s.id; }); }
+if (!actv().length) set.soff = {};                       // همه‌ی سایت‌ها خاموش = داده‌ی خراب؛ همه روشن شوند
 var treeSig = '', staleN = 0, audOpen = false, hiddenN = 0, TREE = [], BR_BY = {}, MD_BY = {}, nav = { lvl: 0, brand: null }, imgPend = {}, imgTot = 0, imgOk = 0, imgBad = 0, imgLastT = 0, startAnchor = ls.get('pp.last', null), lastTried = 0, prevP = null, FLAT = [], ALLB = [], gateRetried = 0;
 var FULL_EVERY = 3 * 86400e3;
 function friendly(m) {
@@ -438,6 +444,10 @@ function friendly(m) {
   if (/timeout|timed out|زمان انتظار/i.test(m)) return 'سایت دیر جواب داد';
   if (/ConnectException|Unreachable|refused|SSL|Handshake/i.test(m)) return 'اتصال به سایت برقرار نشد';
   if (/Too many follow-up/i.test(m)) return 'سایت درخواست را در چرخه انداخت';
+  var h = /HTTP[: ]*(\d{3})/i.exec(m);
+  if (h) { var c = +h[1]; return c === 403 || c === 429 || c === 401 ? 'سایت دسترسی را بسته یا محدود کرده (' + fa(c) + ')' : c === 404 ? 'صفحه‌ی سایت پیدا نشد (' + fa(c) + ')' : c >= 500 ? 'سایت خراب یا شلوغ است (' + fa(c) + ')' : 'سایت جواب درست نداد (' + fa(c) + ')'; }
+  if (/reset|SocketException|EOF|abort|broken pipe/i.test(m)) return 'اتصال وسطِ کار قطع شد';
+  if (m && !/[؀-ۿ]/.test(m)) return 'خطای نامشخص در دریافت از سایت';        // متنِ انگلیسیِ فنی به کاربر نشان داده نمی‌شود (متنِ اصلی در «کپی گزارش» هست)
   return m;
 }
 var saveFail = false;
@@ -461,6 +471,9 @@ function applyTheme() {
 }
 if (mq && mq.addEventListener) mq.addEventListener('change', function () { if (set.theme === 'auto') applyTheme(); });
 
+var STALE_H = 10;       // حالت دستی: بعد از این‌همه ساعت قیمت‌ها «قدیمی» حساب می‌شوند و هنگام باز شدنِ برنامه خودکار تازه می‌شوند
+function oldestOk() { var m = 0; actv().forEach(function (s) { var t = db.t[s.id] || 0; if (t && (!m || t < m)) m = t; }); return m || lastOk(); }
+function needFresh() { var now = Date.now(); return actv().some(function (s) { return !db.t[s.id] || now - db.t[s.id] > STALE_H * 3600000; }); }
 function lastOk() { var m = 0; Object.keys(db.t).forEach(function (k) { if (srcOn(k) && db.t[k] > m) m = db.t[k]; }); return m; }
 function agoText(ms) {
   var m = Math.floor(ms / 60000);
@@ -488,8 +501,9 @@ function updPill() {
   u.classList.remove('busy', 'stale');
   if (busy) { u.classList.add('busy'); t.textContent = firstLoad() ? 'دریافت اولیه‌ی عطرها…' : 'در حال بروزرسانی قیمت…'; return; }
   if (!lo) { u.classList.add('stale'); t.textContent = 'قیمتی دریافت نشده'; return; }
-  var age = Date.now() - lo;
-  if (age > (autoMs() ? 40 * 60000 : 24 * 3600000)) { u.classList.add('stale'); t.textContent = 'قیمت‌ها قدیمی‌اند · ' + agoText(age); }
+  var age = Date.now() - oldestOk();      // قدیمی‌ترین سایتِ روشن؛ یک سایتِ قدیمی در میانگین گم نمی‌شود
+  if (saveFail) { u.classList.add('stale'); t.textContent = 'ذخیره نشد؛ حافظه‌ی برنامه پر است'; return; }
+  if (age > (autoMs() ? 40 * 60000 : STALE_H * 3600000)) { u.classList.add('stale'); t.textContent = 'قیمت‌ها قدیمی‌اند · ' + agoText(age); }
   else t.textContent = 'آخرین بروزرسانی ' + agoText(age);
 }
 function srcDone() { return actv().filter(function (s) { return stt[s.id] && stt[s.id].ok; }).length; }   // سایت‌هایی که اطلاعاتشان آمده
@@ -571,6 +585,7 @@ function setEntries() {
 /* فهرستِ نمایشی را از حافظه می‌سازد؛ اگر فقط قیمت‌ها عوض شده باشد، همان صفحه سر جایش می‌ماند و فقط صفحه‌ی جزئیات (اگر باز است) بروز می‌شود */
 function rebuild(light) {
   var l = light && FLAT.length ? FLAT : Core.buildList(db, order(), TRUSTED, 12 * 3600e3, order());   // light: فقط روشن/خاموشیِ برندها عوض شده؛ داده همان است
+  if (!l.length && !light && lastOk()) { var l2 = Core.buildList(db, order(), TRUSTED, 0, order()); if (l2.length) l = l2; }      // همه‌ی قیمت‌ها قدیمی‌اند: به‌جای صفحه‌ی خالی همان‌ها را نشان بده (نشانگرِ بالا قرمز و «قدیمی» می‌شود)
   if (l !== FLAT) { hiddenN = l.hidden || 0; staleN = l.stale || 0; } FLAT = l;
   var sig = (set.lang === 'en' ? 'en' : 'fa') + '|' + l.length + '|' + Object.keys(db.wd || {}).length + '|' + l.map(function (g) { return g.id + '~' + g.name + '~' + g.img + g.sizes.map(function (z) { return z.ml + ':' + z.price + ':' + z.srcs.map(function (r) { return r.s + r.pid + r.price + (r.used ? 1 : 0); }).join('/'); }).join(','); }).join(';');
   if (sig !== treeSig || !ALLB.length) { ALLB = Core.tree(l, set.lang === 'en' ? 'en' : 'fa', db.wd); treeSig = sig; }   // درخت فقط وقتی دوباره ساخته می‌شود که داده/زبان عوض شده باشد
@@ -611,15 +626,17 @@ function checkReady() {
 }
 
 /* ---- رفتن بین سطح‌ها ---- */
+var swapping = false;
 function swap(anchor) {
-  var st = $('stage'); st.classList.add('out');
-  setTimeout(function () { setEntries(); mountModel(anchor); navUi(); st.classList.remove('out'); }, RM ? 0 : 140);
+  var st = $('stage'); st.classList.add('out'); swapping = true;
+  setTimeout(function () { swapping = false; setEntries(); mountModel(anchor); navUi(); st.classList.remove('out'); }, RM ? 0 : 140);
 }
 function openEntry(id) {
   if (BR_BY[id]) { nav.lvl = 1; nav.brand = id; ls.set('pp.last', id); startAnchor = id; swap(null); }
   else if (MD_BY[id]) openDetail(id);
 }
 function goUp() {
+  if (swapping) return true;                    // دو بار پشت‌سرهم زدنِ «برگشت» برنامه را نبندد
   if (nav.lvl === 0) return false;
   var b = nav.brand; nav.lvl = 0; nav.brand = null; swap(b); return true;
 }
@@ -709,7 +726,7 @@ window.__imgDone = function (id, path) {
   for (var i = 0; i < list.length; i++) if (list[i].imgId === id) { list[i].loc = path; break; }
   imgSettled();
 };
-window.__imgFail = function (id) { if (imgPend[id]) { delete imgPend[id]; imgBad++; } imgSettled(); };
+window.__imgFail = function (id) { if (imgPend[id]) { delete imgPend[id]; imgBad++; } setTimeout(function () { delete imgAsked[id]; }, 300000); imgSettled(); };      // عکسِ ناموفق بعد از چند دقیقه دوباره امتحان می‌شود
 function queueImgs() {
   if (!(window.Native && window.Native.cacheImg)) return;
   TREE.forEach(function (b) {
@@ -767,7 +784,7 @@ async function refresh(manual) {
       clean: { clone: CL2.clone | 0, purged: pg, titles: CL2.n | 0, junk: CL2.junk | 0, merged: mg, names: au2.nmod | 0, brands: (au2.brands || []).length, sus: au2.nsus | 0 } };
     ls.set('pp.run', RUN);
   } catch (e4) { console.error(e4); }
-  busy = false; lastTried = Date.now(); saveDb(); updPill(); overlay(); refBtn(); renderSheet();
+  busy = false; lastTried = Date.now(); lastTry = lastTried; ls.set('pp.try', lastTry); saveDb(); updPill(); overlay(); refBtn(); renderSheet();
   queueImgs(); checkReady();
   if (manual) {
     if (!ok) toast('اینترنت یا سایت‌ها جواب ندادند؛ دوباره امتحان کنید', 4200);
@@ -784,7 +801,7 @@ function renderSheet() {
   Array.prototype.forEach.call($('sUpdA').children, function (b) { b.classList.toggle('on', +b.dataset.v === (updAutoOn() ? 1 : 0)); });
   Array.prototype.forEach.call($('sModel').children, function (b) { b.classList.toggle('on', b.dataset.v === set.model); });
   var bad = false;
-  $('sSrc').innerHTML = Core.SOURCES.map(function (s) {
+  var srcHtml = Core.SOURCES.map(function (s) {
     var x = stt[s.id], txt = '—', cls = '', P = prog[s.id];
     if (busy && P && !P.done) txt = (P.mode === 'full' ? 'دریافت اولیه ' : 'قیمت‌ها ') + '<bdi>' + fa(P.n) + '</bdi>';
     else if (x && x.ok) { txt = fa(x.n) + ' محصول' + (x.note && /ناقص/.test(x.note) ? ' (ناقص)' : ''); }
@@ -793,6 +810,7 @@ function renderSheet() {
     if (!on) { txt = 'خاموش؛ بروز نمی‌شود و در فهرست نیست'; cls = 'offs'; }
     return '<div class="' + cls + '"><span>' + s.name + '</span><span class="st">' + (busy && P && !P.done && on ? txt : esc(txt)) + '</span><button type="button" class="sw' + (on ? ' on' : '') + '" data-s="' + s.id + '" role="switch" aria-checked="' + (on ? 'true' : 'false') + '" aria-label="' + esc(s.name) + '"><i></i></button></div>';
   }).join('') + '<div style="border:0;color:var(--mu);font-size:12px;padding-top:8px"><span>با کلیدِ کنار هر سایت می‌توانید آن را خاموش کنید. نقطه‌ی کوچک کنار قیمت یعنی فقط یک سایت آن را داشته.</span></div>';
+  var sEl = $('sSrc'); if (sEl._h !== srcHtml) { sEl._h = srcHtml; sEl.innerHTML = srcHtml; }      // محتوا عوض نشده = دست نزن (وگرنه لمسِ کلید وسطِ بازسازی گم می‌شد)
   renderReport();
   $('sCopy').style.display = bad || adv ? '' : 'none'; $('sFull').style.display = bad || adv ? '' : 'none';
   $('sVer').textContent = 'نسخه ' + VERSION;
@@ -803,6 +821,7 @@ function clock(t) { if (!t) return '—'; var d = new Date(t), p = function (n) 
 /* گزارش به‌روز: وضعیت دریافت هر سایت، فهرست، عکس‌ها و نام‌ها؛ تا تنظیمات باز است خودش تازه می‌شود */
 /* ---------- گزارش: هر بخش به زبان ساده می‌گوید «چه شد / چرا / چه باید کرد» ---------- */
 var RUN = ls.get('pp.run', null);
+if (!RUN || typeof RUN !== 'object' || !Array.isArray(RUN.src)) RUN = null;
 function sizeMap(l) { var o = {}; (l || []).forEach(function (g) { g.sizes.forEach(function (z) { o[g.id + '|' + z.ml] = z.price; }); }); return o; }
 function diffMaps(a, b) {
   var d = { up: 0, down: 0, nw: 0, gone: 0, same: 0 };
@@ -860,7 +879,7 @@ function renderReport() {
   /* ۲) مشکل‌ها و کار لازم */
   var iss = [];
   r.src.forEach(function (x) { if (x.o.kind !== 'ok' && x.o.kind !== 'off') iss.push('<b>' + esc(x.name) + ':</b> ' + esc(x.o.say) + '. ' + esc(x.o.todo)); });
-  if (saveFail) iss.push('<b>حافظه‌ی گوشی پر است:</b> اطلاعات ممکن است بعد از بستن برنامه برنگردد. از گوشی فضا خالی کنید.');
+  if (saveFail) iss.push('<b>حافظه‌ی خودِ برنامه پر شده:</b> اطلاعات ممکن است بعد از بستن برنامه برنگردد. اگر تکرار شد، در تنظیمات اندروید برای این برنامه «پاک کردن حافظه» را بزنید و دوباره باز کنید.');
   if (r.ps.have < r.ps.need) iss.push('<b>عکس‌ها:</b> ' + B(r.ps.need - r.ps.have) + ' عکس هنوز روی گوشی نیست. خودش دانلود می‌کند؛ کاری لازم نیست.');
   if (au.nsus) iss.push('<b>نام‌های شبیه هم:</b> ' + B(au.nsus) + ' جفت نام شبیه هم هست که قیمتشان به هم نمی‌خورد، پس یکی نشدند (ممکن است دو عطرِ جدا باشند). نمونه‌ها در «پالایش».');
   if (staleN) iss.push('<b>کالای قدیمی:</b> ' + B(staleN) + ' کالا چند ساعت است در سایت دیده نشده و قیمتش نشان داده نمی‌شود. با بروزرسانی بعدی روشن می‌شود.');
@@ -894,7 +913,8 @@ function renderReport() {
   S.push('<b>فهرست:</b> ' + B(r.nb) + ' برند،' + B(r.nm) + ' عطر،' + B(r.nv) + ' نوع');
   S.push('<b>نام انگلیسی:</b> ' + B(r.withEn) + ' از ' + B(r.all) + ' را خودِ سایت‌ها داده‌اند؛ بقیه ساخته می‌شود');
   sec('سایت‌ها و فهرست', S, r.src.some(function (x) { return !x.ok; }));
-  el.innerHTML = out.join('');
+  var rh = out.join(''); if (el._h === rh) return; el._h = rh;
+  el.innerHTML = rh;
   var t = el.querySelector('.aud-t'); if (t) t.onclick = function () { audOpen = !audOpen; renderReport(); };
 }
 var brOpen = false;
@@ -1032,7 +1052,9 @@ window.__updErr = function (m) {
 };
 function autoMs() { var m = +set.auto; return m > 0 ? m * 60000 : 0; }      // ۰ = دستی (پیش‌فرض)
 function autoDue() { var lo = lastOk(); if (!lo) return true; var a = autoMs(); return a > 0 && Date.now() - lo > a; }
-window.__resume = function () { updPill(); if (updDue()) updCheck(false); if (!busy && autoDue()) refresh(false); };
+var lastTry = +ls.get('pp.try', 0) || 0;       // آخرین تلاشِ بروزرسانی (ماندگار)؛ سایتِ همیشه‌خراب هر بار باز شدن را به بمباران تبدیل نکند
+function launchDue() { return !busy && needFresh() && Date.now() - lastTry > 1800000; }      // قیمت‌ها قدیمی‌اند یا سایتی هنوز نیامده: حتی در حالت دستی یک بار تازه شود
+window.__resume = function () { updPill(); if (updDue()) updCheck(false); if (!busy && (autoDue() || launchDue())) refresh(false); };
 document.addEventListener('visibilitychange', function () { if (!document.hidden) window.__resume(); });
 window.addEventListener('beforeunload', function () { if (curModel && nav.lvl === 0) { var a = curModel.getAnchor(); if (a) ls.set('pp.last', a); } });
 window.__pp = { get allBrands() { return ALLB; }, open: openEntry, up: goUp, view: viewImg, closeView: closeViewer, get nav() { return nav; }, get tree() { return TREE; }, get gate() { var ps = photoStat(); return { need: ps.need, have: ps.have, ready: !!db.ready, tot: imgTot, left: imgLeft(), ok: imgOk, bad: imgBad }; }, mount: function (m) { var t = performance.now(); set.model = m; mountModel(curModel ? curModel.getAnchor() : null); return performance.now() - t; }, get model() { return curModel; }, get list() { return list; }, get flat() { return FLAT; }, get state() { return { db: db, st: stt, busy: busy, imgLoc: imgLoc }; }, refresh: refresh, net: net };
@@ -1042,7 +1064,7 @@ applyTheme();
 loadImgs();
 try { rebuild(); } catch (e) { console.error(e); }
 updPill(); overlay(); renderSheet();
-if (autoDue()) refresh(false);
+if (autoDue() || launchDue()) refresh(false);
 setTimeout(function () { if (updAutoOn() && hasN('updCheck')) updCheck(false); }, 1500);      // هر بار که برنامه باز می‌شود نسخه‌ی تازه را می‌پرسد
 setInterval(function () { updPill(); if (!busy && autoDue()) refresh(false); }, 30000);
 /* قفل ورود: اگر دانلود گیر کرد خودش دوباره تلاش کند؛ عکسی که جواب نداد جلوی ورود را نگیرد */
