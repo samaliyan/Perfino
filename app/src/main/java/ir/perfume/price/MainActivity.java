@@ -4,12 +4,15 @@ import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.content.ClipData;
 import android.content.ClipboardManager;
+import android.content.ContentValues;
 import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
 import android.graphics.Color;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Environment;
+import android.provider.MediaStore;
 import android.view.View;
 import android.view.ViewGroup;
 import android.webkit.JavascriptInterface;
@@ -25,6 +28,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.net.CookieHandler;
 import java.net.CookieManager;
 import java.net.HttpURLConnection;
@@ -307,6 +311,46 @@ public class MainActivity extends Activity {
         @JavascriptInterface public void updCheck() { if (upd != null) upd.check(); }
         @JavascriptInterface public void updDownload() { if (upd != null) upd.download(); }
         @JavascriptInterface public boolean updInstall() { return upd != null && upd.install(); }
+
+        /** متن را در یک فایل ذخیره می‌کند (Downloads) و برگه‌ی اشتراک‌گذاری را باز می‌کند. مسیر/نام جا را برمی‌گرداند؛ در خطا رشته‌ی خالی. */
+        @JavascriptInterface
+        public String saveText(final String name, final String text) {
+            try {
+                final byte[] data = text.getBytes("UTF-8");
+                final String safe = name.replaceAll("[^A-Za-z0-9._-]", "_");
+                if (Build.VERSION.SDK_INT >= 29) {
+                    ContentValues cv = new ContentValues();
+                    cv.put(MediaStore.MediaColumns.DISPLAY_NAME, safe);
+                    cv.put(MediaStore.MediaColumns.MIME_TYPE, "text/plain");
+                    cv.put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS);
+                    final Uri uri = getContentResolver().insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, cv);
+                    if (uri == null) return "";
+                    OutputStream os = getContentResolver().openOutputStream(uri);
+                    if (os == null) return "";
+                    try { os.write(data); } finally { os.close(); }
+                    runOnUiThread(new Runnable() {
+                        @Override public void run() {
+                            try {
+                                Intent send = new Intent(Intent.ACTION_SEND);
+                                send.setType("text/plain");
+                                send.putExtra(Intent.EXTRA_STREAM, uri);
+                                send.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                                startActivity(Intent.createChooser(send, "ارسال فایل"));
+                            } catch (Exception ignore) { }
+                        }
+                    });
+                    return "Downloads/" + safe;
+                }
+                File dir = getExternalFilesDir(null);
+                if (dir == null) dir = getFilesDir();
+                File f = new File(dir, safe);
+                FileOutputStream fo = new FileOutputStream(f);
+                try { fo.write(data); } finally { fo.close(); }
+                return f.getAbsolutePath();
+            } catch (Exception e) {
+                return "";
+            }
+        }
 
         @JavascriptInterface
         public void copy(final String text) {
