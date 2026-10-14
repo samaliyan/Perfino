@@ -1,7 +1,7 @@
 (function () {
 'use strict';
 var RM = !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
-var VERSION = '1.25';
+var VERSION = '1.26';
 function $(id) { return document.getElementById(id); }
 function fa(n) { return String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, '٬').replace(/\d/g, function (d) { return '۰۱۲۳۴۵۶۷۸۹'[d]; }); }
 function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
@@ -1151,6 +1151,9 @@ $('sSamp').onclick = function () {
   }); });
   var t = 'نمونه عنوان‌ها ' + VERSION + ' (فروشگاه | عنوان اصلی | نام ساخته‌شده | میل)\n\nمشکوک (' + bad.length + '):\n' + bad.join('\n')
     + '\n\nردشده (' + rej.length + '):\n' + rej.join('\n') + '\n\nبقیه (' + okk.length + '):\n' + okk.join('\n');
+  var hdr = '\n\nوضعیت هر سایت در آخرین بروزرسانی:\n' + Core.SOURCES.map(function (x) { var q = stt[x.id] || {}; return x.name + ': ' + (q.ok ? 'ok ' + q.n + (q.mode ? ' (' + q.mode + ')' : '') + (q.note ? ' ' + q.note : '') : (q.raw || q.err || 'نامشخص')); }).join('\n')
+    + '\nرد شده در آخرین بروزرسانی: ' + ((Core.REJ && Core.REJ.n) || 0) + ' ' + JSON.stringify((Core.REJ && Core.REJ.by) || {}) + '\nنمونهٔ ردشده‌ها:\n' + ((Core.REJ && Core.REJ.ex) || []).slice(0, 40).map(function (e) { return e[0] + ' | ' + e[1]; }).join('\n');
+  t += hdr;
   var raw = Object.keys(Core.RAWC || {}).map(function (h) { return '\n\n===== نمونهٔ خام صفحه: ' + h + ' =====\n' + Core.RAWC[h]; }).join('');
   t += raw; window.__samp = t;
   var d = new Date(), pad = function (n) { return (n < 10 ? '0' : '') + n; };
