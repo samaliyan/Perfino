@@ -9,7 +9,7 @@ window.__u={checks:0,dl:0,inst:0,code:100,latest:150,log:[]};
 (function(){var N=window.Native;
  N.appCode=function(){return window.__u.code};
  N.updCheck=function(){window.__u.checks++;setTimeout(function(){window.__updInfo(window.__u.latest)},50)};
- N.updDownload=function(){window.__u.dl++;var p=0;var iv=setInterval(function(){p+=20;if(p<100){window.__updProg(p)}else{clearInterval(iv);window.__updReady(window.__u.latest)}},500)};
+ N.updDownload=function(){window.__u.dl++;var p=0;var iv=setInterval(function(){p+=20;if(p<100){window.__updProg(p)}else{clearInterval(iv);window.__updReady(window.__u.latest)}},2500)};
  N.updInstall=function(){window.__u.inst++;return true};
 })();
 """

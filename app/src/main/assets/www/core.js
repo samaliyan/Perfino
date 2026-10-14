@@ -36,7 +36,7 @@ function normFa0(s, keepAlef) {
   s = s.replace(/[\s\u00a0]+/g, ' ').trim();
   return s;
 }
-var EXCL = /تستر|tester|نمونه|سمپل|sample|گیفت|gift ?set|ست هدیه|مینیاتور|miniature|دکانت|decant|اسانس|تکه ای|ریفیل|refill|بادی ?اسپری|body ?(spray|mist|lotion|wash)|لوسیون|شمع|خوشبو ?کننده|اسپری بدن|دئودورانت|دیودورانت|deodorant|ژل دوش|shower|کرم |اسپری مو|هیر ?میست|hair ?mist|شامپو|روغن عطر|عطر روغنی|رول ?ان|roll ?on|صابون|(^| )پک |(^| )ست( |$)|\bset\b|\bkit\b|(^| )کیت( |$)|مجموعه|جا ?عطری|\d+ ?تایی|\d+ ?عددی|(?:دو|سه|چهار|پنج|شش) ?(?:عددی|تایی)|\d{2,3} ?(?:ml|میل) ?[x×] ?[2-9](?!\d)|(?:^|[^\d])[2-9] ?[x×] ?\d{2,3} ?(?:ml|میل)|عمده|بدون ?(جعبه|پلمب)|پلمب شکسته|دست دوم|کارکرده|اکسسوری|مشابه|کپی|الهام ?گرفته|\binspired\b|\bclone\b|ایمیتیشن|imitation|هم ?رایحه|افتر ?شیو|آفتر ?شیو|after ?shave|body ?splash|بادی ?اسپلش|hair ?perfume|عطر مو|perfume ?oil|\bcandle\b|\bsoap\b|\bunboxed\b|without ?box|\bused\b|بدون ?کارتن|یدک|\d ?pack\b|\d+ ?عدد(?![؀-ۿ])|تقسیمی|بدون ?برچسب|فاقد ?جعبه|استوک|(^| )طرح( |$)|عطر ماشین|خوشبو ?کننده|room ?spray|\bcar\b|\bcream\b|کرم|\bshampoo\b|\blotion\b|\bdupe\b|similar to|gift ?pack|gift ?box|پک هدیه|\bpack\b|ماسک (صورت|مو|پوست)|(صورت|مو) ماسک|(face|hair|sheet) ?mask|بادی ?میست|fragrance ?mist|\bmist\b|body ?(butter|scrub|oil|crem|creme)|\bbutter\b|\bscrub\b|hair ?oil|gel ?douche|\bcr[eè]me\b|diffuser|\bdeo\b|دئو|coffret|\bduo\b|بخور|\d ?x ?\d|روغن (مو|بدن)|معادل|الهامی|با رایحه|\balternative\b|\bequivalent\b|\bimpression\b/;
+var EXCL = /تستر|tester|نمونه|سمپل|sample|گیفت|gift ?set|ست هدیه|مینیاتور|miniature|دکانت|decant|اسانس|تکه ای|ریفیل|refill|بادی ?اسپری|body ?(spray|mist|lotion|wash)|لوسیون|شمع|خوشبو ?کننده|اسپری بدن|دئودورانت|دیودورانت|deodorant|ژل دوش|shower|کرم |اسپری مو|هیر ?میست|hair ?mist|شامپو|روغن عطر|عطر روغنی|رول ?ان|roll ?on|صابون|(^| )پک |(^| )ست( |$)|\bset\b|\bkit\b|(^| )کیت( |$)|مجموعه|جا ?عطری|\d+ ?تایی|\d+ ?عددی|(?:دو|سه|چهار|پنج|شش) ?(?:عددی|تایی)|\d{2,3} ?(?:ml|میل) ?[x×] ?[2-9](?!\d)|(?:^|[^\d])[2-9] ?[x×] ?\d{2,3} ?(?:ml|میل)|عمده|بدون ?(جعبه|پلمب)|پلمب شکسته|دست دوم|کارکرده|اکسسوری|مشابه|کپی|الهام ?گرفته|\binspired\b|\bclone\b|ایمیتیشن|imitation|هم ?رایحه|افتر ?شیو|آفتر ?شیو|after ?shave|body ?splash|بادی ?اسپلش|hair ?perfume|عطر مو|perfume ?oil|\bcandle\b|\bsoap\b|\bunboxed\b|without ?box|\bused\b|بدون ?کارتن|یدک|\d ?pack\b|\d+ ?عدد(?![؀-ۿ])|تقسیمی|بدون ?برچسب|فاقد ?جعبه|استوک|(^| )طرح( |$)|عطر ماشین|خوشبو ?کننده|room ?spray|\bcar\b|\bcream\b|کرم|\bshampoo\b|\blotion\b|\bdupe\b|similar to|gift ?pack|gift ?box|پک هدیه|\bpack\b|ماسک (صورت|مو|پوست)|(صورت|مو) ماسک|(face|hair|sheet) ?mask|بادی ?میست|fragrance ?mist|\bmist\b|body ?(butter|scrub|oil|crem|creme)|\bbutter\b|\bscrub\b|hair ?oil|gel ?douche|\bcr[eè]me\b|diffuser|\bdeo\b|دئو|coffret|\bduo\b|بخور|\d ?x ?\d|روغن (مو|بدن)|معادل|الهامی|\balternative\b|\bequivalent\b|\bimpression\b/;
 var STOP = {};
 ('فقط تنها عطر ادکلن ادکلون مردانه زنانه مردونه زنونه یونیسکس یونی اورجینال اصل اصلی original حجم میلی لیتر لیتری برند مدل مناسب خرید قیمت فروش اسپری spray for men women unisex ml oz by ادو cc fl نسخه جدید پرفروش ارجینال تضمینی ویژه رایگان ارسال گارانتی پلمپ پلمب کارتن جعبه باکس box عطرادکلن وارداتی اروپایی ایتالیایی تخفیف موجود هدیه فوری نمایندگی رسمی لوکس کیفیت کوالیتی perfume fragrance genuine authentic sale shipping france mens womens stock instock ضمانت اصالت عالی انبار سریع نوروز عددی brand box damaged vintage ترین بهترین برتر پرطرفدار محبوب تازه محصول کالا نیش niche luxury ایرانی اقایان اقایون آقایان آقایون بانوان خانم خانمها female ladies اوریجینال اورجینال ارجینال آنلاین فروشگاه batch بارکد barcode').split(' ').forEach(function (w) { STOP[w] = 1; });
 var RE_SIZE = /(\d+(?:\.\d+)?)\s*(?:میلی ?لیتر|میلی|میل|مل|ml|cc)(?![a-zا-ی])/g;
@@ -163,6 +163,11 @@ function vetReason(t) {
    نشانه: پیش از «مدل» نامِ سازنده‌ی ناشناخته هست و بعد از «مدل» نامِ برندِ شناخته‌شده. چنین کالایی قیمتِ عطرِ اصلی را خراب می‌کند و وارد فهرست نمی‌شود. */
 var CLONE_GEN = {}; 'عطر ادکلن ادکلون مردانه زنانه مردونه زنونه یونیسکس پرفیوم ادو ادوپرفیوم ادوتویلت پارفوم parfum perfume edp edt cologne men women مناسب خانم آقایان بانوان'.split(' ').forEach(function (w) { CLONE_GEN[w] = 1; });
 function isCloneTitle(t) {
+  var sm = /(?:^| )با (?:رایحه|بوی|عطر)(?: ی)? (.+)$/.exec(t);          // «با رایحه‌ی ساواج» = تقلید؛ «با رایحه‌ی خنک» فقط توضیح است (برای این یکی کالا رد نمی‌شود)
+  if (sm) {
+    var af = sm[1].split(' ').filter(function (w) { return w && !STOP[w] && !CLONE_GEN[w] && !/^\d+(?:ml|cc|میل)?$/.test(w); }).map(function (w) { return w.replace(/آ/g, 'ا').replace(/ؤ/g, 'و').replace(/ئ/g, 'ی'); });
+    if (af.length && brandOf(af, [], true).id !== 'other') return true;
+  }
   var tk = t.split(/\s+/), i = tk.indexOf('مدل');
   if (i < 0) i = tk.indexOf('model');
   if (i < 1 || i >= tk.length - 1) return false;
@@ -173,6 +178,12 @@ function isCloneTitle(t) {
   if (/^(pour (un )?(homme|femme|hom)|the one|homme|femme|پور (اون )?(هوم|فم))$/.test(after.join(' '))) return false;      // «Model Pour Homme» نامِ عمومی است، نه عطرِ یک برند
   return brandOf(after, []).id !== 'other' && brandOf(before, [], true).id === 'other';
 }
+/* توضیحِ تبلیغاتی داخل عنوان نامِ عطر نیست: «با رایحه‌ی خنک»، «با ساختار ترش»، «مناسب فصل بهار» ... تا اندازه/غلظت یا آخر عنوان */
+var DESC_END = '(?= \\d| ادو| ادکلن| ادوپرفیوم| edp| edt| parfum| eau|$)';
+var RE_DESC = new RegExp('(?:^| )(?:همراه )?(?:با|دارای|حاوی) (?:ساختار|رایحه|رایحه ی|بوی|بو|نت|نوت|نت ها|نت های|نوت ها|نوت های|ترکیب|طعم|حس|فضای|پایه|اسانس|عطر|ماندگاری|پخش|کیفیت|تم|ته ?مایه|عصاره|مواد|آروما|رنگ)(?: [^\\d]*?)?' + DESC_END, 'g');
+var RE_SEASON = new RegExp('(?:^| )(?:مناسب|ویژه|مخصوص|برای)(?: ی)? (?:فصل|روزهای|روز|شب|تابستان|زمستان|بهار|پاییز)(?: [^\\d]*?)?' + DESC_END, 'g');
+function stripDesc(t) { return t.replace(RE_DESC, ' ').replace(RE_SEASON, ' ').replace(/ فصل (?:بهار|تابستان|پاییز|زمستان)(?= |$)/g, ' ').replace(/\s+/g, ' ').trim(); }
+function isNameless(p) { var e = brandOf(p.key, []); return e.id !== 'other' && !stripBrand(p.key, e).length; }      // فقط نامِ برند؛ نامِ عطر پیدا نشد
 function parseTitle(raw) {
   var t = normFa(String(raw == null ? '' : raw).replace(/<[^>]*>/g, ' '), true);
   t = t.replace(/(\d)[,٫](\d{1,2})(?=\s*(?:fl|oz|میل(?!یون)|ml))/g, '$1.$2');          // «3,4 oz» = 3.4 oz
@@ -180,6 +191,7 @@ function parseTitle(raw) {
   if (!t) return null;
   if (EXCL.test(t)) { REJ.n++; return null; }
   var vr = vetReason(t); if (vr) { REJ.n++; REJ.by[vr] = (REJ.by[vr] || 0) + 1; if (REJ.ex.length < 40 && vr !== 'clone') REJ.ex.push([vr, String(raw).slice(0, 90)]); return null; }
+  t = stripDesc(t);
   var m, sizes = [];
   RE_SIZE.lastIndex = 0;
   while ((m = RE_SIZE.exec(t))) sizes.push(+m[1]);
@@ -1307,6 +1319,11 @@ function ingestChunk(C, list) {
     if (x.st === 2) { M[pid] = [x.t || '', 0, 0, 0, nowMin]; return; }
     var p = parseTitle(x.t);
     if (!p) { M[pid] = [x.t, 0, 0, 0, nowMin]; return; }
+    if (x.e && isNameless(p)) {                           // عنوان نامِ عطر نداشت (فقط توضیح بود): از نشانیِ صفحه (slug) که نامِ لاتین دارد کمک می‌گیریم
+      var p2 = parseTitle(x.e + ' ' + p.ml + ' ml' + (p.conc ? ' ' + p.conc : ''));
+      if (p2 && p2.ml === p.ml && !isNameless(p2)) { p2.gn = p2.gn || p.gn; p2.conc = p2.conc || p.conc; p = p2; CLEANSE.healed = (CLEANSE.healed | 0) + 1; }
+    }
+    if (isNameless(p)) { CLEANSE.nameless = (CLEANSE.nameless | 0) + 1; (CLEANSE.nlEx = CLEANSE.nlEx || []).length < 30 && CLEANSE.nlEx.push(String(x.t).slice(0, 100)); }
     st.added++;
     if (!C.byG) C.byG = pricesByGroup(db);
     var gid = resolve(db, idx, G, C.byG, p, price, src);
@@ -1330,14 +1347,14 @@ function purgeStored(db) {      // بیرون‌بردنِ کالاهای ذخی
     Object.keys(M).forEach(function (pid) {
       var e = M[pid];
       if (e[2] && e[0] && db.g[e[2]] && db.g[e[2]].k.some(function (w) { return STOP[w]; })) { e[0] = ''; rk++; }      // گروهی که با قاعده‌ی قدیمی‌تر ساخته شده و واژه‌ی اضافه (آقایان/بانوان...) در کلیدش مانده: عنوان در دریافتِ کامل بعدی دوباره تحلیل می‌شود
-      if (e[2] && e[0]) { var r0 = REJ.n, c0 = CLEANSE.clone | 0; var pr = parseTitle(e[0]); var isC = !pr && REJ.n > r0; CLEANSE.clone = c0; if (isC) { e[1] = 0; e[2] = 0; e[3] = 0; e[0] = ''; n++; } }      // عنوان پاک می‌شود تا اگر قاعده برداشته شد، دریافتِ کامل دوباره تحلیلش کند
+      if (e[2] && e[0]) { var r0 = REJ.n, c0 = CLEANSE.clone | 0; var pr = parseTitle(e[0]); var isC = !pr && REJ.n > r0; CLEANSE.clone = c0; if (isC) { e[1] = 0; e[2] = 0; e[3] = 0; e[0] = ''; n++; } else if (pr && db.g[e[2]] && pr.key.join(' ') !== db.g[e[2]].k.join(' ')) { e[0] = ''; rk++; } }      // قاعده‌ی نام عوض شده: این کالا با نامِ تازه دوباره ثبت شود      // عنوان پاک می‌شود تا اگر قاعده برداشته شد، دریافتِ کامل دوباره تحلیلش کند
     });
   });
   REJ.n = R0.n; REJ.by = R0.by; REJ.ex.length = R0.ex; CLEANSE.junk = R0.junk;      // بازبینیِ حافظه شمارنده‌های گزارش را باد نکند
   if (rk) db.full = {};                       // بروزرسانیِ بعدی «کامل» باشد تا عنوانِ پاک‌شده‌ها دوباره تحلیل شود
   return n;
 }
-var DEDUPE_V = 6;
+var DEDUPE_V = 7;
 function ingestEnd(C, complete) {
   if (complete) {                                      // فهرستِ ناگهان خیلی کوچک‌تر شده (صفحه‌ی خطا/کپچا): پاک‌سازی نکن
     var known = Object.keys(C.M).length, seenN = Object.keys(C.seen).length;
@@ -1815,10 +1832,10 @@ function histSnap(h, list, srcSig, now, labFn, blkSig) {
 /* گزارش: همه‌چیز از روی تاریخچه + فهرست فعلی. هر ردیف: { k, gid, name, l, ml, ... } */
 function histReport(h, list, now, o) {
   now = now || Date.now(); o = o || {};
-  var thr = o.thr || 0.08, R = { span: h && h.t0 ? (now - h.t0) / H_DAY : 0, up: [], down: [], gone: [], back: [], low: [], fresh: [], gap: [] };
-  var cur = {};
+  var thr = o.thr || 0.08, R = { span: h && h.t0 ? (now - h.t0) / H_DAY : 0, up: [], down: [], gone: [], back: [], low: [], fresh: [], gap: [], trend: { n: 0, up: 0, down: 0, same: 0, med: 0 } };
+  var cur = {}, pcs = [];
   (list || []).forEach(function (g) { g.sizes.forEach(function (z) {
-    cur[g.id + '|' + z.ml] = 1;
+    cur[g.id + '|' + z.ml] = z;
     var used = z.srcs.filter(function (r) { return r.used !== false; });
     if (used.length >= 2) {                                         // اختلاف قیمتِ فروشگاه‌ها همین حالا
       var lo = used[0], hi = used[0]; used.forEach(function (r) { if (r.price < lo.price) lo = r; if (r.price > hi.price) hi = r; });
@@ -1829,16 +1846,18 @@ function histReport(h, list, now, o) {
   if (h && h.d) Object.keys(h.d).forEach(function (k) {
     var e = h.d[k], gid = k.split('|')[0], ml = +k.split('|')[1], base = { k: k, gid: gid, name: e.n, l: e.l || '', ml: ml };
     var isCur = !!cur[k];
+    if (isCur) { base.n = cur[k].srcs.length; base.stores = cur[k].srcs.map(function (r) { return r.s; }); base.pts = (e.p || []).slice(-8).map(function (q) { return q[1]; }); }
     if (isCur && e.p && e.p.length) {
       var last = e.p[e.p.length - 1], ref = null;                   // قدیمی‌ترین نقطه‌ی ۳۰ روز اخیر
       for (var i = 0; i < e.p.length; i++) if (now - e.p[i][0] <= 30 * H_DAY) { ref = e.p[i]; break; }
       if (!ref) ref = last;
       if (ref !== last || e.p.length > 1) {
         var from = ref[1], to = last[1], pc = (to - from) / from;
+        R.trend.n++; pcs.push(pc); if (pc >= 0.02) R.trend.up++; else if (pc <= -0.02) R.trend.down++; else R.trend.same++;
         if (Math.abs(pc) >= thr && Math.abs(to - from) >= 20000) { var rec = Object.assign({}, base, { from: from, to: to, pct: pc, ago: (now - ref[0]) / H_DAY }); (pc > 0 ? R.up : R.down).push(rec); }
       }
     }
-    if (!isCur && e.o && now - e.o <= 30 * H_DAY) R.gone.push(Object.assign({}, base, { ago: (now - e.o) / H_DAY, price: e.p && e.p.length ? e.p[e.p.length - 1][1] : 0 }));
+    if (!isCur && e.o && now - e.o <= 30 * H_DAY) R.gone.push(Object.assign({}, base, { was: e.cm || 0, ago: (now - e.o) / H_DAY, price: e.p && e.p.length ? e.p[e.p.length - 1][1] : 0 }));
     if (isCur && e.r && now - e.r <= 14 * H_DAY) R.back.push(Object.assign({}, base, { ago: (now - e.r) / H_DAY, price: e.p[e.p.length - 1][1] }));
     if (isCur && e.cm > e.c && now - (e.ct || 0) <= 14 * H_DAY) R.low.push(Object.assign({}, base, { was: e.cm, now: e.c, price: e.p[e.p.length - 1][1] }));
     if (isCur && R.span >= 3 && e.f && e.f > h.t0 + 0.5 * H_DAY && now - e.f <= 7 * H_DAY) R.fresh.push(Object.assign({}, base, { ago: (now - e.f) / H_DAY, price: e.p[e.p.length - 1][1] }));
@@ -1847,9 +1866,27 @@ function histReport(h, list, now, o) {
   R.gone.sort(function (a, b) { return a.ago - b.ago; }); R.back.sort(function (a, b) { return a.ago - b.ago; });
   R.low.sort(function (a, b) { return (b.was - b.now) - (a.was - a.now); }); R.fresh.sort(function (a, b) { return a.ago - b.ago; });
   R.gap.sort(function (a, b) { return b.d - a.d; });
+  if (pcs.length) { pcs.sort(function (a, b) { return a - b; }); R.trend.med = (pcs[(pcs.length - 1) >> 1] + pcs[pcs.length >> 1]) / 2; }
   return R;
 }
-root.Core = { histNew: histNew, histFix: histFix, histSnap: histSnap, histReport: histReport, purgeStored: purgeStored, setBlock: setBlock, REJ: REJ, vetReason: vetReason, reconcile: reconcile, CLEANSE: CLEANSE, cleanseText: cleanseText, cleanBrandName: cleanBrandName, itemUrl: itemUrl, STALE_MIN: STALE_MIN, fa2en: fa2en, en2fa: en2fa, enTokens: enTokens, titleEn: titleEn, tree: tree, brandOf: brandOf, specInfo: specInfo, enrichTitle: enrichTitle, genderOf: genderOf, nameCmp: nameCmp, CFG: CFG, newDb: newDb, dbIndex: dbIndex, ingest: ingest, ingestAsync: ingestAsync, buildList: buildList, normFa: normFa, parseTitle: parseTitle, aggregate: aggregate, SOURCES: SOURCES, extractCards: extractCards,
+/* آمارِ همین حالا از فهرست (بدون تاریخچه): تعداد، هر فروشگاه چند عطر دارد و چقدر ارزان/گران است */
+function marketStats(list) {
+  var R = { perfumes: (list || []).length, sizes: 0, single: 0, multi: 0, bySrc: {} };
+  function S(id) { return R.bySrc[id] || (R.bySrc[id] = { n: 0, shared: 0, cheapest: 0, idx: [], avg: 0 }); }
+  (list || []).forEach(function (g) { g.sizes.forEach(function (z) {
+    R.sizes++;
+    if (z.srcs.length < 2) R.single++; else R.multi++;
+    z.srcs.forEach(function (r) { S(r.s).n++; });
+    var u = z.srcs.filter(function (r) { return r.used !== false && r.price > 0; });
+    if (u.length < 2) return;
+    var vals = u.map(function (r) { return r.price; }).sort(function (a, b) { return a - b; }), md = (vals[(vals.length - 1) >> 1] + vals[vals.length >> 1]) / 2, lo = vals[0];
+    var tie = vals.filter(function (v) { return v === lo; }).length;
+    u.forEach(function (r) { var s = S(r.s); s.shared++; if (r.price === lo && tie < u.length) s.cheapest++; s.idx.push(r.price / md); });
+  }); });
+  Object.keys(R.bySrc).forEach(function (k) { var s = R.bySrc[k]; s.avg = s.idx.length ? s.idx.reduce(function (a, b) { return a + b; }, 0) / s.idx.length : 0; delete s.idx; });
+  return R;
+}
+root.Core = { marketStats: marketStats, histNew: histNew, histFix: histFix, histSnap: histSnap, histReport: histReport, purgeStored: purgeStored, setBlock: setBlock, REJ: REJ, vetReason: vetReason, reconcile: reconcile, CLEANSE: CLEANSE, cleanseText: cleanseText, cleanBrandName: cleanBrandName, itemUrl: itemUrl, STALE_MIN: STALE_MIN, fa2en: fa2en, en2fa: en2fa, enTokens: enTokens, titleEn: titleEn, tree: tree, brandOf: brandOf, specInfo: specInfo, enrichTitle: enrichTitle, genderOf: genderOf, nameCmp: nameCmp, CFG: CFG, newDb: newDb, dbIndex: dbIndex, ingest: ingest, ingestAsync: ingestAsync, buildList: buildList, normFa: normFa, parseTitle: parseTitle, aggregate: aggregate, SOURCES: SOURCES, extractCards: extractCards,
   wooSource: wooSource, digikalaSource: digikalaSource, htmlSource: htmlSource, letterOf: letterOf, median: median, priceFromText: priceFromText, similar: similar };
 if (typeof module !== 'undefined') module.exports = root.Core;
 })(typeof window !== 'undefined' ? window : globalThis);
