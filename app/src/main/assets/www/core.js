@@ -195,6 +195,7 @@ function parseTitle(raw) {
   if (!t) return null;
   if (EXCL.test(t)) { REJ.n++; return null; }
   var vr = vetReason(t); if (vr) { REJ.n++; REJ.by[vr] = (REJ.by[vr] || 0) + 1; if (REJ.ex.length < 40 && vr !== 'clone') REJ.ex.push([vr, String(raw).slice(0, 90)]); return null; }
+  var tailG = ''; t = t.replace(/(\d\s*(?:ml|میل))\s+([wmu])\s*$/i, function (_, a, g) { tailG = g.toLowerCase(); return a; });      // «... 100ml W» (هایلند): حرفِ آخر جنسیت است
   t = stripDesc(t);
   var m, sizes = [];
   RE_SIZE.lastIndex = 0;
@@ -237,6 +238,7 @@ function parseTitle(raw) {
   if (!shown.length) return null;
   shown = cleanToks(shown).filter(function (w) { return w.length > 1 || /[a-z0-9]/.test(w); });      // حرفِ تکِ فارسی = باقی‌مانده‌ی خراب
   if (!shown.length || !meaningful(shown)) { CLEANSE.junk++; return null; }
+  var nseen = {}; shown = shown.filter(function (w) { if (!/^\d+$/.test(w)) return true; if (nseen[w]) return false; nseen[w] = 1; return true; });      // «2004 ... 2004» (سالِ تکراری در بخشِ فارسی و انگلیسیِ عنوان)
   var lw = shown[shown.length - 1], pgn = '';
   if (shown.length > 2 && (lw === 'من' || lw === 'وومن' || lw === 'ومن')) { pgn = lw === 'من' ? 'm' : 'w'; shown = shown.slice(0, -1); lw = shown[shown.length - 1]; }
   if (shown.length > 2 && (lw === 'man' || lw === 'woman' || lw === 'مرد' || lw === 'زن')) {      // «Man/Woman» آخرِ عنوان = جنسیت؛ مگر اینکه نامِ خودِ عطر باشد (Jimmy Choo Man)
@@ -245,7 +247,7 @@ function parseTitle(raw) {
   }
   var key = canonBrand(shown.map(function (w) { return w.replace(/آ/g, 'ا').replace(/ؤ/g, 'و').replace(/ئ/g, 'ی'); }));
   var name = shown.map(function (w) { return hasFa ? w : cap(w); }).join(' ');
-  return { key: key, name: name, conc: conc, ml: ml, fa: hasFa, gn: genderOf(t) || pgn };
+  return { key: key, name: name, conc: conc, ml: ml, fa: hasFa, gn: genderOf(t) || pgn || (tailG === 'w' ? 'w' : tailG === 'm' ? 'm' : tailG === 'u' ? 'u' : '') };
 }
 
 /* یک ویرایش (حذف/افزودن/جایگزینیِ یک حرف) بین a و b؛ خروجی: [حرف۱، حرف۲] یا null */
@@ -1555,7 +1557,7 @@ async function digikalaSource(net, rep, mode) {
   for (vi = 0; vi < DK_URLS.length && !first; vi++) { var r1 = await one(1, vi); if (r1.k === 'ok') { first = r1; break; } err = r1.e; }
   if (!first) throw new Error(err || 'دیجی‌کالا جواب نداد');
   var d1 = first.d; eat(d1); rep(out.length, 0);
-  total = Math.min(80, (d1.pager && d1.pager.total_pages) || 1);
+  total = Math.min(100, (d1.pager && d1.pager.total_pages) || 1);
   var done = 1;
   for (var page = 2; page <= total; page += CFG.conc + 1) {
     var ps = []; for (var i = 0; i < CFG.conc + 1 && page + i <= total; i++) ps.push(page + i);
@@ -1564,8 +1566,8 @@ async function digikalaSource(net, rep, mode) {
     done += ps.length; rep(out.length, done / total);
   }
   if (!out.length) throw new Error('محصولی پیدا نشد');
-  var capped = !(d1.pager && d1.pager.total_pages > 0) || d1.pager.total_pages > 80;
-  return { items: out, complete: !failed && total > 0 && !capped, note: failed ? 'ناقص: ' + failed + ' صفحه' : (capped ? 'ناقص: تعداد صفحه‌ها معلوم نیست یا بیش از ۸۰ است' : '') };
+  var capped = !(d1.pager && d1.pager.total_pages > 0) || d1.pager.total_pages > 100;
+  return { items: out, complete: !failed && total > 0 && !capped, note: failed ? 'ناقص: ' + failed + ' صفحه' : (capped ? 'ناقص: تعداد صفحه‌ها معلوم نیست یا بیش از ۱۰۰ است' : '') };
 }
 
 /* ---- HTML عمومی (برای سایت‌هایی که API ندارند) ---- */

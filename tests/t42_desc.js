@@ -40,4 +40,9 @@ chk(key('ادوپرفیوم مردانه پارادایز لایت مدل آدا
 chk(key('ادو پرفیوم مردانه پینک ویژوآل مدل FIERO رایحه خنک و ترش حجم 100 میلی لیتر')==='پینک ویژوال fiero','bare رایحه خنک و ترش');
 chk(C.stripPriceTail('ادو پرفیوم زنانه مارلین میسیلدا10,230,000%158,695,500 تومان')==='ادو پرفیوم زنانه مارلین میسیلدا','price tail stripped');
 chk(C.stripPriceTail('عطر 100 میل')==='عطر 100 میل','no tail untouched');
+// فایل ۱۹:۴۶ کاربر
+chk(key('عطر ادکلن ژان پل گوتیه له میل او دت 2004 | Jean Paul Gaultier Le Male Eau d Ete 2004 100 میل ادوتویلت')==='ژان پل گوتیه لو میل او دت 2004','duplicate year removed: '+key('عطر ادکلن ژان پل گوتیه له میل او دت 2004 | Jean Paul Gaultier Le Male Eau d Ete 2004 100 میل ادوتویلت'));
+chk(key('J.DEL POZO Arabian Night Edp 100ml W')==='j del pozo arabian night'&&P('J.DEL POZO Arabian Night Edp 100ml W').gn==='w','trailing W = gender');
+chk(P('CARTIER Must De Cartier Pour Homme Edt 100ml M').gn==='m','trailing M = gender');
+chk(P('ادو پرفیوم مردانه ولکانو اگزودوس 30 میلی گرم').ml===30,'میلی گرم typo');
 console.log(ok + ' ok ' + failed + ' bad'); process.exit(failed ? 1 : 0);
