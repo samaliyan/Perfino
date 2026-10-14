@@ -1740,7 +1740,85 @@ var SOURCES = [
   { id: 'hiland', name: 'هایلند', run: function (net, rep, mode) { return wooOrHtml('https://hilandbeauty.com', 'https://hilandbeauty.com/fa/%D8%B9%D8%B7%D8%B1-%D9%88-%D8%A7%D8%AF%DA%A9%D9%84%D9%86', net, rep, mode); } }
 ];
 
-root.Core = { purgeStored: purgeStored, setBlock: setBlock, REJ: REJ, vetReason: vetReason, reconcile: reconcile, CLEANSE: CLEANSE, cleanseText: cleanseText, cleanBrandName: cleanBrandName, itemUrl: itemUrl, STALE_MIN: STALE_MIN, fa2en: fa2en, en2fa: en2fa, enTokens: enTokens, titleEn: titleEn, tree: tree, brandOf: brandOf, specInfo: specInfo, enrichTitle: enrichTitle, genderOf: genderOf, nameCmp: nameCmp, CFG: CFG, newDb: newDb, dbIndex: dbIndex, ingest: ingest, ingestAsync: ingestAsync, buildList: buildList, normFa: normFa, parseTitle: parseTitle, aggregate: aggregate, SOURCES: SOURCES, extractCards: extractCards,
+/* ---------- تاریخچه‌ی قیمت و موجودی (برای «گزارش بازار») ----------
+   h.d["gid|ml"] = { n: نام, l: برچسب, f: اولین‌بار, s: آخرین‌بار دیده شد, c: تعداد فروشگاه، cm/ct: بیشترین تعداد و زمانش,
+                     p: [[زمان، قیمت]...], m/mt: شمارنده‌ی «دیده نشد», o: از این زمان ناموجود, r: دوباره موجود شد در }              */
+var H_DAY = 86400000, H_KEEP = 60 * H_DAY, H_MAXP = 24, H_MAXE = 9000;
+function histNew() { return { v: 1, t0: 0, t: 0, as: '', d: {} }; }
+function histFix(h) { return (h && typeof h === 'object' && h.d && typeof h.d === 'object' && !Array.isArray(h.d)) ? h : histNew(); }
+function histSnap(h, list, srcSig, now, labFn) {
+  now = now || Date.now();
+  if (!h || !h.d || !list || !list.length) return { skipped: 'empty' };
+  if (h.t && now < h.t) return { skipped: 'clock' };                 // ساعتِ گوشی عقب رفته
+  var present = {}, np = 0;
+  list.forEach(function (g) { g.sizes.forEach(function (z) { present[g.id + '|' + z.ml] = [g, z]; np++; }); });
+  if (!np) return { skipped: 'empty' };
+  var chg = !!(h.as && h.as !== srcSig);                              // مجموعه‌ی سایت‌های روشن عوض شده: مقایسه با قبل بی‌معنی است
+  var live = 0, miss = 0;
+  Object.keys(h.d).forEach(function (k) { var e = h.d[k]; if (!e.o) { live++; if (!present[k]) miss++; } });
+  var mass = live >= 20 && miss > live * 0.4;                         // یک‌دفعه بیش از ۴۰٪ نیامده: خطای دریافت است، ناموجود حساب نشود
+  if (!h.t0) h.t0 = now;
+  Object.keys(present).forEach(function (k) {
+    var g = present[k][0], z = present[k][1], e = h.d[k], ns = z.srcs.length, lab = labFn ? labFn(g) : '';
+    if (!e) { h.d[k] = { n: g.name, l: lab, f: now, s: now, c: ns, cm: ns, ct: now, p: [[now, z.price]] }; return; }
+    e.n = g.name; e.l = lab; e.s = now; e.m = 0; e.mt = 0;
+    if (e.o) { if (now - e.o >= 6 * 3600000) e.r = now; e.o = 0; }
+    e.c = ns; if (!e.cm || ns >= e.cm || now - (e.ct || 0) > 14 * H_DAY) { e.cm = ns; e.ct = now; }
+    var p = e.p = Array.isArray(e.p) ? e.p : [], last = p[p.length - 1];
+    if (chg || !last) e.p = [[now, z.price]];
+    else if (Math.abs(z.price - last[1]) / last[1] >= 0.02) { p.push([now, z.price]); if (p.length > H_MAXP) p.shift(); }
+  });
+  Object.keys(h.d).forEach(function (k) {
+    var e = h.d[k];
+    if (now - (e.s || 0) > H_KEEP) { delete h.d[k]; return; }
+    if (present[k] || e.o) return;
+    if (chg || mass) { e.mt = 0; e.m = 0; return; }
+    if (!e.mt) { e.mt = now; e.m = 1; }
+    else if (now - e.mt >= 1800000) { e.o = e.mt; e.m = 2; }          // دو بار با فاصله‌ی نیم‌ساعت دیده نشد
+  });
+  var ks = Object.keys(h.d);
+  if (ks.length > H_MAXE) ks.sort(function (a, b) { return h.d[a].s - h.d[b].s; }).slice(0, ks.length - H_MAXE).forEach(function (k) { delete h.d[k]; });
+  h.as = srcSig; h.t = now;
+  return { skipped: mass ? 'mass' : '', n: np };
+}
+/* گزارش: همه‌چیز از روی تاریخچه + فهرست فعلی. هر ردیف: { k, gid, name, l, ml, ... } */
+function histReport(h, list, now, o) {
+  now = now || Date.now(); o = o || {};
+  var thr = o.thr || 0.08, R = { span: h && h.t0 ? (now - h.t0) / H_DAY : 0, up: [], down: [], gone: [], back: [], low: [], fresh: [], gap: [] };
+  var cur = {};
+  (list || []).forEach(function (g) { g.sizes.forEach(function (z) {
+    cur[g.id + '|' + z.ml] = 1;
+    var used = z.srcs.filter(function (r) { return r.used !== false; });
+    if (used.length >= 2) {                                         // اختلاف قیمتِ فروشگاه‌ها همین حالا
+      var lo = used[0], hi = used[0]; used.forEach(function (r) { if (r.price < lo.price) lo = r; if (r.price > hi.price) hi = r; });
+      var d = hi.price - lo.price;
+      if (lo.price > 0 && d / lo.price >= 0.15 && d / lo.price <= 2 && d >= 50000) R.gap.push({ k: g.id + '|' + z.ml, gid: g.id, name: g.name, l: o.lab ? o.lab(g) : '', ml: z.ml, lo: lo.price, loS: lo.s, hi: hi.price, hiS: hi.s, pct: d / lo.price, d: d });
+    }
+  }); });
+  if (h && h.d) Object.keys(h.d).forEach(function (k) {
+    var e = h.d[k], gid = k.split('|')[0], ml = +k.split('|')[1], base = { k: k, gid: gid, name: e.n, l: e.l || '', ml: ml };
+    var isCur = !!cur[k];
+    if (isCur && e.p && e.p.length) {
+      var last = e.p[e.p.length - 1], ref = null;                   // قدیمی‌ترین نقطه‌ی ۳۰ روز اخیر
+      for (var i = 0; i < e.p.length; i++) if (now - e.p[i][0] <= 30 * H_DAY) { ref = e.p[i]; break; }
+      if (!ref) ref = last;
+      if (ref !== last || e.p.length > 1) {
+        var from = ref[1], to = last[1], pc = (to - from) / from;
+        if (Math.abs(pc) >= thr && Math.abs(to - from) >= 20000) { var rec = Object.assign({}, base, { from: from, to: to, pct: pc, ago: (now - ref[0]) / H_DAY }); (pc > 0 ? R.up : R.down).push(rec); }
+      }
+    }
+    if (!isCur && e.o && now - e.o <= 30 * H_DAY) R.gone.push(Object.assign({}, base, { ago: (now - e.o) / H_DAY, price: e.p && e.p.length ? e.p[e.p.length - 1][1] : 0 }));
+    if (isCur && e.r && now - e.r <= 14 * H_DAY) R.back.push(Object.assign({}, base, { ago: (now - e.r) / H_DAY, price: e.p[e.p.length - 1][1] }));
+    if (isCur && e.cm > e.c && now - (e.ct || 0) <= 14 * H_DAY) R.low.push(Object.assign({}, base, { was: e.cm, now: e.c, price: e.p[e.p.length - 1][1] }));
+    if (isCur && R.span >= 3 && e.f && e.f > h.t0 + 0.5 * H_DAY && now - e.f <= 7 * H_DAY) R.fresh.push(Object.assign({}, base, { ago: (now - e.f) / H_DAY, price: e.p[e.p.length - 1][1] }));
+  });
+  R.up.sort(function (a, b) { return b.pct - a.pct; }); R.down.sort(function (a, b) { return a.pct - b.pct; });
+  R.gone.sort(function (a, b) { return a.ago - b.ago; }); R.back.sort(function (a, b) { return a.ago - b.ago; });
+  R.low.sort(function (a, b) { return (b.was - b.now) - (a.was - a.now); }); R.fresh.sort(function (a, b) { return a.ago - b.ago; });
+  R.gap.sort(function (a, b) { return b.d - a.d; });
+  return R;
+}
+root.Core = { histNew: histNew, histFix: histFix, histSnap: histSnap, histReport: histReport, purgeStored: purgeStored, setBlock: setBlock, REJ: REJ, vetReason: vetReason, reconcile: reconcile, CLEANSE: CLEANSE, cleanseText: cleanseText, cleanBrandName: cleanBrandName, itemUrl: itemUrl, STALE_MIN: STALE_MIN, fa2en: fa2en, en2fa: en2fa, enTokens: enTokens, titleEn: titleEn, tree: tree, brandOf: brandOf, specInfo: specInfo, enrichTitle: enrichTitle, genderOf: genderOf, nameCmp: nameCmp, CFG: CFG, newDb: newDb, dbIndex: dbIndex, ingest: ingest, ingestAsync: ingestAsync, buildList: buildList, normFa: normFa, parseTitle: parseTitle, aggregate: aggregate, SOURCES: SOURCES, extractCards: extractCards,
   wooSource: wooSource, digikalaSource: digikalaSource, htmlSource: htmlSource, letterOf: letterOf, median: median, priceFromText: priceFromText, similar: similar };
 if (typeof module !== 'undefined') module.exports = root.Core;
 })(typeof window !== 'undefined' ? window : globalThis);

@@ -160,7 +160,7 @@ svg{display:block}
 #sr{position:absolute;top:6px;left:10px;z-index:41;width:44px;height:44px;border-radius:50%;border:1px solid var(--gb);background:var(--pill);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);display:flex;align-items:center;justify-content:center;color:var(--tx);cursor:pointer;padding:0}
 #sr:active{transform:scale(.9)}
 :root{--zs:1}
-#dtc .dti,#dtc .dact,#dtc .vr,#dtc .dnote,#srr,#sheet>*:not(.gr){zoom:var(--zs)}
+#dtc .dti,#dtc .dact,#dtc .vr,#dtc .dnote,#srr,#mkr,#sheet>*:not(.gr){zoom:var(--zs)}
 #dtc .sz{flex-wrap:wrap;gap:2px 12px}
 #dtc .zp{margin-inline-start:auto}
 #srch{position:absolute;top:0;left:0;right:0;bottom:0;z-index:48;background:var(--bg);display:none;flex-direction:column;padding:calc(8px + env(safe-area-inset-top,0px)) 14px 0}
@@ -169,6 +169,23 @@ svg{display:block}
 #srq{flex:1;min-width:0;height:48px;border-radius:24px;border:1.5px solid var(--gb);background:var(--pill);color:var(--tx);font:inherit;font-size:17px;padding:0 18px;outline:none}
 #srq:focus{border-color:var(--ac)}
 #srx{height:48px;min-width:64px;padding:0 14px;border-radius:24px;border:1px solid var(--gb);background:var(--pill);color:var(--tx);font:inherit;font-size:14px;font-weight:700;cursor:pointer}
+#mk{position:absolute;top:0;left:0;right:0;bottom:0;z-index:49;background:var(--bg);display:none;flex-direction:column;padding:calc(8px + env(safe-area-inset-top,0px)) 14px 0}
+#mk.on{display:flex}
+.mkt{flex:1;margin:0;font-size:20px}
+#mkx{height:48px;min-width:64px;padding:0 14px;border-radius:24px;border:1px solid var(--gb);background:var(--pill);color:var(--tx);font:inherit;font-size:14px;font-weight:700;cursor:pointer}
+#mkr{flex:1;overflow-y:auto;padding-bottom:30px;-webkit-overflow-scrolling:touch}
+.mks{margin:20px 0 4px;font-size:17px;font-weight:800}
+.mkh{color:var(--mu);font-size:13px;line-height:1.8;margin-bottom:6px}
+.mkn{color:var(--mu);font-size:13px;line-height:1.8;padding:10px 0}
+.mkr{display:flex;align-items:center;gap:10px;width:100%;min-height:60px;padding:8px 4px;border:0;border-bottom:1px solid var(--cb);background:none;color:var(--tx);font:inherit;text-align:right;cursor:pointer}
+.mkr .mi{flex:1;min-width:0}
+.mkr b{display:block;font-size:15px;overflow-wrap:anywhere;unicode-bidi:plaintext}
+.mkr small{display:block;color:var(--mu);font-size:12px;line-height:1.7;unicode-bidi:plaintext}
+.mkr .mv{flex:none;max-width:48%;text-align:left}
+.mkr .mv b{font-size:14px}
+.mv.up b{color:#e0564a}.mv.dn b{color:#2fae6b}.mv.gn b{color:#e0a030}
+.mkc{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 2px}
+.mkc span{padding:6px 12px;border-radius:16px;border:1px solid var(--gb);font-size:13px}
 .srchips{display:flex;gap:8px;margin-bottom:8px}
 .srchips button{min-height:44px;padding:0 16px;border-radius:22px;border:1.5px solid var(--gb);background:none;color:var(--tx);font:inherit;font-size:14px;font-weight:700;cursor:pointer}
 .srchips button.on{background:var(--ac);color:#0c0f1f;border-color:var(--ac)}
@@ -294,7 +311,8 @@ svg{display:block}
   <button id="gear" aria-label="تنظیمات"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.2"/><path d="M19.4 13a7.6 7.6 0 0 0 0-2l2-1.6-2-3.4-2.4 1a7.4 7.4 0 0 0-1.7-1L15 3.4h-4l-.4 2.6a7.4 7.4 0 0 0-1.7 1l-2.4-1-2 3.4 2 1.6a7.6 7.6 0 0 0 0 2l-2 1.6 2 3.4 2.4-1c.5.4 1.1.7 1.7 1l.4 2.6h4l.4-2.6c.6-.3 1.2-.6 1.7-1l2.4 1 2-3.4z"/></svg></button>
   <button id="sr" aria-label="جستجو"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg></button>
   <button id="bk" aria-label="بازگشت"><svg width="13" height="20" viewBox="0 0 10 16" aria-hidden="true" style="transform:scaleX(-1)"><path d="M8 1L2 8l6 7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
-  <div id="srch" role="dialog" aria-label="جستجو"><div class="srh"><input id="srq" type="search" placeholder="نام عطر یا برند را بنویسید" autocomplete="off" enterkeyhint="search"><button id="srx">بستن</button></div><div class="srchips"><button id="srFav">لیست مغازه ★ <span id="srFc"></span></button></div><div id="srr"></div></div>
+  <div id="srch" role="dialog" aria-label="جستجو"><div class="srh"><input id="srq" type="search" placeholder="نام عطر یا برند را بنویسید" autocomplete="off" enterkeyhint="search"><button id="srx">بستن</button></div><div class="srchips"><button id="mkOpen">گزارش بازار</button><button id="srFav">لیست مغازه ★ <span id="srFc"></span></button></div><div id="srr"></div></div>
+  <div id="mk" role="dialog" aria-label="گزارش بازار"><div class="srh"><h2 class="mkt">گزارش بازار</h2><button id="mkx">بستن</button></div><div id="mkr"></div></div>
   <div id="dt" role="dialog" aria-label="جزئیات"><button id="dtx">بستن</button><div id="dtc"></div></div>
   <div id="vw" role="dialog" aria-label="عکس بزرگ"><div id="vwb"></div><div class="vh2">برای بستن، روی صفحه بزنید</div></div>
   <div id="scm"></div>
@@ -303,6 +321,7 @@ svg{display:block}
   <div id="sheet" role="dialog" aria-label="تنظیمات">
     <div class="gr"></div>
     <h2>تنظیمات</h2>
+    <button class="btn" id="sMk"><span>گزارش بازار: تغییر قیمت و موجودی</span></button>
     <h3>رنگ صفحه</h3>
     <div class="seg" id="sTheme"><button data-v="light">روشن</button><button data-v="dark">تاریک</button><button data-v="auto">خودکار</button></div>
     <h3>شکل لیست</h3>

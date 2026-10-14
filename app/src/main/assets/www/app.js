@@ -1,7 +1,7 @@
 (function () {
 'use strict';
 var RM = !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
-var VERSION = '1.15';
+var VERSION = '1.16';
 function $(id) { return document.getElementById(id); }
 function fa(n) { return String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, '٬').replace(/\d/g, function (d) { return '۰۱۲۳۴۵۶۷۸۹'[d]; }); }
 function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
@@ -546,7 +546,7 @@ function overlay() {
       o._bk = bk;
       $('gbt').innerHTML = bk ? '<button id="retry">تلاش دوباره</button>' + (bk === 'f2' ? '<button id="goon" class="gh2">ادامه با اطلاعات فعلی</button>' : '') : '';
       var rb = $('retry'); if (rb) rb.onclick = function () { refresh(true); };
-      var gb = $('goon'); if (gb) gb.onclick = function () { db.ready = true; saveDb(); enter(); };
+      var gb = $('goon'); if (gb) gb.onclick = function () { db.ready = true; saveDb(); enter(); histTake(); };
     }
     return;
   }
@@ -588,6 +588,59 @@ function setEntries() {
   list = curEntries(); list.forEach(function (p) { p.loc = imgLoc[p.imgId] || ''; });
   struct = structOf(list);
 }
+/* ---------- تاریخچه و «گزارش بازار» ---------- */
+var VM = {}, hist = Core.histFix(ls.get('pp.hist', null)), mkOn = false;
+function histTake() {
+  try {
+    var now = Date.now(), a = actv();
+    if (!db.ready || !a.length || !a.every(function (s) { return db.t[s.id] && now - db.t[s.id] < 12 * 3600e3; })) return;   // همه‌ی سایت‌های روشن باید تازه باشند؛ وگرنه کالاهای یک سایتِ خراب «ناموجود» دیده می‌شوند
+    Core.histSnap(hist, FLAT, order().join(','), now, function (g) { return [GN[g.gn], g.conc].filter(Boolean).join(' · '); });
+    if (!ls.set('pp.hist', hist)) {
+      Object.keys(hist.d).forEach(function (k) { var e = hist.d[k]; if (e.p && e.p.length > 2) e.p = [e.p[0], e.p[e.p.length - 1]]; });
+      if (!ls.set('pp.hist', hist)) { hist = Core.histNew(); ls.set('pp.hist', hist); }
+    }
+  } catch (e) { console.error(e); }
+}
+function dayT(d) { return d < 1 ? 'امروز' : fa(d) + ' روز پیش'; }
+function srcName(id) { var r = ''; Core.SOURCES.forEach(function (s) { if (s.id === id) r = s.name; }); return r || id; }
+function mkRow(r, val, sub) {
+  var m = VM[r.gid], lab = [r.l, fa(r.ml) + ' میل'].filter(Boolean).join(' · ');
+  return '<button type="button" class="mkr"' + (m ? ' data-m="' + esc(m) + '"' : '') + '><div class="mi"><b>' + esc(r.name) + '</b><small>' + esc(lab) + '</small>' + (sub ? '<small>' + sub + '</small>' : '') + '</div><div class="mv ' + val[0] + '"><b>' + val[1] + '</b>' + (val[2] ? '<small>' + val[2] + '</small>' : '') + '</div></button>';
+}
+function mkSec(title, hint, rows, total) {
+  return '<div class="mks">' + title + (total ? ' <span class="mkn">(' + fa(total) + ' مورد)</span>' : '') + '</div><div class="mkh">' + hint + '</div>'
+    + (rows.length ? rows.join('') + (total > rows.length ? '<div class="mkn">و ' + fa(total - rows.length) + ' مورد دیگر که اینجا نشان داده نشد.</div>' : '') : '<div class="mkn">موردی نیست.</div>');
+}
+function mkRender() {
+  var R = Core.histReport(hist, FLAT, Date.now(), { thr: 0.08, lab: function (g) { return [GN[g.gn], g.conc].filter(Boolean).join(' · '); } }), CAP = 20, T = function (a) { return a.slice(0, CAP); }, tm = function (n) { return fa(n) + ' تومان'; };
+  var span = R.span, intro = span < 1
+    ? 'ثبت تاریخچه از همین امروز شروع شده است. گزارش‌های «تغییر قیمت» و «موجودی» بعد از چند روز پر می‌شود. «اختلاف قیمت فروشگاه‌ها» همین الان کار می‌کند.'
+    : 'تاریخچه ' + fa(span) + ' روز است ثبت می‌شود و با هر بروزرسانی کامل‌تر می‌شود. روی هر عطر بزنید تا صفحه‌اش باز شود.';
+  var h = '<div class="mkh">' + intro + '</div>'
+    + '<div class="mkc"><span>گران شده: ' + fa(R.up.length) + '</span><span>ارزان شده: ' + fa(R.down.length) + '</span><span>ناموجود: ' + fa(R.gone.length) + '</span><span>دوباره موجود: ' + fa(R.back.length) + '</span></div>';
+  h += mkSec('اختلاف قیمت بین فروشگاه‌ها', 'یک عطر در یک فروشگاه خیلی ارزان‌تر از فروشگاه دیگر است. یا فرصت خرید است یا یکی از قیمت‌ها اشتباه است؛ قبل از خرید خودتان چک کنید.',
+    T(R.gap).map(function (r) { return mkRow(r, ['gn', fa(r.pct * 100) + '٪ اختلاف', tm(r.d) + ' فرق'], 'ارزان‌تر: ' + esc(srcName(r.loS)) + '، ' + tm(r.lo) + '<br>گران‌تر: ' + esc(srcName(r.hiS)) + '، ' + tm(r.hi)); }), R.gap.length);
+  h += mkSec('گران شده‌اند', 'قیمت در ۳۰ روز اخیر دست‌کم ۸٪ بالا رفته است.',
+    T(R.up).map(function (r) { return mkRow(r, ['up', fa(r.pct * 100) + '٪ گران‌تر', tm(r.to - r.from) + ' بیشتر'], 'قبلاً ' + tm(r.from) + '، الان ' + tm(r.to) + '<br>' + dayT(r.ago) + ' شروع شد'); }), R.up.length);
+  h += mkSec('ارزان شده‌اند', 'قیمت در ۳۰ روز اخیر دست‌کم ۸٪ پایین آمده است.',
+    T(R.down).map(function (r) { return mkRow(r, ['dn', fa(-r.pct * 100) + '٪ ارزان‌تر', tm(r.from - r.to) + ' کمتر'], 'قبلاً ' + tm(r.from) + '، الان ' + tm(r.to) + '<br>' + dayT(r.ago) + ' شروع شد'); }), R.down.length);
+  h += mkSec('ناموجود شده‌اند', 'این اندازه الان در هیچ‌کدام از فروشگاه‌ها دیده نمی‌شود. اگر مشتری خواست، زودتر تهیه کنید.',
+    T(R.gone).map(function (r) { return mkRow(r, ['up', 'ناموجود', dayT(r.ago)], r.price ? 'آخرین قیمت: ' + tm(r.price) : ''); }), R.gone.length);
+  h += mkSec('دوباره موجود شده‌اند', 'مدتی نبودند و در دو هفته‌ی اخیر دوباره پیدا شدند.',
+    T(R.back).map(function (r) { return mkRow(r, ['dn', 'دوباره موجود', dayT(r.ago)], 'قیمت: ' + tm(r.price)); }), R.back.length);
+  h += mkSec('موجودی کم شده', 'تعداد فروشگاه‌هایی که این را دارند کمتر شده؛ یعنی دارد کم‌یاب می‌شود.',
+    T(R.low).map(function (r) { return mkRow(r, ['gn', 'کم‌یاب', 'در ' + fa(r.now) + ' فروشگاه'], 'قبلاً در ' + fa(r.was) + ' فروشگاه بود، قیمت: ' + tm(r.price)); }), R.low.length);
+  h += mkSec('تازه‌های بازار', 'در هفته‌ی اخیر برای اولین بار در فروشگاه‌ها دیده شده‌اند.',
+    T(R.fresh).map(function (r) { return mkRow(r, ['dn', 'تازه', dayT(r.ago)], 'قیمت: ' + tm(r.price)); }), R.fresh.length);
+  $('mkr').innerHTML = h;
+}
+function openReport() { mkOn = true; closeSearch(); if (open) closeSheet(); mkRender(); $('mk').classList.add('on'); $('mkr').scrollTop = 0; }
+function closeReport() { mkOn = false; $('mk').classList.remove('on'); }
+$('mkOpen').onclick = openReport; $('sMk').onclick = openReport; $('mkx').onclick = closeReport;
+$('mkr').addEventListener('click', function (e) {
+  var b = e.target.closest('button.mkr'); if (!b || !b.dataset.m || !MD_BY[b.dataset.m]) return;
+  closeReport(); openDetail(b.dataset.m);
+});
 /* فهرستِ نمایشی را از حافظه می‌سازد؛ اگر فقط قیمت‌ها عوض شده باشد، همان صفحه سر جایش می‌ماند و فقط صفحه‌ی جزئیات (اگر باز است) بروز می‌شود */
 function rebuild(light) {
   var l = light && FLAT.length ? FLAT : Core.buildList(db, order(), TRUSTED, 12 * 3600e3, order());   // light: فقط روشن/خاموشیِ برندها عوض شده؛ داده همان است
@@ -601,7 +654,8 @@ function rebuild(light) {
     return ms.length === b.models.length ? b : Object.assign({}, b, { models: ms });
   }).filter(function (b) { return b.models.length; });
   BR_BY = {}; MD_BY = {};
-  TREE.forEach(function (b) { BR_BY[b.id] = b; b.models.forEach(function (m) { m.brandId = b.id; MD_BY[m.id] = m; }); });
+  VM = {};
+  TREE.forEach(function (b) { BR_BY[b.id] = b; b.models.forEach(function (m) { m.brandId = b.id; MD_BY[m.id] = m; m.variants.forEach(function (v) { VM[v.id] = m.id; }); }); });
   if (nav.brand && !BR_BY[nav.brand]) { nav.lvl = 0; nav.brand = null; }
   var vis = []; TREE.forEach(function (b) { b.models.forEach(function (m) { m.variants.forEach(function (v) { vis.push(v); }); }); });
   var np = priceMap(vis), ch = 0;
@@ -632,7 +686,7 @@ function checkReady() {
   if (imgLeft() > 0) { overlay(); return; }
   if (srcDone() < actv().length && !gateRetried) { gateRetried = 1; overlay(); setTimeout(function () { refresh(false); }, 2500); return; }   // سایتِ ناموفق یک‌بار دیگر امتحان می‌شود؛ بعد هر سایتی که در دسترس بود کافی است
   if (srcDone() < 1 || !list.length) { overlay(); return; }
-  db.ready = true; saveDb(); enter();
+  db.ready = true; saveDb(); enter(); histTake();
 }
 
 /* ---- رفتن بین سطح‌ها ---- */
@@ -801,7 +855,7 @@ async function refresh(manual) {
     tick();
   }));
   var ch = 0;
-  try { ch = rebuild(); } catch (e3) { console.error(e3); }
+  try { ch = rebuild(); histTake(); } catch (e3) { console.error(e3); }
   try {
     var au2 = (ALLB && ALLB.audit) || {}, mg = 0, pg = 0, CL2 = Core.CLEANSE || {};
     Core.SOURCES.forEach(function (s) { mg += (stt[s.id] && stt[s.id].merged) | 0; pg += (stt[s.id] && stt[s.id].purged) | 0; });
@@ -1021,6 +1075,7 @@ $('sCopy').onclick = function () {
 };
 window.__back = function () {
   if ($('updBox').classList.contains('on')) { $('updBox').classList.remove('on'); return true; }
+  if (mkOn) { closeReport(); return true; }
   if (srOn) { closeSearch(); return true; }
   if (vwId) { closeViewer(); return true; }
   if (open) { closeSheet(); return true; }
