@@ -32,7 +32,7 @@ async def main():
             await pg.evaluate("document.getElementById('sr').click()"); await pg.wait_for_timeout(200)
             await pg.evaluate("document.getElementById('srq').value=%s;document.getElementById('srq').dispatchEvent(new Event('input'))"%json.dumps(m['tok'])); await pg.wait_for_timeout(400)
             await pg.evaluate("document.querySelector('#srr .sn1[data-id=\"%s\"]').click()"%m['id']); await pg.wait_for_timeout(400)
-            await pg.evaluate("document.querySelector('#dtc [data-a=hide]').click()"); await pg.evaluate("document.querySelector('#dtc [data-a=hide]').click()"); await pg.wait_for_timeout(500)
+            await pg.evaluate("document.querySelector('#dtc [data-a=hide]').click()"); await pg.wait_for_timeout(700); await pg.evaluate("document.querySelector('#dtc [data-a=hide]').click()"); await pg.wait_for_timeout(500)
         async def found(m):
             await pg.evaluate("document.getElementById('sr').click()"); await pg.wait_for_timeout(200)
             await pg.evaluate("document.getElementById('srq').value=%s;document.getElementById('srq').dispatchEvent(new Event('input'))"%json.dumps(m['tok'])); await pg.wait_for_timeout(400)

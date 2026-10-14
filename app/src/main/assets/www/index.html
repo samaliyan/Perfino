@@ -141,7 +141,7 @@ svg{display:block}
 #sheet h2{font-size:20px;margin:6px 0 14px}
 #sheet h3{font-size:14px;margin:18px 0 8px;color:var(--mu);font-weight:600}
 .seg{display:flex;flex-wrap:wrap;margin:0 -4px}
-.seg button{margin:4px;flex:1 1 auto;min-width:0;padding:11px 8px;border-radius:16px;border:1.5px solid var(--cb);background:transparent;font-size:15px;font-weight:600;cursor:pointer;transition:transform .15s}
+.seg button{margin:4px;min-height:46px;flex:1 1 auto;min-width:0;padding:11px 8px;border-radius:16px;border:1.5px solid var(--cb);background:transparent;font-size:15px;font-weight:600;cursor:pointer;transition:transform .15s}
 .seg button:active{transform:scale(.96)}
 .seg button.on{border-color:var(--ac);background:var(--cb)}
 #sAuto button{flex:1 1 calc(20% - 8px);padding:9px 1px;font-size:13px}
@@ -194,6 +194,7 @@ svg{display:block}
 .mkmore{display:block;width:100%;min-height:48px;margin:8px 0 2px;border-radius:14px;border:1.5px dashed var(--gb);background:none;color:var(--ac);font:inherit;font-size:14px;font-weight:700;cursor:pointer}
 .spk{display:block;margin-top:4px;margin-inline-start:auto;color:var(--mu);direction:ltr}
 .mv.up .spk{color:#e0564a}.mv.dn .spk{color:#2fae6b}
+.mkbar{display:flex;align-items:center;gap:8px;margin:5px 0;font-size:13px}.mkbar span{flex:none;width:34%;color:var(--mu)}.mkbar i{display:block;height:12px;border-radius:6px;background:var(--ac);min-width:0}.mkbar b{flex:none;font-size:13px}.srchips.mkch{flex-wrap:wrap;gap:6px;margin:8px 0 2px}.srchips.mkch button{min-height:44px;padding:0 12px;font-size:13px}
 .mkc{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 2px}
 .mkc span{padding:6px 12px;border-radius:16px;border:1px solid var(--gb);font-size:13px}
 .srchips{display:flex;gap:8px;margin-bottom:8px}
@@ -322,7 +323,7 @@ svg{display:block}
   <button id="sr" aria-label="جستجو"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg></button>
   <button id="bk" aria-label="بازگشت"><svg width="13" height="20" viewBox="0 0 10 16" aria-hidden="true" style="transform:scaleX(-1)"><path d="M8 1L2 8l6 7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
   <div id="srch" role="dialog" aria-label="جستجو"><div class="srh"><input id="srq" type="search" placeholder="نام عطر یا برند را بنویسید" autocomplete="off" enterkeyhint="search"><button id="srx">بستن</button></div><div class="srchips"><button id="mkOpen">گزارش بازار</button><button id="srFav">لیست مغازه ★ <span id="srFc"></span></button></div><div id="srr"></div></div>
-  <div id="mk" role="dialog" aria-label="گزارش بازار"><div class="srh"><h2 class="mkt">گزارش بازار</h2><button id="mkx">بستن</button></div><div class="mkt2" id="mkt2"><button type="button" data-t="sum">خلاصه</button><button type="button" data-t="price">قیمت‌ها</button><button type="button" data-t="stock">موجودی</button></div><div id="mkr"></div></div>
+  <div id="mk" role="dialog" aria-label="گزارش بازار"><div class="srh"><h2 class="mkt">گزارش بازار</h2><button id="mkx">بستن</button></div><div class="mkt2" id="mkt2"><button type="button" data-t="sum">خلاصه</button><button type="button" data-t="cmp">مقایسه</button><button type="button" data-t="brand">برندها</button><button type="button" data-t="chg">تغییرات</button></div><div id="mkr"></div></div>
   <div id="dt" role="dialog" aria-label="جزئیات"><button id="dtx">بستن</button><div id="dtc"></div></div>
   <div id="vw" role="dialog" aria-label="عکس بزرگ"><div id="vwb"></div><div class="vh2">برای بستن، روی صفحه بزنید</div></div>
   <div id="scm"></div>

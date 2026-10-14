@@ -19,7 +19,7 @@ window.__FX=%s;
  window.Native={listImgs:function(){return localStorage.getItem('imgcache')||'{}'},cacheImg:function(id,u){window.__imgReq=(window.__imgReq||[]);window.__imgReq.push(id+'|'+u);setTimeout(function(){var c=JSON.parse(localStorage.getItem('imgcache')||'{}');c[id]='data:image/svg+xml;utf8,<svg xmlns=%%22http://www.w3.org/2000/svg%%22 width=%%2240%%22 height=%%2240%%22><rect width=%%2240%%22 height=%%2240%%22 fill=%%22%%23c33%%22/></svg>';localStorage.setItem('imgcache',JSON.stringify(c));window.__imgDone&&window.__imgDone(id,c[id])},5)},fetch:function(id,url,h){window.__calls.push(url);var r=window.__MODE&&window.__MODE(url)||resp(url);window.__bytes+=(r.b||'').length;setTimeout(function(){window.__nat(id,r.s,r.b)},window.__DELAY||3)},copy:function(t){window.__copied=t},setBars:function(c,l){window.__bars=[c,l]}};
 })();
 """%FX
-async def new_page(p, w=360,h=780, scheme='dark', stub=STUB, extra=None, mobile=True):
+async def new_page(p, w=360,h=780, scheme='dark', stub=STUB, extra=None, mobile=True, adv=True):
     b=await p.chromium.launch(executable_path='/opt/pw-browsers/chromium-1194/chrome-linux/chrome',args=['--no-sandbox'])
     ctx=await b.new_context(viewport={'width':w,'height':h},color_scheme=scheme,has_touch=mobile,is_mobile=mobile,device_scale_factor=2 if mobile else 1)
     IMG=b'<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200"><rect width="200" height="200" fill="#fff"/><rect x="82" y="20" width="36" height="30" fill="#c9a24a"/><rect x="60" y="50" width="80" height="130" rx="14" fill="#9cc7f0"/><rect x="75" y="100" width="50" height="40" fill="#fff" opacity=".8"/></svg>'
@@ -33,6 +33,7 @@ async def new_page(p, w=360,h=780, scheme='dark', stub=STUB, extra=None, mobile=
     errs=[]
     pg.on('pageerror',lambda e:errs.append('PAGEERR '+str(e)))
     pg.on('console',lambda m:errs.append('CONSOLE '+m.text) if m.type=='error' else None)
+    if adv: await pg.add_init_script("window.__forceAdv=1;document.addEventListener('DOMContentLoaded',function(){var e=document.getElementById('sAdv');if(e)e.style.display='';});")
     if stub: await pg.add_init_script(stub)
     if extra: await pg.add_init_script(extra)
     return b,ctx,pg,errs

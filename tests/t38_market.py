@@ -22,9 +22,10 @@ async def main():
         g=flat[4]; d[key(g)]={'n':'د','l':'','f':now-1*D,'s':now,'c':g['n'],'cm':g['n'],'ct':now,'r':now-2*D,'p':[[now-1*D,g['price']]]}
         d['zzz|100']={'n':'عطر ناموجود آزمایشی','l':'مردانه','f':now-9*D,'s':now-3*D,'c':1,'cm':1,'ct':now-3*D,'o':now-2*D,'p':[[now-9*D,2500000]]}
         seed={'v':1,'t0':now-10*D,'t':now-3600000,'as':'','d':d}
-        TABS={'sum':['فروشگاه‌ها با هم','روند قیمت‌ها','برندهایی که بیشتر تغییر','راهنمای گزارش'],
-              'price':['اختلاف قیمت بین فروشگاه‌ها','گران شده‌اند','ارزان شده‌اند'],
-              'stock':['ناموجود شده‌اند','دوباره موجود شده‌اند','موجودی کم شده','تازه‌های بازار','فقط در یک فروشگاه']}
+        TABS={'sum':['فروشگاه‌ها با هم','روند قیمت‌ها'],
+              'cmp':['مقایسهٔ فروشگاه‌ها'],
+              'brand':['سطح قیمتِ برندها'],
+              'chg':['گران شده‌اند','ارزان شده‌اند','ناموجود شده‌اند','دوباره موجود شده‌اند','موجودی کم شده','تازه‌های بازار']}
         for w,fs in ((320,0),(360,3)):
             pre="if(!sessionStorage.getItem('mk')){sessionStorage.setItem('mk','1');localStorage.setItem('pp.hist',%s);%s}"%(json.dumps(json.dumps(seed)),"var s=JSON.parse(localStorage.getItem('pp.set')||'{}');s.fs=%d;localStorage.setItem('pp.set',JSON.stringify(s));"%fs)
             b,ctx,pg,errs=await new_page(p,extra=pre)
@@ -45,11 +46,11 @@ async def main():
             await pg.evaluate("document.querySelector('#mkt2 [data-t=sum]').click()"); await pg.wait_for_timeout(200)
             nk=await pg.evaluate("document.querySelectorAll('#mkr .mkk').length"); chk(tag+'six summary cards',nk==6,nk)
             ns=await pg.evaluate("document.querySelectorAll('#mkr .mkr.nl').length"); chk(tag+'store rows shown',ns>=3,ns)
-            await pg.evaluate("document.querySelector('#mkt2 [data-t=price]').click()"); await pg.wait_for_timeout(300)
+            await pg.evaluate("document.querySelector('#mkt2 [data-t=chg]').click()"); await pg.wait_for_timeout(300)
             nr=await pg.evaluate("[].map.call(document.querySelectorAll('#mkr .mkr'),function(r){return r.innerText})")
             chk(tag+'rise row',any('گران‌تر' in r and 'قبلاً' in r for r in nr)); chk(tag+'drop row',any('ارزان‌تر' in r and 'قبلاً' in r for r in nr))
             chk(tag+'sparkline drawn',await pg.evaluate("document.querySelectorAll('#mkr .spk polyline').length")>=2)
-            await pg.evaluate("document.querySelector('#mkt2 [data-t=stock]').click()"); await pg.wait_for_timeout(300)
+            await pg.evaluate("document.querySelector('#mkt2 [data-t=chg]').click()"); await pg.wait_for_timeout(300)
             nr=await pg.evaluate("[].map.call(document.querySelectorAll('#mkr .mkr'),function(r){return r.innerText})")
             chk(tag+'gone row with last price',any('عطر ناموجود آزمایشی' in r and '۲٬۵۰۰٬۰۰۰' in r for r in nr),[r for r in nr if 'ناموجود آزمایشی' in r])
             chk(tag+'low row',any('کم‌یاب' in r for r in nr)); chk(tag+'back row',any('دوباره موجود' in r for r in nr))
@@ -61,14 +62,14 @@ async def main():
                 after=await pg.evaluate("document.querySelectorAll('#mkr .mkr').length"); chk(tag+'show more adds rows',after>before,[before,after])
             else: chk(tag+'show more adds rows',True,'no section over 10 rows')
             # هر ردیف قابل لمس است: یا صفحه‌ی عطر یا جستجو
-            allb=await pg.evaluate("document.querySelectorAll('#mkr div.mkr:not(.nl)').length+document.querySelectorAll('#mkr button.mkr:not([data-m]):not([data-q])').length")
+            allb=await pg.evaluate("document.querySelectorAll('#mkr div.mkr:not(.nl)').length+document.querySelectorAll('#mkr button.mkr:not([data-m]):not([data-q]):not([data-b])').length")
             chk(tag+'every row is tappable',allb==0,allb)
             # ردیفِ ناموجود → جستجو با نام
             await pg.evaluate("(function(){var r=[].filter.call(document.querySelectorAll('#mkr .mkr[data-q]'),function(x){return /ناموجود آزمایشی/.test(x.innerText)})[0];if(r)r.click()})()"); await pg.wait_for_timeout(500)
             chk(tag+'gone row opens search with its name',await pg.evaluate("document.getElementById('srch').classList.contains('on') && !document.getElementById('mk').classList.contains('on') && document.getElementById('srq').value.indexOf('ناموجود')>=0"),await pg.evaluate("document.getElementById('srq').value"))
             await pg.evaluate("window.__back()"); await pg.wait_for_timeout(300)
             await pg.evaluate("document.getElementById('sr').click()"); await pg.evaluate("document.getElementById('mkOpen').click()"); await pg.wait_for_timeout(300)
-            await pg.evaluate("document.querySelector('#mkt2 [data-t=price]').click()"); await pg.wait_for_timeout(300)
+            await pg.evaluate("document.querySelector('#mkt2 [data-t=chg]').click()"); await pg.wait_for_timeout(300)
             clicked=await pg.evaluate("(function(){var r=document.querySelector('#mkr .mkr[data-m]');if(!r)return 0;r.click();return 1})()"); await pg.wait_for_timeout(500)
             chk(tag+'row opens detail',clicked and await pg.evaluate("document.getElementById('dt').classList.contains('on')") and not await pg.evaluate("document.getElementById('mk').classList.contains('on')"))
             await pg.evaluate("window.__back()"); await pg.wait_for_timeout(300)
@@ -84,7 +85,7 @@ async def main():
         b,ctx,pg,errs=await new_page(p,extra=pre)
         await pg.goto('file://'+ROOT+'/index.html'); await wait_ready(pg,180000); await pg.wait_for_timeout(1500)
         await pg.evaluate("document.getElementById('sr').click()"); await pg.evaluate("document.getElementById('mkOpen').click()"); await pg.wait_for_timeout(400)
-        await pg.evaluate("document.querySelector('#mkt2 [data-t=price]').click()"); await pg.wait_for_timeout(300)
+        await pg.evaluate("document.querySelector('#mkt2 [data-t=chg]').click()"); await pg.wait_for_timeout(300)
         nr=await pg.evaluate("[].map.call(document.querySelectorAll('#mkr .mkr'),function(r){return r.innerText})")
         chk('hidden perfume is not in the report (rise row gone)',not any('گران‌تر' in r and 'قبلاً' in r for r in nr) and any('ارزان‌تر' in r and 'قبلاً' in r for r in nr),len(nr))
         await b.close()

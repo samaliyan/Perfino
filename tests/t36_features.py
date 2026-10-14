@@ -51,7 +51,7 @@ async def main():
         chk('detail action buttons >=44px',all(h>=44 for h in hs),hs)
         # ۲) پنهان کردن (دو لمس)
         n0=info['n']
-        await pg.evaluate("document.querySelector('#dtc .dact button.warn').click()"); await pg.wait_for_timeout(200)
+        await pg.evaluate("document.querySelector('#dtc .dact button.warn').click()"); await pg.wait_for_timeout(700)
         chk('first tap asks for confirmation',await pg.evaluate("document.querySelector('#dtc .dact button.warn').textContent")=='مطمئنید؟ دوباره بزنید')
         await pg.evaluate("document.querySelector('#dtc .dact button.warn').click()"); await pg.wait_for_timeout(600)
         n1=await pg.evaluate("window.__pp.tree.reduce(function(a,x){return a+x.models.length},0)")
