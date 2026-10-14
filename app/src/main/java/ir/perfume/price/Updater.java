@@ -129,11 +129,13 @@ class Updater {
                     InputStream in = c.getInputStream();
                     OutputStream out = new FileOutputStream(tmp);
                     byte[] buf = new byte[16384]; int n, tot = 0; boolean head = true; boolean pk = false;
+                    final long len = c.getContentLengthLong(); int lastPct = -1;
                     while ((n = in.read(buf)) > 0) {
                         if (head && n >= 4) { pk = buf[0] == 'P' && buf[1] == 'K'; head = false; if (!pk) break; }
                         tot += n;
                         if (tot > MAX_APK) { pk = false; break; }
                         out.write(buf, 0, n);
+                        if (len > 0) { int pc = (int) (tot * 100L / len); if (pc >= lastPct + 3 && pc < 100) { lastPct = pc; call("__updProg", String.valueOf(pc)); } }
                     }
                     out.close(); in.close(); c.disconnect();
                     if (!pk || tot < 20000) throw new java.io.IOException("bad file");

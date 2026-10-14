@@ -158,6 +158,9 @@ svg{display:block}
 #toast.on{opacity:1;transform:none}
 #updBox{position:absolute;left:16px;right:16px;bottom:calc(22px + env(safe-area-inset-bottom,0px));z-index:90;margin:0 auto;max-width:420px;padding:16px;border-radius:20px;background:var(--sheet);border:1.5px solid var(--ac);box-shadow:0 12px 40px rgba(0,0,0,.45);display:none}
 #updBox.on{display:block}
+#updBox .upb{display:none;height:10px;border-radius:5px;background:var(--cb);margin:0 0 12px;overflow:hidden}#updBox .upb i{display:block;height:100%;width:0;border-radius:5px;background:var(--ac);transition:width .3s ease}
+.btn:disabled{opacity:.75;cursor:default}
+.srcs .sw{flex:none;width:46px;height:44px;margin:-8px 0;padding:0;border:0;background:none;position:relative;cursor:pointer}.srcs .sw::before{content:'';position:absolute;top:12px;right:2px;width:42px;height:22px;border-radius:11px;background:var(--cb);transition:background .2s}.srcs .sw i{position:absolute;top:15px;right:5px;width:16px;height:16px;border-radius:50%;background:var(--tx);transition:transform .2s}.srcs .sw.on::before{background:var(--ac)}.srcs .sw.on i{transform:translateX(-20px);background:#0c0f1f}.srcs .offs span{opacity:.6}
 #updTx{font-size:15px;font-weight:600;line-height:1.9;text-align:center;margin-bottom:12px}
 #updBox .updb{display:flex;gap:10px}#updBox .updb .btn{flex:1;margin:0}
 #ov small{display:block;font-size:12px;color:var(--mu);margin-top:6px;line-height:1.8}
@@ -166,8 +169,8 @@ svg{display:block}
 .rp{background:var(--card);border:1px solid var(--cb);border-radius:14px;padding:10px 12px;margin:0 0 10px;font-size:13px;line-height:1.9}.rp h4{margin:0 0 4px;font-size:14px}.rp p{margin:2px 0;overflow-wrap:anywhere}.rp.bad{border-color:#ef5b5b}.rp.bad h4{color:#ef5b5b}.rp b{font-weight:700}
 .srcs div>*+*{margin-inline-start:10px}
 .srcs div{display:flex;justify-content:space-between;border-bottom:1px solid var(--cb);padding:3px 0}
-.srcs span:last-child{color:var(--mu);text-align:left;min-width:0;overflow-wrap:anywhere}
-.srcs .bad span:last-child{color:#ef5b5b}
+.srcs span.st,.srcs span:last-child{color:var(--mu);text-align:left;min-width:0;overflow-wrap:anywhere}
+.srcs .bad span:last-child,.srcs .bad span.st{color:#ef5b5b}
 .ver{margin-top:14px;font-size:11px;color:var(--mu);text-align:center}
 
 /* ---- برند ← مدل ← جزئیات ---- */
@@ -259,7 +262,7 @@ svg{display:block}
   <div id="dt" role="dialog" aria-label="جزئیات"><button id="dtx">بستن</button><div id="dtc"></div></div>
   <div id="vw" role="dialog" aria-label="عکس بزرگ"><div id="vwb"></div><div class="vh2">برای بستن، روی صفحه بزنید</div></div>
   <div id="scm"></div>
-  <div id="updBox" role="dialog" aria-live="polite"><div id="updTx"></div><div class="updb"><button class="btn" id="updGo"><span>بله، نصب شود</span></button><button class="btn ghost" id="updLater"><span>بعداً</span></button></div></div>
+  <div id="updBox" role="dialog" aria-live="polite"><div id="updTx"></div><div class="upb" id="updPb"><i id="updPbi"></i></div><div class="updb"><button class="btn" id="updGo"><span>بله، نصب شود</span></button><button class="btn ghost" id="updLater"><span>بعداً</span></button></div></div>
   <div id="toast" role="status" aria-live="polite"></div>
   <div id="sheet" role="dialog" aria-label="تنظیمات">
     <div class="gr"></div>

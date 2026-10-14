@@ -1,7 +1,7 @@
 (function () {
 'use strict';
 var RM = !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
-var VERSION = '1.12';
+var VERSION = '1.13';
 function $(id) { return document.getElementById(id); }
 function fa(n) { return String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, '٬').replace(/\d/g, function (d) { return '۰۱۲۳۴۵۶۷۸۹'[d]; }); }
 function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
@@ -424,8 +424,12 @@ db.full = db.full || {}; db.t = db.t || {}; db.fa = db.fa || {}; db.sc = db.sc |
 try { localStorage.removeItem('pp.raw'); } catch (e) {}
 var idx = Core.dbIndex(db);
 var stt = ls.get('pp.st', {}), prog = {}, busy = false, curModel = null, list = [], struct = '', psig = '', mq = window.matchMedia ? matchMedia('(prefers-color-scheme: dark)') : null;
-var ORDER = Core.SOURCES.map(function (s) { return s.id; }), TRUSTED = {}, imgLoc = {}, imgAsked = {};
+var ORDER = [], TRUSTED = {}, imgLoc = {}, imgAsked = {};
 Core.SOURCES.forEach(function (s) { if (s.trusted) TRUSTED[s.id] = true; });
+/* سایت‌هایی که کاربر خاموش کرده (set.soff) نه دریافت می‌شوند و نه در فهرست می‌آیند؛ حداقل یک سایت همیشه روشن می‌ماند */
+function srcOn(id) { return !(set.soff && set.soff[id]); }
+function actv() { return Core.SOURCES.filter(function (s) { return srcOn(s.id); }); }
+function order() { return actv().map(function (s) { return s.id; }); }
 var treeSig = '', staleN = 0, audOpen = false, hiddenN = 0, TREE = [], BR_BY = {}, MD_BY = {}, nav = { lvl: 0, brand: null }, imgPend = {}, imgTot = 0, imgOk = 0, imgBad = 0, imgLastT = 0, startAnchor = ls.get('pp.last', null), lastTried = 0, prevP = null, FLAT = [], ALLB = [], gateRetried = 0;
 var FULL_EVERY = 3 * 86400e3;
 function friendly(m) {
@@ -457,7 +461,7 @@ function applyTheme() {
 }
 if (mq && mq.addEventListener) mq.addEventListener('change', function () { if (set.theme === 'auto') applyTheme(); });
 
-function lastOk() { var m = 0; Object.keys(db.t).forEach(function (k) { if (db.t[k] > m) m = db.t[k]; }); return m; }
+function lastOk() { var m = 0; Object.keys(db.t).forEach(function (k) { if (srcOn(k) && db.t[k] > m) m = db.t[k]; }); return m; }
 function agoText(ms) {
   var m = Math.floor(ms / 60000);
   if (m < 1) return 'همین الان';
@@ -488,7 +492,7 @@ function updPill() {
   if (age > (autoMs() ? 40 * 60000 : 24 * 3600000)) { u.classList.add('stale'); t.textContent = 'قیمت‌ها قدیمی‌اند · ' + agoText(age); }
   else t.textContent = 'آخرین بروزرسانی ' + agoText(age);
 }
-function srcDone() { return Core.SOURCES.filter(function (s) { return stt[s.id] && stt[s.id].ok; }).length; }   // سایت‌هایی که اطلاعاتشان آمده
+function srcDone() { return actv().filter(function (s) { return stt[s.id] && stt[s.id].ok; }).length; }   // سایت‌هایی که اطلاعاتشان آمده
 function imgLeft() { return Object.keys(imgPend).length; }
 /* عکس‌ها: need = مدل‌هایی که عکس دارند (برندهای روشن)، have = آن‌هایی که روی گوشی هست */
 function photoStat() {
@@ -501,7 +505,7 @@ function overlay() {
   if (db.ready && list.length) { o.className = ''; o.innerHTML = ''; o._h = ''; o._g = 0; return; }
   o.className = 'on';
   if (!db.ready) {                       // قفل ورود: تا پایان دانلود اولیه وارد برنامه نمی‌شویم
-    var N = Core.SOURCES.length, sd = srcDone(), il = imgLeft(), phase = busy ? 'src' : il > 0 ? 'img' : 'fail';
+    var N = actv().length, sd = srcDone(), il = imgLeft(), phase = busy ? 'src' : il > 0 ? 'img' : 'fail';
     var ps = photoStat(), sf = phase === 'src' ? (pct() == null ? 0 : pct()) : 1, imf = ps.need ? ps.have / ps.need : (phase === 'img' ? 0 : 1);
     var all = phase === 'src' ? sf * .75 : phase === 'img' ? .75 + .25 * imf : .75 + .25 * imf;
     if (!o._g) {                         // اسکلت فقط یک‌بار ساخته می‌شود؛ بعد فقط متن‌ها عوض می‌شوند (تا چرخش دایره از اول شروع نشود)
@@ -566,7 +570,7 @@ function setEntries() {
 }
 /* فهرستِ نمایشی را از حافظه می‌سازد؛ اگر فقط قیمت‌ها عوض شده باشد، همان صفحه سر جایش می‌ماند و فقط صفحه‌ی جزئیات (اگر باز است) بروز می‌شود */
 function rebuild(light) {
-  var l = light && FLAT.length ? FLAT : Core.buildList(db, ORDER, TRUSTED, 12 * 3600e3);   // light: فقط روشن/خاموشیِ برندها عوض شده؛ داده همان است
+  var l = light && FLAT.length ? FLAT : Core.buildList(db, order(), TRUSTED, 12 * 3600e3, order());   // light: فقط روشن/خاموشیِ برندها عوض شده؛ داده همان است
   if (l !== FLAT) { hiddenN = l.hidden || 0; staleN = l.stale || 0; } FLAT = l;
   var sig = (set.lang === 'en' ? 'en' : 'fa') + '|' + l.length + '|' + Object.keys(db.wd || {}).length + '|' + l.map(function (g) { return g.id + '~' + g.name + '~' + g.img + g.sizes.map(function (z) { return z.ml + ':' + z.price + ':' + z.srcs.map(function (r) { return r.s + r.pid + r.price + (r.used ? 1 : 0); }).join('/'); }).join(','); }).join(';');
   if (sig !== treeSig || !ALLB.length) { ALLB = Core.tree(l, set.lang === 'en' ? 'en' : 'fa', db.wd); treeSig = sig; }   // درخت فقط وقتی دوباره ساخته می‌شود که داده/زبان عوض شده باشد
@@ -601,7 +605,7 @@ function enter() { setEntries(); mountModel(nav.lvl ? null : startAnchor); overl
 function checkReady() {
   if (db.ready || busy) return;
   if (imgLeft() > 0) { overlay(); return; }
-  if (srcDone() < Core.SOURCES.length && !gateRetried) { gateRetried = 1; overlay(); setTimeout(function () { refresh(false); }, 2500); return; }   // سایتِ ناموفق یک‌بار دیگر امتحان می‌شود؛ بعد هر سایتی که در دسترس بود کافی است
+  if (srcDone() < actv().length && !gateRetried) { gateRetried = 1; overlay(); setTimeout(function () { refresh(false); }, 2500); return; }   // سایتِ ناموفق یک‌بار دیگر امتحان می‌شود؛ بعد هر سایتی که در دسترس بود کافی است
   if (srcDone() < 1 || !list.length) { overlay(); return; }
   db.ready = true; saveDb(); enter();
 }
@@ -741,7 +745,7 @@ async function refresh(manual) {
   if (Core.CLEANSE) { Core.CLEANSE.n = 0; Core.CLEANSE.junk = 0; }
   busy = true; prog = {}; updPill(); overlay(); refBtn(); if (open) renderSheet();
   var ok = 0, bad = 0, t0 = Date.now(), snap0 = FLAT.length ? sizeMap(FLAT) : null;
-  await Promise.all(Core.SOURCES.map(async function (s) {
+  await Promise.all(actv().map(async function (s) {
     try { await doSource(s); ok++; }
     catch (e) {
       bad++;
@@ -759,7 +763,7 @@ async function refresh(manual) {
     var au2 = (ALLB && ALLB.audit) || {}, mg = 0, pg = 0, CL2 = Core.CLEANSE || {};
     Core.SOURCES.forEach(function (s) { mg += (stt[s.id] && stt[s.id].merged) | 0; pg += (stt[s.id] && stt[s.id].purged) | 0; });
     RUN = { t: Date.now(), dur: Date.now() - t0, manual: !!manual, chg: snap0 ? diffMaps(snap0, sizeMap(FLAT)) : null,
-      src: Core.SOURCES.map(function (s) { var o = srcState(s); return { name: o.name, kind: o.kind, cnt: o.cnt }; }),
+      src: actv().map(function (s) { var o = srcState(s); return { name: o.name, kind: o.kind, cnt: o.cnt }; }),
       clean: { clone: CL2.clone | 0, purged: pg, titles: CL2.n | 0, junk: CL2.junk | 0, merged: mg, names: au2.nmod | 0, brands: (au2.brands || []).length, sus: au2.nsus | 0 } };
     ls.set('pp.run', RUN);
   } catch (e4) { console.error(e4); }
@@ -785,8 +789,10 @@ function renderSheet() {
     if (busy && P && !P.done) txt = (P.mode === 'full' ? 'دریافت اولیه ' : 'قیمت‌ها ') + '<bdi>' + fa(P.n) + '</bdi>';
     else if (x && x.ok) { txt = fa(x.n) + ' محصول' + (x.note && /ناقص/.test(x.note) ? ' (ناقص)' : ''); }
     else if (x && x.err) { txt = x.err + (x.t ? ' (قیمت قبلی نگه داشته شد)' : ''); cls = 'bad'; bad = true; }
-    return '<div class="' + cls + '"><span>' + s.name + '</span><span>' + (busy && P && !P.done ? txt : esc(txt)) + '</span></div>';
-  }).join('') + '<div style="border:0;color:var(--mu);font-size:12px;padding-top:8px"><span>نقطه‌ی کوچک کنار قیمت یعنی فقط یک سایت آن را داشته.</span></div>';
+    var on = srcOn(s.id);
+    if (!on) { txt = 'خاموش؛ بروز نمی‌شود و در فهرست نیست'; cls = 'offs'; }
+    return '<div class="' + cls + '"><span>' + s.name + '</span><span class="st">' + (busy && P && !P.done && on ? txt : esc(txt)) + '</span><button type="button" class="sw' + (on ? ' on' : '') + '" data-s="' + s.id + '" role="switch" aria-checked="' + (on ? 'true' : 'false') + '" aria-label="' + esc(s.name) + '"><i></i></button></div>';
+  }).join('') + '<div style="border:0;color:var(--mu);font-size:12px;padding-top:8px"><span>با کلیدِ کنار هر سایت می‌توانید آن را خاموش کنید. نقطه‌ی کوچک کنار قیمت یعنی فقط یک سایت آن را داشته.</span></div>';
   renderReport();
   $('sCopy').style.display = bad || adv ? '' : 'none'; $('sFull').style.display = bad || adv ? '' : 'none';
   $('sVer').textContent = 'نسخه ' + VERSION;
@@ -808,6 +814,7 @@ function srcState(s) {
   var x = stt[s.id] || {}, fullT = db.full[s.id], cnt = 0;
   Object.keys(db.it[s.id] || {}).forEach(function (k) { var e = db.it[s.id][k]; if (e[2] && e[1] > 0) cnt++; });
   var o = { name: s.name, cnt: cnt, t: db.t[s.id] || 0, kind: 'ok', say: '', todo: '' };
+  if (!srcOn(s.id)) { o.kind = 'off'; o.say = 'خاموش است (به انتخاب شما)'; o.todo = ''; return o; }
   if (x.err) { o.kind = 'err'; o.say = 'جواب نداد (' + x.err + ')'; o.todo = db.t[s.id] ? 'قیمت‌های قبلی این سایت نگه داشته شد. اگر اینترنت درست است، چند دقیقه بعد دوباره «بروزرسانی» را بزنید.' : 'هنوز هیچ قیمتی از این سایت نیامده؛ اینترنت را بررسی و دوباره بروزرسانی کنید.'; }
   else if (!x.ok && !db.t[s.id]) { o.kind = 'wait'; o.say = 'هنوز چیزی از این سایت نیامده'; o.todo = 'بروزرسانی را بزنید.'; }
   else if (x.note && /ناقص/.test(x.note)) { o.kind = 'part'; o.say = 'فهرست سایت کامل خوانده نشد'; o.todo = 'آنچه خوانده شد بروز شد و بقیه با قیمتِ قبلی ماند؛ بار بعد خودش دوباره امتحان می‌کند. کاری لازم نیست.'; }
@@ -821,8 +828,8 @@ function reportData() {
   var withEn = 0; FLAT.forEach(function (g) { if (g.en) withEn++; });
   var src = Core.SOURCES.map(function (s) {
     var o = srcState(s), P = prog[s.id];
-    var st = busy && P && !P.done ? 'در حال دریافت (' + fa(P.n) + ')' : o.kind === 'ok' ? 'کامل' : o.kind === 'part' ? 'ناقص (دوباره امتحان می‌کند)' : o.kind === 'err' ? 'خطا: ' + (stt[s.id].err || '') : 'هنوز نیامده';
-    return { name: s.name, st: st, ok: o.kind === 'ok', cnt: o.cnt, t: o.t, note: (stt[s.id] || {}).note || '', o: o };
+    var st = busy && P && !P.done ? 'در حال دریافت (' + fa(P.n) + ')' : o.kind === 'off' ? 'خاموش (بروز نمی‌شود)' : o.kind === 'ok' ? 'کامل' : o.kind === 'part' ? 'ناقص (دوباره امتحان می‌کند)' : o.kind === 'err' ? 'خطا: ' + (stt[s.id].err || '') : 'هنوز نیامده';
+    return { name: s.name, st: st, ok: o.kind === 'ok' || o.kind === 'off', cnt: o.cnt, t: o.t, note: (stt[s.id] || {}).note || '', o: o };
   });
   return { ps: ps, nb: nb, nm: nm, nv: nv, withEn: withEn, all: FLAT.length, src: src };
 }
@@ -852,7 +859,7 @@ function renderReport() {
   sec('نتیجه‌ی آخرین بروزرسانی', L1, false);
   /* ۲) مشکل‌ها و کار لازم */
   var iss = [];
-  r.src.forEach(function (x) { if (x.o.kind !== 'ok') iss.push('<b>' + esc(x.name) + ':</b> ' + esc(x.o.say) + '. ' + esc(x.o.todo)); });
+  r.src.forEach(function (x) { if (x.o.kind !== 'ok' && x.o.kind !== 'off') iss.push('<b>' + esc(x.name) + ':</b> ' + esc(x.o.say) + '. ' + esc(x.o.todo)); });
   if (saveFail) iss.push('<b>حافظه‌ی گوشی پر است:</b> اطلاعات ممکن است بعد از بستن برنامه برنگردد. از گوشی فضا خالی کنید.');
   if (r.ps.have < r.ps.need) iss.push('<b>عکس‌ها:</b> ' + B(r.ps.need - r.ps.have) + ' عکس هنوز روی گوشی نیست. خودش دانلود می‌کند؛ کاری لازم نیست.');
   if (au.nsus) iss.push('<b>نام‌های شبیه هم:</b> ' + B(au.nsus) + ' جفت نام شبیه هم هست که قیمتشان به هم نمی‌خورد، پس یکی نشدند (ممکن است دو عطرِ جدا باشند). نمونه‌ها در «پالایش».');
@@ -930,11 +937,22 @@ sheet.addEventListener('pointerup', sUp); sheet.addEventListener('pointercancel'
 $('sTheme').onclick = function (e) { var v = e.target.dataset && e.target.dataset.v; if (!v) return; set.theme = v; ls.set('pp.set', set); applyTheme(); renderSheet(); };
 $('sModel').onclick = function (e) { var b = e.target.closest && e.target.closest('button'); if (!b || !b.dataset.v) return; set.model = b.dataset.v; ls.set('pp.set', set); renderSheet(); var a = curModel ? curModel.getAnchor() : null; mountModel(a); closeSheet(); };
 $('sUpdA').onclick = function (e) { var b = e.target.closest('button'); if (!b || b.dataset.v == null) return; set.updAuto = +b.dataset.v; ls.set('pp.set', set); renderSheet(); if (set.updAuto && updDue()) updCheck(false); };
-$('sUpd').onclick = function () { updSt.asked = false; updCheck(true); };
-$('updLater').onclick = function () { $('updBox').classList.remove('on'); };
+$('sSrc').onclick = function (e) {
+  var b = e.target.closest('button.sw'); if (!b) return;
+  var id = b.dataset.s, on = srcOn(id);
+  if (on && actv().length <= 1) { toast('حداقل یک سایت باید روشن بماند', 2500); return; }
+  set.soff = set.soff || {}; if (on) set.soff[id] = 1; else delete set.soff[id];
+  ls.set('pp.set', set);
+  try { rebuild(); } catch (e2) { console.error(e2); }
+  renderSheet(); updPill();
+  if (!on && !busy && !(db.it[id] && Object.keys(db.it[id]).length)) refresh(false);      // تازه روشن شد و هنوز چیزی ندارد
+  else if (!on && !busy) toast('سایت روشن شد؛ با «بروزرسانی» قیمت‌هایش تازه می‌شود', 3500);
+};
+$('sUpd').onclick = function () { if ($('sUpd').disabled) return; updSt.dismissed = false; updCheck(true); };
+$('updLater').onclick = function () { updSt.dismissed = true; updSt.manual = false; $('updBox').classList.remove('on'); };
 $('updGo').onclick = function () {
-  $('updGo').disabled = true; updSt.installing = true;
-  $('updTx').textContent = 'در حال نصب… اگر اندروید پرسید، گزینه‌ی بروزرسانی را بزنید.';
+  if ($('updGo').disabled) return;
+  updSt.phase = 'inst'; updSt.installing = true; updRender();
   var ok = false; try { ok = window.Native.updInstall(); } catch (e) { }
   if (!ok) window.__updErr('start');
 };
@@ -956,7 +974,7 @@ window.__back = function () {
   return goUp();
 };
 /* ---------- بروزرسانی خودِ برنامه از گیت‌هاب ---------- */
-var updSt = { code: 0, ready: 0, asked: false, manual: false }, UPD_EVERY = 3 * 3600000;
+var updSt = { code: 0, ready: 0, phase: '', pct: null, dismissed: false, checking: false, manual: false }, UPD_EVERY = 3 * 3600000;
 function hasN(k) { return !!(window.Native && typeof window.Native[k] === 'function'); }
 function updText(t) { var e = $('sUpdT'); if (e) e.textContent = t; }
 function updAutoOn() { return set.updAuto !== 0; }
@@ -964,34 +982,53 @@ function updCheck(manual) {
   updSt.manual = !!manual;
   if (!hasN('updCheck')) { if (manual) toast('این امکان فقط در برنامه‌ی نصب‌شده کار می‌کند', 3000); return; }
   ls.set('pp.updt', Date.now());
+  updSt.checking = true; updRender();
   if (manual) updText('در حال بررسی…');
   try { window.Native.updCheck(); } catch (e) { }
 }
 function updDue() { return updAutoOn() && hasN('updCheck') && Date.now() - (+ls.get('pp.updt', 0) || 0) > UPD_EVERY; }
-function showUpd() {
-  if (updSt.asked && !updSt.manual) return;
-  updSt.asked = true;
-  $('updTx').textContent = 'نسخه‌ی جدید برنامه آماده است. الان نصب شود؟ بعد از نصب باید برنامه را دوباره باز کنید.';
-  $('updGo').disabled = false; $('updBox').classList.add('on');
+/* پنجره‌ی بروزرسانی: سه حالت دارد؛ dl = در حال دانلود (دکمه غیرفعال با درصد)، ready = آماده‌ی نصب، inst = در حال نصب */
+function updRender() {
+  var ph = updSt.phase, g = $('updGo'), sp = g.querySelector('span'), pb = $('updPb'), bi = $('updPbi'), me = $('sUpd'), ms = me.querySelector('span');
+  if (ph === 'dl') {
+    var pc = updSt.pct == null ? null : Math.max(0, Math.min(100, Math.round(updSt.pct)));
+    $('updTx').textContent = 'نسخه‌ی جدید برنامه پیدا شد و دارد دانلود می‌شود. چند لحظه صبر کنید.';
+    g.disabled = true; g.classList.add('busy'); sp.textContent = pc == null ? 'در حال دانلود…' : 'دانلود ' + fa(pc) + '٪';
+    pb.style.display = 'block'; bi.style.width = (pc == null ? 8 : pc) + '%';
+  } else if (ph === 'inst') {
+    $('updTx').textContent = 'در حال نصب… اگر اندروید پرسید، گزینه‌ی بروزرسانی را بزنید.';
+    g.disabled = true; g.classList.add('busy'); sp.textContent = 'در حال نصب…'; pb.style.display = 'none';
+  } else {
+    $('updTx').textContent = 'نسخه‌ی جدید برنامه دانلود شد. الان نصب شود؟ بعد از نصب باید برنامه را دوباره باز کنید.';
+    g.disabled = false; g.classList.remove('busy'); sp.textContent = 'بله، نصب شود'; pb.style.display = 'none';
+  }
+  var wk = ph === 'dl' || ph === 'inst' || updSt.checking;
+  me.disabled = wk; me.classList.toggle('busy', wk);
+  ms.textContent = ph === 'dl' ? 'در حال دانلود…' : ph === 'inst' ? 'در حال نصب…' : updSt.checking ? 'در حال بررسی…' : 'بررسی نسخه‌ی جدید';
+  if (ph && (!updSt.dismissed || updSt.manual)) $('updBox').classList.add('on'); else $('updBox').classList.remove('on');
 }
+function showUpd() { updSt.phase = 'ready'; updRender(); }
 window.__updInfo = function (code) {
+  updSt.checking = false;
   var cur = hasN('appCode') ? +window.Native.appCode() : 0;
   if (code > cur) {
     updSt.code = code;
     if (updSt.ready === code) { showUpd(); return; }
     updText('نسخه‌ی تازه پیدا شد؛ در حال دانلود…');
+    updSt.phase = 'dl'; updSt.pct = null; updRender();
     try { window.Native.updDownload(); } catch (e) { }
   } else {
-    updText('برنامه‌ی شما آخرین نسخه است');
+    updText('برنامه‌ی شما آخرین نسخه است'); updRender();
     if (updSt.manual) toast('آخرین نسخه را دارید', 2500);
   }
 };
+window.__updProg = function (p) { if (updSt.phase === 'dl') { updSt.pct = +p; updRender(); } };
 window.__updReady = function (code) { updSt.ready = code; updText('نسخه‌ی تازه آماده‌ی نصب است'); showUpd(); };
 window.__updErr = function (m) {
-  $('updBox').classList.remove('on');
+  var was = updSt.phase;
+  updSt.phase = ''; updSt.checking = false; updSt.installing = false; updRender();
   updText('بروزرسانیِ برنامه انجام نشد؛ بعداً دوباره امتحان کنید');
-  if (updSt.manual || updSt.installing) toast('بروزرسانیِ برنامه انجام نشد', 3500);
-  updSt.installing = false;
+  if (updSt.manual || was) toast('بروزرسانیِ برنامه انجام نشد', 3500);
 };
 function autoMs() { var m = +set.auto; return m > 0 ? m * 60000 : 0; }      // ۰ = دستی (پیش‌فرض)
 function autoDue() { var lo = lastOk(); if (!lo) return true; var a = autoMs(); return a > 0 && Date.now() - lo > a; }
@@ -1006,12 +1043,12 @@ loadImgs();
 try { rebuild(); } catch (e) { console.error(e); }
 updPill(); overlay(); renderSheet();
 if (autoDue()) refresh(false);
-setTimeout(function () { if (updDue()) updCheck(false); }, 8000);
+setTimeout(function () { if (updAutoOn() && hasN('updCheck')) updCheck(false); }, 1500);      // هر بار که برنامه باز می‌شود نسخه‌ی تازه را می‌پرسد
 setInterval(function () { updPill(); if (!busy && autoDue()) refresh(false); }, 30000);
 /* قفل ورود: اگر دانلود گیر کرد خودش دوباره تلاش کند؛ عکسی که جواب نداد جلوی ورود را نگیرد */
 setInterval(function () {
   if (db.ready) return;
   if (!busy && imgLeft() > 0 && Date.now() - imgLastT > 40000) { imgBad += imgLeft(); imgPend = {}; checkReady(); }
-  else if (!busy && imgLeft() === 0 && srcDone() < Core.SOURCES.length && Date.now() - lastTried > 45000) refresh(false);
+  else if (!busy && imgLeft() === 0 && srcDone() < actv().length && Date.now() - lastTried > 45000) refresh(false);
 }, 5000);
 })();

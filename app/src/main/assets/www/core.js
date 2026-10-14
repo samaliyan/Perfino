@@ -1237,10 +1237,11 @@ async function ingestSlices(db, idx, src, list, complete) {
 }
 /* ساخت فهرست نمایشی از db */
 var STALE_MIN = 240;   // دقیقه
-function buildList(db, srcOrder, trusted, maxAge) {
+function buildList(db, srcOrder, trusted, maxAge, only) {   // only: فقط این سایت‌ها (سایتِ خاموش‌شده در فهرست نمی‌آید)
   setLex(db.wd);
   var by = {}, now = Date.now(), stale = 0;
   Object.keys(db.it).forEach(function (s) {
+    if (only && only.indexOf(s) < 0) return;
     if (maxAge && (!db.t[s] || now - db.t[s] > maxAge)) return;
     var m = db.it[s], tmin = db.t[s] ? Math.floor(Math.min(db.t[s], now) / 60000) : 0, nowM = Math.floor(now / 60000);   // ساعتِ گوشی عقب رفته باشد هم درست حساب می‌شود
     Object.keys(m).forEach(function (pid) {
