@@ -1,7 +1,13 @@
 (function () {
 'use strict';
 var RM = !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
-var VERSION = '1.31';
+var VERSION = '1.32';
+var myCode = (function () { var m = /\/b(\d{1,10})\/index\.html$/.exec(String(location.pathname || '')); return m ? m[1] : '0'; })();      // نسخه‌ی این صفحه از روی آدرسش؛ در گزارش‌ها به جاوا فرستاده می‌شود تا صفحه‌ی کهنه نتواند نسخه‌ی تازه را «سالم» اعلام کند
+function otaCall(n) { try { if (window.Native && typeof window.Native[n] === 'function') window.Native[n](myCode); } catch (e) { } }
+otaCall('otaBoot');      // «جاوااسکریپتِ این صفحه شروع شد»: برنامه به صفحه‌ی بی‌نصب مهلتِ بیشتری برای ساختن فهرست می‌دهد
+var bootErr = 0, okSent = false, errSent = false;      // خطای جاوااسکریپت در شروعِ برنامه؛ اگر صفر نبود «سالم بالا آمدم» گفته نمی‌شود (بروزرسانیِ بی‌نصبِ خراب برمی‌گردد)
+function bootBad() { if (!okSent && !errSent) { errSent = true; otaCall('otaErr'); } }      // به برنامه می‌گوید دیگر «زنده‌ام» نخواهد آمد: به جای دو دقیقه، چند ثانیه بعد برمی‌گردد
+window.addEventListener('error', function (e) { var m = String((e && e.message) || ''); if (m.indexOf('ResizeObserver') < 0) { bootErr++; bootBad(); } });
 function $(id) { return document.getElementById(id); }
 function fa(n) { return String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, '٬').replace(/\d/g, function (d) { return '۰۱۲۳۴۵۶۷۸۹'[d]; }); }
 function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
@@ -23,9 +29,22 @@ var ls = {
       var ok = false; try { ok = !!window.Native.fileSet(k, str); } catch (e) { ok = false; }
       if (ok) { try { localStorage.removeItem(k); } catch (e) { } return true; }
     }
-    try { localStorage.setItem(k, str); return true; } catch (e) { return false; }
+    try { localStorage.setItem(k, str); lsMirror(); return true; } catch (e) { return false; }
   }
 };
+/* تنظیمات و لیست مغازه یک نسخه‌ی پشتیبان هم در فایلِ برنامه دارند. اگر گوشی حافظه‌ی صفحه را پاک کرد (یا بسته‌ی بی‌نصب از جای دیگری باز شد)، از همین فایل برمی‌گردد */
+var LSM = ['pp.set', 'pp.st', 'pp.last', 'pp.try', 'pp.updt', 'pp.run'], lsmT = 0;
+function lsMirror() {
+  if (!fileOk()) return; clearTimeout(lsmT);
+  lsmT = setTimeout(function () { try { var o = {}; LSM.forEach(function (k) { var v = localStorage.getItem(k); if (v != null) o[k] = v; }); window.Native.fileSet('pp.ls', JSON.stringify(o)); } catch (e) { } }, 700);
+}
+(function lsRestore() {
+  try {
+    if (!fileOk() || localStorage.getItem('pp.set') !== null) return;
+    var raw = window.Native.fileGet('pp.ls'); if (!raw) return; var o = JSON.parse(raw);
+    LSM.forEach(function (k) { if (typeof o[k] === 'string' && localStorage.getItem(k) === null) localStorage.setItem(k, o[k]); });
+  } catch (e) { }
+})();
 function themeNow() { return document.documentElement.getAttribute('data-th'); }
 
 /* ---------- بطری جایگزین عکس ---------- */
@@ -763,7 +782,8 @@ $('mkr').addEventListener('click', function (e) {
 /* فهرستِ نمایشی را از حافظه می‌سازد؛ اگر فقط قیمت‌ها عوض شده باشد، همان صفحه سر جایش می‌ماند و فقط صفحه‌ی جزئیات (اگر باز است) بروز می‌شود */
 /* «مهرِ داده»: اگر هیچ قیمت/زمان/گروهی عوض نشده باشد، درخت دوباره ساخته نمی‌شود (ساختنش روی گوشی چند ثانیه است) و از فایلِ ذخیره‌شده خوانده می‌شود */
 function dataStamp(lang) {
-  var now = Date.now(), p = [VERSION, lang, Object.keys(db.g).length, Object.keys(db.wd || {}).length, db.dv | 0];
+  var now = Date.now(), wc = 0; try { if (window.Native && window.Native.webCode) wc = window.Native.webCode() | 0; } catch (e) { }
+  var p = [VERSION, wc, lang, Object.keys(db.g).length, Object.keys(db.wd || {}).length, db.dv | 0];
   order().forEach(function (s) {
     var m = db.it[s] || {}, n = 0, a = 0, b = 0, c = 0;
     for (var k in m) { var e = m[k]; n++; a += e[1] | 0; b += e[4] | 0; c += e[2] ? e[2].charCodeAt(e[2].length - 1) + e[2].length : 0; }
@@ -814,6 +834,7 @@ function rebuild(light) {
   VM = {}; VA = {};
   ALLB.forEach(function (b) { b.models.forEach(function (m) { m.variants.forEach(function (v) { VA[v.id] = { m: m.id, b: b.id, bn: b.name }; }); }); });
   TREE.forEach(function (b) { BR_BY[b.id] = b; b.models.forEach(function (m) { m.brandId = b.id; MD_BY[m.id] = m; m.variants.forEach(function (v) { VM[v.id] = m.id; }); }); });
+  srWarm();      // نمایه‌ی جستجو را وقتِ بیکاری بساز، نه وقتی پدر روی ذره‌بین می‌زند
   if (nav.brand && !BR_BY[nav.brand]) { nav.lvl = 0; nav.brand = null; }
   var vis = []; TREE.forEach(function (b) { b.models.forEach(function (m) { m.variants.forEach(function (v) { vis.push(v); }); }); });
   var np = priceMap(vis), ch = 0;
@@ -1328,6 +1349,11 @@ $('updLater').onclick = function () { updSt.dismissed = true; updSt.manual = fal
 $('updGo').onclick = function () {
   if ($('updGo').disabled) return;
   updSt.phase = 'inst'; updSt.installing = true; updRender();
+  if (updSt.mode === 'ota') {      // بدون نصب: فقط صفحه با فایل‌های تازه از نو بالا می‌آید
+    var ok2 = false; try { ok2 = window.Native.otaApply(); } catch (e) { }
+    if (!ok2) window.__otaErr();
+    return;
+  }
   var ok = false; try { ok = window.Native.updInstall(); } catch (e) { }
   if (!ok) { updSt.ready = 0; window.__updErr('start'); setTimeout(function () { updSt.dismissed = false; updCheck(true); }, 600); }      // فایلِ دانلودشده از بین رفته (کمبود حافظه): دوباره دانلود شود، نه گیر کردن تا باز شدنِ بعدی
 };
@@ -1446,61 +1472,69 @@ var FS = [1, 1.15, 1.3, 1.5];
 function applyFs() { document.documentElement.style.setProperty('--zs', FS[set.fs | 0] || 1); }
 /* ---------- جستجو و لیست مغازه ---------- */
 var srOn = false, srFavOnly = false, srIdx = [], srSig = '', srT = 0, srVoice = null, voiceOn = false, voiceTo = 0;
-function srNorm(x) { return Core.normFa(String(x || '')).toLowerCase().replace(/[،؛؟٪٫٬]/g, ' ').replace(/[^؀-ۿa-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim(); }
-function srBuild() {
-  var sig = TREE.length + ':' + treeStamp + ':' + Object.keys(set.hide).join(',') + ':' + Object.keys(set.off || {}).join(','); if (sig === srSig) return; srSig = sig; srIdx = [];
-  var hasFa = function (t) { return /[؀-ۿ]/.test(t); };
-  TREE.forEach(function (b) {
-    b.models.forEach(function (m) {
-      var parts = [b.name, m.name];
-      if (hasFa(b.name)) parts.push(Core.fa2en(b.name.split(' '), db.wd));
-      m.variants.forEach(function (v) {
-        if (v.key) { parts.push(v.key.join(' ')); if (hasFa(v.key.join(' '))) parts.push(Core.fa2en(v.key, db.wd)); }
-        if (typeof v.en === 'string') parts.push(v.en);
-      });
-      srIdx.push({ m: m, b: b, h: ' ' + srNorm(parts.join(' ')) + ' ' });
-    });
-  });
+function srNorm(x) { return Core.srn(x); }
+var srTools = {
+  toEn: function (w) { var r = Core.fa2en([w], db.wd); return Array.isArray(r) ? r.join(' ') : String(r); },
+  toFa: function (w) { var r = Core.en2fa([w], db.wd); return Array.isArray(r) ? r.join(' ') : String(r); }
+};
+var srWT = 0;
+function srWarm() { clearTimeout(srWT); srWT = setTimeout(function () { try { srBuild(); } catch (e) { } }, 2200); }
+/* نمایه فقط به نام‌ها و شناسه‌ها بستگی دارد؛ با هر تغییرِ قیمت دوباره ساخته نمی‌شود (روی گوشی ثانیه‌ها طول می‌کشد) */
+function srSigOf() {
+  var h = 0, n = 0;
+  for (var i = 0; i < TREE.length; i++) {
+    var ms = TREE[i].models; n += ms.length;
+    for (var j = 0; j < ms.length; j++) { var t = ms[j].id + '|' + ms[j].name; for (var k = 0; k < t.length; k++) h = (h * 31 + t.charCodeAt(k)) | 0; }
+  }
+  return TREE.length + ':' + n + ':' + h + ':' + (set.lang === 'en' ? 'en' : 'fa') + ':' + Object.keys(db.wd || {}).length + ':' + Object.keys(set.hide).join(',') + ':' + Object.keys(set.off || {}).join(',');
 }
-function srMatch(h, toks) {
-  return toks.every(function (t) {
-    if (h.indexOf(t) >= 0) return true;
-    if (/[؀-ۿ]/.test(t)) { var en = srNorm(Core.fa2en([t], db.wd)); if (en && en.length >= 3 && h.indexOf(' ' + en) >= 0) return true; }      // «ساواج» ← sauvage
-    return false;
-  });
+function srBuild() {
+  var sig = srSigOf(); if (sig === srSig) return;
+  srIdx = Core.searchIndex(TREE, srTools.toEn); srSig = sig;      // نشانه فقط بعد از ساختنِ درست؛ اگر خطا شد دفعه‌ی بعد دوباره امتحان می‌شود
+}
+/* دو ردیفِ هم‌نامِ پشت‌سرهم (یک عطر با نام فارسی و انگلیسی): کنارش اولین عنوانِ سایت را بنویس تا فرقشان معلوم باشد */
+function srDup(list) {
+  var c = {}; list.forEach(function (x) { var k = x.b.name + '|' + x.m.name; c[k] = (c[k] || 0) + 1; });
+  return function (x) {
+    if (c[x.b.name + '|' + x.m.name] < 2) return '';
+    var v = x.m.variants && x.m.variants[0], t = v ? String(v.name || '') : '';
+    return t && t !== x.m.name ? ' · ' + (t.length > 26 ? t.slice(0, 26) + '…' : t) : '';
+  };
 }
 function srRender() {
-  var q = srNorm($('srq').value), toks = q ? q.split(' ') : [], out = [], box = $('srr'), nf = Object.keys(set.fav).length;
+  var raw = $('srq').value, q = srNorm(raw), out = [], box = $('srr'), nf = Object.keys(set.fav).length;
   $('srFc').textContent = nf ? '(' + fa(nf) + ')' : ''; $('srFav').classList.toggle('on', srFavOnly);
   srBuild();
   function row(m, b, gone, id, lab) {
     var fv = !!set.fav[id];
-    return '<div class="srr' + (gone ? ' gone' : '') + '"><button type="button" class="sn1" data-id="' + esc(id) + '"' + (gone ? ' disabled' : '') + '><b>' + esc(m) + '</b><small>' + esc(b) + (gone ? ' · الان در سایت‌ها نیست' : '') + '</small></button><button type="button" class="sf" data-f="' + esc(id) + '" aria-label="لیست مغازه">' + (fv ? '★' : '☆') + '</button></div>';
+    return '<div class="srr' + (gone ? ' gone' : '') + '"><button type="button" class="sn1" data-id="' + esc(id) + '"' + (gone ? ' disabled' : '') + '><b>' + esc(m) + '</b><small>' + esc(b) + (gone ? ' · الان در سایت‌ها نیست' : '') + esc(lab || '') + '</small></button><button type="button" class="sf" data-f="' + esc(id) + '" aria-label="لیست مغازه">' + (fv ? '★' : '☆') + '</button></div>';
   }
   if (srFavOnly) {
-    Object.keys(set.fav).forEach(function (id) {
+    if (q) {      // لیست مغازه + نوشته: همان ترتیبِ نزدیکی، فقط از عطرهای لیست
+      Core.searchRank(srIdx, [raw], srTools, { prefixLast: true }).forEach(function (r) { var x = srIdx[r.i]; if (set.fav[x.m.id]) out.push([0, 0, row(x.m.name, x.b.name, false, x.m.id)]); });
+    } else Object.keys(set.fav).forEach(function (id) {
       var m = MD_BY[id], lab = String(set.fav[id]).split(' | ');
-      if (m && (!toks.length || srMatch(' ' + srNorm(BR_BY[m.brandId].name + ' ' + m.name) + ' ', toks))) out.push([BR_BY[m.brandId].name, m.name, row(m.name, BR_BY[m.brandId].name, false, id)]);
-      else if (!m && !toks.length) out.push([lab[0] || '', lab[1] || '', row(lab[1] || lab[0], lab[0] || '', true, id)]);
+      if (m) out.push([BR_BY[m.brandId].name, m.name, row(m.name, BR_BY[m.brandId].name, false, id)]);
+      else out.push([lab[0] || '', lab[1] || '', row(lab[1] || lab[0], lab[0] || '', true, id)]);
     });
-    out.sort(function (a, c) { return (a[0] + a[1]).localeCompare(c[0] + c[1], 'fa'); });
-    box.innerHTML = out.length ? out.map(function (x) { return x[2]; }).join('') : '<div class="sremp">لیست مغازه خالی است.<br>در صفحه‌ی هر عطر یا همین‌جا روی ستاره بزنید تا عطرهای مغازه را جدا نگه دارید.</div>';
+    if (!q) out.sort(function (a, c) { return (a[0] + a[1]).localeCompare(c[0] + c[1], 'fa'); });
+    box.innerHTML = out.length ? out.map(function (x) { return x[2]; }).join('') : (q ? '<div class="sremp">در لیست مغازه چیزی با این نام نیست.</div>' : '<div class="sremp">لیست مغازه خالی است.<br>در صفحه‌ی هر عطر یا همین‌جا روی ستاره بزنید تا عطرهای مغازه را جدا نگه دارید.</div>');
     return;
   }
-  if (srVoice && $('srq').value === srVoice.text) {      // نتیجه‌ی گفتار: چند پیشنهادِ نزدیک؛ نه حدسِ بی‌صدا
-    box.innerHTML = '<div class="srvh">شنیدم: «' + esc(srVoice.text) + '»<small>کدام را می‌گویید؟ روی آن بزنید.</small></div>' + srVoice.ranks.map(function (x) { return row(x.m.name, x.b.name, false, x.m.id); }).join('');
+  if (srVoice && raw === srVoice.text) {      // نتیجه‌ی گفتار: چند پیشنهادِ نزدیک؛ نه حدسِ بی‌صدا
+    box.innerHTML = '<div class="srvh">شنیدم: «' + esc(srVoice.text) + '»<small>کدام را می‌گویید؟ روی آن بزنید.</small></div>' + (function (dp) { return srVoice.ranks.map(function (x) { return row(x.m.name, x.b.name, false, x.m.id, dp(x)); }).join(''); })(srDup(srVoice.ranks));
     return;
   }
-  if (!toks.length) {
+  if (!q) {
     var rc = set.rec.filter(function (x) { return x && MD_BY[x[0]]; }).slice(0, 8);
     box.innerHTML = (rc.length ? '<div class="srvh">آخرین‌هایی که دیدید</div>' + rc.map(function (x) { var m = MD_BY[x[0]]; return row(m.name, BR_BY[m.brandId].name, false, x[0]); }).join('') : '')
       + '<div class="sremp">نام عطر یا برند را بنویسید، یا با دکمه‌ی میکروفون بگویید.<br>مثلاً «ساواج» یا «sauvage» یا «ورساچه».</div>';
     return;
   }
-  srIdx.forEach(function (x) { if (srMatch(x.h, toks)) out.push([x.m.name.toLowerCase().indexOf(toks[0]) === 0 ? 0 : 1, x]); });
-  out.sort(function (a, c) { return a[0] - c[0]; });
+  out = Core.searchRank(srIdx, [raw], srTools, { prefixLast: true });
   var more = out.length > 60; out = out.slice(0, 60);
-  box.innerHTML = out.length ? out.map(function (r) { return row(r[1].m.name, r[1].b.name, false, r[1].m.id); }).join('') + (more ? '<div class="sremp">فقط ۶۰ مورد اول نشان داده شد؛ دقیق‌تر بنویسید.</div>' : '')
+  var dp = srDup(out.map(function (r) { return srIdx[r.i]; }));
+  box.innerHTML = out.length ? out.map(function (r) { var x = srIdx[r.i]; return row(x.m.name, x.b.name, false, x.m.id, dp(x)); }).join('') + (more ? '<div class="sremp">فقط ۶۰ مورد اول نشان داده شد؛ دقیق‌تر بنویسید.</div>' : '')
     : '<div class="sremp">چیزی پیدا نشد.<br>املای دیگری را امتحان کنید یا فقط بخشی از نام را بنویسید.</div>';
 }
 function openSearch(q) {
@@ -1520,7 +1554,6 @@ $('srr').addEventListener('click', function (e) {
   var b = e.target.closest('button.sn1'); if (b && b.dataset.id && MD_BY[b.dataset.id]) { closeSearch(); openDetail(b.dataset.id); }
 });
 /* ---------- گفتنِ نام عطر ---------- */
-function voiceEn(t) { return srNorm(Core.fa2en([t], db.wd)); }
 function startVoice() {
   if (voiceOn) return;
   if (!hasN('startVoice')) { toast('ضبط صدا در این گوشی نیست؛ نام را بنویسید', 3500); openSearch(); return; }
@@ -1532,10 +1565,15 @@ function voiceGo(alts) {
   alts = alts.map(srNorm).filter(function (a, i, ar) { return a && ar.indexOf(a) === i; });
   if (!alts.length) { toast('چیزی نشنیدم؛ دوباره بگویید', 3000); return null; }
   srBuild();
-  var rk = Core.voiceRank(srIdx, alts, voiceEn), said = alts[0];
+  var rk = Core.searchRank(srIdx, alts, srTools, { prefixLast: false }), said = alts[0];
   if (!rk.length) { srVoice = null; openSearch(said); toast('«' + said + '» را پیدا نکردم؛ بنویسید یا دوباره بگویید', 4000); return { kind: 'none', said: said }; }
-  var top = rk[0], sec = rk[1];
-  if (top.s >= .8 && (!sec || top.s - sec.s >= .1)) {
+  var top = rk[0], sec = null;
+  for (var q = 1; q < rk.length && q < 12; q++) { if (!top.ex || rk[q].ex) { sec = rk[q]; break; } }      // وقتی نام دقیق گفته شده، فقط یک نامِ «دقیقِ» دیگر رقیب است، نه املای نزدیک
+  var gap = sec ? top.s - sec.s : 9;
+  /* فقط برند گفته شده (مثلاً «دیور») = لیست؛ هرگز یک عطرِ دلخواه باز نشود. واژه‌ی بی‌جواب (miss) یا دو واژه روی یک واژه‌ی عطر (dupc) = لیست. املای نزدیک: دست‌کم دو واژه، و هر واژه حداکثر یک غلطِ املایی تا جور شدن */
+  var near = rk.length > 1 && top.s - rk[1].s < .03 - 1e-9;      // دو املای تقریباً هم‌امتیاز (مثلاً «تامین» و «تمین» که هر دو در فهرست‌اند): خودکار باز نمی‌شود
+  var sure = !top.bo && !top.miss && !top.dupc && !near && (top.ex ? gap >= .12 - 1e-9 : (top.cnt >= 2 && top.s >= 1.15 && top.mn >= .7 && gap >= .15 - 1e-9));
+  if (sure) {      // نامِ عطر کامل گفته شده (یا املای نزدیک و همه‌ی واژه‌ها جور) و رقیبِ نزدیک ندارد
     var e = srIdx[top.i]; srVoice = null; closeSearch(); openDetail(e.m.id); toast('«' + e.m.name + '» · ' + e.b.name, 2600);
     return { kind: 'open', id: e.m.id, said: said };
   }
@@ -1590,43 +1628,84 @@ $('hdList').onclick = function (e) {
   renderSheet(); toast('عطر برگشت', 2200);
 };
 /* ---------- بروزرسانی خودِ برنامه از گیت‌هاب ---------- */
-var updSt = { code: 0, ready: 0, phase: '', pct: null, dismissed: false, checking: false, manual: false }, UPD_EVERY = 3 * 3600000;
+var updSt = { code: 0, ready: 0, phase: '', pct: null, dismissed: false, checking: false, manual: false, mode: '' }, UPD_EVERY = 3 * 3600000;
 function hasN(k) { return !!(window.Native && typeof window.Native[k] === 'function'); }
 function updText(t) { var e = $('sUpdT'); if (e) e.textContent = t; }
 function updAutoOn() { return set.updAuto !== 0; }
 function updCheck(manual) {
   updSt.manual = !!manual;
-  if (!hasN('updCheck')) { if (manual) toast('این امکان فقط در برنامه‌ی نصب‌شده کار می‌کند', 3000); return; }
+  if (!hasN('updCheck') && !hasN('otaCheck')) { if (manual) toast('این امکان فقط در برنامه‌ی نصب‌شده کار می‌کند', 3000); return; }
+  if (updSt.phase === 'dl' || updSt.phase === 'inst') { updRender(); return; }      // همین الان دارد گرفته/باز می‌شود؛ از نو شروع نکن
+  if (updSt.phase === 'ready') { updRender(); return; }      // آماده است و منتظر «بله»؛ دوباره نپرس (اگر کاربر دستی زد، پنجره دوباره نشان داده می‌شود)
+  if (updSt.checking && Date.now() - updSt.checkT < 45000) return;      // پرسیدن در جریان است
   ls.set('pp.updt', Date.now());
-  updSt.checking = true; updRender();
+  updSt.checking = true; updSt.checkT = Date.now(); updSt.mode = ''; updRender();
+  clearTimeout(updSt.checkTm); updSt.checkTm = setTimeout(function () { if (updSt.checking && !updSt.phase) window.__otaInfo({ ok: false, reason: 'net' }); }, 45000);      // جوابی نیامد: گیر نکن
   if (manual) updText('در حال بررسی…');
-  try { window.Native.updCheck(); } catch (e) { }
+  if (hasN('otaCheck')) {      // اول بروزرسانیِ بدون نصب. فایل APK (و پنجره‌ی Install anyway) فقط وقتی لازم است که خودِ جاوا عوض شده باشد
+    try { window.Native.otaCheck(); } catch (e) { window.__otaInfo({ ok: false, reason: 'net' }); }
+    return;
+  }
+  updApk();      // برنامه‌ی قدیمی که اصلاً بروزرسانیِ بی‌نصب ندارد
 }
-function updDue() { return updAutoOn() && hasN('updCheck') && Date.now() - (+ls.get('pp.updt', 0) || 0) > UPD_EVERY; }
+function updApk() { try { window.Native.updCheck(); } catch (e) { window.__updErr('check'); } }
+function updDue() { return updAutoOn() && (hasN('updCheck') || hasN('otaCheck')) && Date.now() - (+ls.get('pp.updt', 0) || 0) > UPD_EVERY; }
 /* پنجره‌ی بروزرسانی: سه حالت دارد؛ dl = در حال دانلود (دکمه غیرفعال با درصد)، ready = آماده‌ی نصب، inst = در حال نصب */
 function updRender() {
-  var ph = updSt.phase, g = $('updGo'), sp = g.querySelector('span'), pb = $('updPb'), bi = $('updPbi'), me = $('sUpd'), ms = me.querySelector('span');
+  var ota = updSt.mode === 'ota', ph = updSt.phase, g = $('updGo'), sp = g.querySelector('span'), pb = $('updPb'), bi = $('updPbi'), me = $('sUpd'), ms = me.querySelector('span');
   if (ph === 'dl') {
     var pc = updSt.pct == null ? null : Math.max(0, Math.min(100, Math.round(updSt.pct)));
-    $('updTx').textContent = 'نسخه‌ی جدید برنامه پیدا شد و دارد دانلود می‌شود. چند لحظه صبر کنید.';
+    $('updTx').textContent = ota ? 'نسخه‌ی جدید برنامه پیدا شد و دارد گرفته می‌شود. چند لحظه صبر کنید.' : 'نسخه‌ی جدید برنامه پیدا شد و دارد دانلود می‌شود. چند لحظه صبر کنید.';
     g.disabled = true; g.classList.add('busy'); sp.textContent = pc == null ? 'در حال دانلود…' : 'دانلود ' + fa(pc) + '٪';
     pb.style.display = 'block'; bi.style.width = (pc == null ? 8 : pc) + '%';
   } else if (ph === 'inst') {
-    $('updTx').textContent = 'در حال نصب… اگر اندروید پرسید، گزینه‌ی بروزرسانی را بزنید.';
-    g.disabled = true; g.classList.add('busy'); sp.textContent = 'در حال نصب…'; pb.style.display = 'none';
+    $('updTx').textContent = ota ? 'نسخه‌ی تازه دارد باز می‌شود…' : 'در حال نصب… اگر اندروید پرسید، گزینه‌ی بروزرسانی را بزنید.';
+    g.disabled = true; g.classList.add('busy'); sp.textContent = ota ? 'در حال باز کردن…' : 'در حال نصب…'; pb.style.display = 'none';
   } else {
-    $('updTx').textContent = 'نسخه‌ی جدید برنامه دانلود شد. الان نصب شود؟ بعد از نصب باید برنامه را دوباره باز کنید.';
-    g.disabled = false; g.classList.remove('busy'); sp.textContent = 'بله، نصب شود'; pb.style.display = 'none';
+    $('updTx').textContent = ota ? 'نسخه‌ی تازه‌ی برنامه آماده است. نصب لازم نیست؛ با زدن دکمه، برنامه چند ثانیه دوباره باز می‌شود.' : 'نسخه‌ی جدید برنامه دانلود شد. الان نصب شود؟ بعد از نصب باید برنامه را دوباره باز کنید.';
+    g.disabled = false; g.classList.remove('busy'); sp.textContent = ota ? 'بله، تازه شود' : 'بله، نصب شود'; pb.style.display = 'none';
   }
-  $('updH').style.display = ph === 'dl' ? 'none' : '';
+  $('updH').style.display = ph === 'dl' || ota ? 'none' : '';      // «Install anyway» فقط وقتی لازم است که واقعاً فایل نصب می‌شود
   var wk = ph === 'dl' || ph === 'inst' || updSt.checking;
   me.disabled = wk; me.classList.toggle('busy', wk);
-  ms.textContent = ph === 'dl' ? 'در حال دانلود…' : ph === 'inst' ? 'در حال نصب…' : updSt.checking ? 'در حال بررسی…' : 'بررسی نسخه‌ی جدید';
+  ms.textContent = ph === 'dl' ? 'در حال دانلود…' : ph === 'inst' ? (ota ? 'در حال باز کردن…' : 'در حال نصب…') : updSt.checking ? 'در حال بررسی…' : 'بررسی نسخه‌ی جدید';
   if (ph && (!updSt.dismissed || updSt.manual)) $('updBox').classList.add('on'); else $('updBox').classList.remove('on');
 }
 function showUpd() { updSt.phase = 'ready'; updRender(); }
+window.__otaInfo = function (o) {
+  if (!o || !o.ok) {      // پرسیدن نشد (اینترنت قطع است یا گیت‌هاب جواب نداد). هرگز سراغ فایل APK نمی‌رویم؛ فقط بعداً دوباره می‌پرسیم
+    updSt.checking = false; updRender();
+    if (o && o.reason === 'none') { updText('برنامه‌ی شما آخرین نسخه است'); if (updSt.manual) toast('آخرین نسخه را دارید', 2500); }
+    else { updText('الان نشد نسخه‌ی تازه را بپرسم؛ اینترنت را ببینید و بعداً دوباره امتحان کنید'); if (updSt.manual) toast('بررسی انجام نشد؛ اینترنت را ببینید', 3500); }
+    return;
+  }
+  if (o.state === 'apk') { updApk(); return; }      // این نسخه بخشِ اصلیِ برنامه را هم عوض کرده؛ نصب لازم است
+  updSt.checking = false; clearTimeout(updSt.checkTm);
+  if (updSt.phase === 'dl' || updSt.phase === 'ready' || updSt.phase === 'inst') return;      // جوابِ دیررسیده؛ بروزرسانی همین الان در جریان است
+  if (o.state === 'new') {
+    updSt.code = o.code; updSt.mode = 'ota';
+    updText('نسخه‌ی تازه پیدا شد؛ در حال گرفتن…');
+    updSt.phase = 'dl'; updSt.pct = null; updRender(); updDlGuard();
+    try { window.Native.otaDownload(); } catch (e) { window.__otaErr(); }
+  } else if (o.cur > o.run) {      // قبلاً گرفته شده ولی هنوز باز نشده
+    updSt.code = o.cur; updSt.mode = 'ota'; updSt.ready = o.cur; updText('نسخه‌ی تازه آماده است'); showUpd();
+  } else {
+    updText('برنامه‌ی شما آخرین نسخه است'); updRender();
+    if (updSt.manual) toast('آخرین نسخه را دارید', 2500);
+  }
+};
+function updDlGuard() { clearTimeout(updSt.dlTm); updSt.dlTm = setTimeout(function () { if (updSt.phase === 'dl' && updSt.mode === 'ota') window.__otaErr(); }, 150000); }      // دو دقیقه و نیم بی‌خبری: گیر نکن
+window.__otaProg = function (p) { if (updSt.phase === 'dl') { updSt.pct = +p; updRender(); updDlGuard(); } };
+window.__otaReady = function (code) { clearTimeout(updSt.dlTm); updSt.mode = 'ota'; updSt.ready = code; updText('نسخه‌ی تازه آماده است'); showUpd(); };
+window.__otaErr = function () {
+  clearTimeout(updSt.dlTm);
+  var was = updSt.phase, wasOta = updSt.mode === 'ota';
+  updSt.phase = ''; updSt.checking = false; updSt.installing = false; updSt.mode = ''; updRender();
+  updText('بروزرسانیِ برنامه انجام نشد؛ بعداً دوباره امتحان کنید');
+  if (updSt.manual || was || wasOta) toast('بروزرسانیِ برنامه انجام نشد', 3500);
+};
 window.__updInfo = function (code) {
-  updSt.checking = false;
+  updSt.checking = false; updSt.mode = 'apk';
   var cur = hasN('appCode') ? +window.Native.appCode() : 0;
   if (code > cur) {
     updSt.code = code;
@@ -1643,7 +1722,7 @@ window.__updProg = function (p) { if (updSt.phase === 'dl') { updSt.pct = +p; up
 window.__updReady = function (code) { updSt.ready = code; updText('نسخه‌ی تازه آماده‌ی نصب است'); showUpd(); };
 window.__updErr = function (m) {
   var was = updSt.phase;
-  updSt.phase = ''; updSt.checking = false; updSt.installing = false; updRender();
+  updSt.phase = ''; updSt.checking = false; updSt.installing = false; updSt.mode = ''; updRender();
   updText('بروزرسانیِ برنامه انجام نشد؛ بعداً دوباره امتحان کنید');
   if (updSt.manual || was) toast('بروزرسانیِ برنامه انجام نشد', 3500);
 };
@@ -1659,10 +1738,22 @@ window.__pp = { voice: function (a) { return voiceGo(a); }, get allBrands() { re
 /* شروع */
 applyTheme(); applyFs();
 loadImgs();
-try { rebuild(); } catch (e) { console.error(e); }
+var bootOk = true;
+try { rebuild(); } catch (e) { bootOk = false; console.error(e); bootBad(); }
 updPill(); overlay(); renderSheet();
+/* «صفحه سالم بالا آمد»: فقط وقتی بدون خطا بالا آمده و یا فهرست روی صفحه کشیده شده، یا صفحه‌ی «در حال آماده‌سازی» (بار اول/بدون داده) نشان داده شده.
+   ساختنِ فهرست روی گوشی چند ثانیه طول می‌کشد، پس هر نیم‌ثانیه نگاه می‌کند (تا ۱۰۰ ثانیه).
+   بسته‌ی بی‌نصبِ خراب این پیام را نمی‌فرستد و ناظرِ برنامه آن را کنار می‌گذارد و به نسخه‌ی سالم برمی‌گرداند. */
+var okTries = 0, okT = setInterval(function () {
+  okTries++;
+  try {
+    if (!hasN('otaOk') || !bootOk || bootErr || okTries > 200) { clearInterval(okT); if (!bootOk || bootErr) bootBad(); return; }
+    var st = $('stage'), dk = $('dock'), ov = $('ov');
+    if (st && dk && (st.children.length || (ov && ov.classList.contains('on') && ov.children.length))) { clearInterval(okT); okSent = true; otaCall('otaOk'); }
+  } catch (e) { clearInterval(okT); }
+}, 500);
 if (autoDue() || launchDue()) refresh(false);
-setTimeout(function () { if (updAutoOn() && hasN('updCheck')) updCheck(false); }, 1500);      // هر بار که برنامه باز می‌شود نسخه‌ی تازه را می‌پرسد
+setTimeout(function () { if (updAutoOn() && (hasN('updCheck') || hasN('otaCheck'))) updCheck(false); }, 1500);      // هر بار که برنامه باز می‌شود نسخه‌ی تازه را می‌پرسد
 setInterval(function () { updPill(); if (!busy && autoDue()) refresh(false); }, 30000);
 /* قفل ورود: اگر دانلود گیر کرد خودش دوباره تلاش کند؛ عکسی که جواب نداد جلوی ورود را نگیرد */
 setInterval(function () {

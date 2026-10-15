@@ -36,13 +36,35 @@ jobs:
         run: gradle --no-daemon assembleRelease
       - name: Copy APK
         run: cp "${{ steps.p.outputs.dir }}/app/build/outputs/apk/release/app-release.apk" "$RUNNER_TEMP/PerfumePrice.apk"
+      - name: Build web bundle (update without install)
+        run: |
+          # شماره‌ی بسته باید همان versionCode ی باشد که build.gradle به APK می‌دهد (برنامه آن‌ها را با هم مقایسه می‌کند)
+          grep -q "GITHUB_RUN_NUMBER') as int) + 100" "${{ steps.p.outputs.dir }}/app/build.gradle" || { echo "versionCode formula in build.gradle is not RUN_NUMBER + 100"; exit 1; }
+          bash tools/make-ota.sh "${{ steps.p.outputs.dir }}/app/src/main/assets/www" "$RUNNER_TEMP/ota" "$((GITHUB_RUN_NUMBER + 100))"
+      - name: Test update-without-install (Java unit tests on the built bundle)
+        run: |
+          mkdir -p "$RUNNER_TEMP/jt"
+          J="${{ steps.p.outputs.dir }}/app/src/main/java/ir/perfume/price"
+          javac -encoding UTF-8 -d "$RUNNER_TEMP/jt" "$J/Ota.java" "$J/OtaGuard.java" tests/java/ir/perfume/price/OtaTest.java tests/java/ir/perfume/price/GuardTest.java
+          java -Dstdout.encoding=UTF-8 -cp "$RUNNER_TEMP/jt" ir.perfume.price.OtaTest "${{ steps.p.outputs.dir }}/app/src/main/assets/www" "$RUNNER_TEMP/ota"
+          java -Dstdout.encoding=UTF-8 -cp "$RUNNER_TEMP/jt" ir.perfume.price.GuardTest
       - uses: actions/upload-artifact@v4
         with:
           name: PerfumePrice-apk
-          path: ${{ runner.temp }}/PerfumePrice.apk
+          path: |
+            ${{ runner.temp }}/PerfumePrice.apk
+            ${{ runner.temp }}/ota/www.zip
+            ${{ runner.temp }}/ota/ota.json
       - name: Publish release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release delete latest --yes --cleanup-tag || true
-          gh release create latest "$RUNNER_TEMP/PerfumePrice.apk" --target "$GITHUB_SHA" --title "PerfumePrice (latest)" --notes "code=$((GITHUB_RUN_NUMBER + 100))"
+          gh release create latest "$RUNNER_TEMP/PerfumePrice.apk" "$RUNNER_TEMP/ota/www.zip" --target "$GITHUB_SHA" --title "PerfumePrice (latest)" --notes "code=$((GITHUB_RUN_NUMBER + 100))"
+          # ota.json آخر بارگذاری می‌شود: گوشی‌ای که آن را دید، www.zip را هم حتماً پیدا می‌کند
+          up=0
+          for i in 1 2 3; do
+            if gh release upload latest "$RUNNER_TEMP/ota/ota.json" --clobber; then up=1; break; fi
+            sleep 5
+          done
+          [ "$up" = 1 ] || { echo "ota.json upload failed"; exit 1; }

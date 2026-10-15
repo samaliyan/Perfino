@@ -2119,10 +2119,21 @@ function marketView(list, o) {
   return V;
 }
 
-/* ---------- پیدا کردن عطر از روی گفتار (املای ناقص یا متفاوت) ----------
-   idx: [{h: ' متنِ نرمال‌شده‌ی برند و مدل (فارسی و انگلیسی) '}]  ؛ alts: چند حدسِ تشخیص‌دهنده (نرمال‌شده)  ؛ toEn(واژه) → معادل انگلیسی
-   خروجی: [{i: شماره‌ی ردیف در idx, s: امتیاز ۰ تا ۱}] مرتب از بهترین */
-var VC_STOP = {}; ('عطر ادکلن ادکلون ادو ادوپرفیوم پرفیوم پارفوم پرفیوم تویلت میل قیمت بده بدید نشون نشان بگو بگید پیدا کن کنید برام برای من یه یک می خوام خواهم خوایم دنبال رو را از و با فقط لطفا').split(' ').forEach(function (w) { VC_STOP[w] = 1; });
+/* ---------- جستجو (نوشتن و گفتن) ----------
+   یک نمایه برای هر مدل: واژه‌های نامِ مدل، معادل انگلیسی، واژه‌های برند و واژه‌های دیگر.
+   هر واژه‌ی جستجو با چند روش سنجیده می‌شود: دقیق، شروع‌شدن با آن (هنگام تایپ)، املای نزدیک (همان حروفِ بی‌صدا یا همان تلفظ انگلیسی) و یک غلطِ تایپی.
+   اول عطرهایی می‌آیند که همه‌ی واژه‌هایشان «دقیقاً» در نامِ عطر یا برند هست؛ بعد بقیه به ترتیبِ نزدیکی به «نامِ مدل». */
+function srMap() { return Object.create(null); }      // «constructor» و «toString» هم می‌توانند واژه باشند؛ شیء ساده نباید با آن‌ها قاطی شود
+var SR_STOP = srMap(); ('عطر ادکلن ادکلون ادو ادوپرفیوم پرفیوم پارفوم تویلت میل میلی لیتر قیمت بده بدید نشون نشان بگو بگید پیدا کن کنید برام برای من یه یک می خوام خواهم خوایم دنبال رو را از و با فقط لطفا مردانه زنانه مردونه زنونه یونیسکس اورجینال اوریجینال ارجینال اصل اصلی ml cc oz edp edt edc eau parfum perfume cologne toilette ادوتویلت ادوکلن ادوپرفوم ادوتوالت توالت اکستریت اسپری تستر').split(' ').forEach(function (w) { SR_STOP[w] = 1; });
+var SR_CONN = srMap(); ('de du di la le the of by and for pour with دو دی د لا لو لی ال بای پور ان اند').split(' ').forEach(function (w) { SR_CONN[w] = 1; });      // واژه‌های ربطیِ نام‌ها؛ اگر در ردیفی نبودند، رد کردنِ آن ردیف دلیل نمی‌شود
+var SR_NUM = srMap(); ('صد دویست سیصد پانصد پنجاه شصت هفتاد هشتاد نود بیست سی چهل لیتر لیتری سی‌سی اونس گرم گرمی میلی‌لیتر mg ccm fl').split(' ').forEach(function (w) { SR_NUM[w] = 1; });      // اندازه‌های رایج («ساواج صد میل»)؛ فقط وقتی دقیق در نام باشند حساب می‌شوند
+('چنده چقدره چقدر چند موجوده موجود دارید داری دارین دارم میخوام میخواستم میخرم بخرم خرید فروش موجودی ارزان ارزون گرون گران جدید تازه خوب بهترین بهتر').split(' ').forEach(function (w) { SR_STOP[w] = 1; });      // حرف‌های روزمره‌ی «ساواج چنده؟»؛ نبودنشان در نام دلیلِ رد کردنِ عطر نیست
+function srNum(t) { return /^\d+([.,]\d+)?$/.test(t); }      // هر عددی («45»، «250»، «3.4») اندازه است؛ فقط وقتی در نام باشد حساب می‌شود («212»، «نامبر 5»)
+function srSoft(t) { return SR_STOP[t] || SR_CONN[t] || SR_NUM[t] || srNum(t); }
+var SR_PNUM = srMap(); (function () { var o = { یک: 1, دو: 2, سه: 3, چهار: 4, پنج: 5, شش: 6, هفت: 7, هشت: 8, نه: 9, ده: 10, یازده: 11, دوازده: 12, سیزده: 13, نوزده: 19 }; for (var k in o) SR_PNUM[k] = String(o[k]); })();
+var SR_NOP = srMap(); ('نامبر نمبر شماره number no n').split(' ').forEach(function (w) { SR_NOP[w] = 1; });      // «نامبر پنج» = «نامبر 5» (شنل)
+var SR_ABBR = srMap(); (function () { var o = { ysl: 'ایو سن لوران', ck: 'کالوین کلین', jlo: 'جنیفر لوپز', jpg: 'ژان پل گوتیه', dg: 'دولچه گابانا', hb: 'هوگو بوس' }; for (var k in o) SR_ABBR[k] = o[k].split(' '); })();      // نام کوتاهِ برندها
+var SR_ALIAS = srMap(); (function () { var o = { 'جادور': 'ژدو', 'ژادور': 'ژدو', 'ژدور': 'ژدو', jadore: 'ژدو', terre: 'تق', 'ترد': 'تق', 'ترا': 'تق', y: 'وای' }; for (var k in o) SR_ALIAS[k] = [o[k]]; })();      // نامِ معروفی که در داده با املای دیگری ثبت شده («ژدو» = جادور دیور)؛ فقط یک نسخه‌ی اضافه از جستجو ساخته می‌شود
 function ed1(a, b) {      // فاصله‌ی ویرایش حداکثر ۱ (جایگزینی، افزودن، حذف، جابه‌جایی دو حرفِ کنار هم)
   var la = a.length, lb = b.length; if (Math.abs(la - lb) > 1) return false;
   var i = 0; while (i < la && i < lb && a[i] === b[i]) i++;
@@ -2130,41 +2141,191 @@ function ed1(a, b) {      // فاصله‌ی ویرایش حداکثر ۱ (جا�
   if (la === lb) { if (a.slice(i + 1) === b.slice(i + 1)) return true; return a[i] === b[i + 1] && a[i + 1] === b[i] && a.slice(i + 2) === b.slice(i + 2); }
   return la > lb ? a.slice(i + 1) === b.slice(i) : b.slice(i + 1) === a.slice(i);
 }
-function vcWord(q, x) {
-  if (x.x === q.t) return 1;
-  if (q.t.length >= 3 && x.x.indexOf(q.t) === 0) return .92;
-  if (q.k.length >= 2 && x.k === q.k && x.x.length >= 3) return .86;
-  if (q.en.length >= 3 && !x.k && x.x.indexOf(q.en) === 0) return .88;
-  if (q.t.length >= 4 && x.x.indexOf(q.t) > 0) return .78;
-  if (q.t.length >= 4 && ed1(q.t, x.x)) return .72;
+function lev(a, b, mx) {      // فاصله‌ی ویرایش با سقف؛ بیشتر از سقف یعنی mx+1
+  var la = a.length, lb = b.length; if (Math.abs(la - lb) > mx) return mx + 1;
+  var prev = [], cur = [], i, j; for (j = 0; j <= lb; j++) prev[j] = j;
+  for (i = 1; i <= la; i++) {
+    cur[0] = i; var lo = cur[0];
+    for (j = 1; j <= lb; j++) { var v = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1)); cur[j] = v; if (v < lo) lo = v; }
+    if (lo > mx) return mx + 1;
+    var t = prev; prev = cur; cur = t;
+  }
+  return prev[lb];
+}
+function skOk(a, b) {      // «همان حروفِ بی‌صدا» فقط وقتی که خودِ دو واژه هم به هم نزدیک باشند؛ وگرنه «دیفای» و «دیویدوف» یکی می‌شد
+  var m = Math.max(a.length, b.length), lim = m <= 5 ? 1 : (m <= 8 ? 2 : 3);
+  return lev(a, b, lim) <= lim;
+}
+var FZC = srMap(), FZN = 0;
+function fzKeyC(w) { var v = FZC[w]; if (v === undefined) { if (++FZN > 60000) { FZC = srMap(); FZN = 0; } v = FZC[w] = fzKey(w); } return v; }      // واژه‌ها تکرار می‌شوند؛ هر کدام یک بار
+var SRN = srMap(), SRNN = 0;
+function srn(x) {
+  x = String(x == null ? '' : x); var v = SRN[x]; if (v !== undefined) return v;
+  if (++SRNN > 60000) { SRN = srMap(); SRNN = 0; }
+  return (SRN[x] = normFa(x.replace(/ى/g, 'ی').replace(/[ھہە]/g, 'ه').replace(/ڪ/g, 'ک')).toLowerCase().replace(/[،؛؟٪٫٬]/g, ' ').replace(/[^؀-ۿa-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim());
+}
+function srToks(x) {      // «۱۰۰ml» → «100» و «ml»؛ «نامبر پنج» → «نامبر 5»؛ «ysl» → «ایو سن لوران»
+  var out = [];
+  srn(x).split(' ').forEach(function (t) {
+    if (!t) return;
+    var m = /^(\d{1,3})(ml|cc|oz|میل|میلی)$/.exec(t);
+    if (m) out.push(m[1], m[2]);
+    else if (SR_ABBR[t]) SR_ABBR[t].forEach(function (w) { out.push(w); });
+    else if (SR_PNUM[t] && out.length && SR_NOP[out[out.length - 1]]) out.push(SR_PNUM[t]);
+    else if (out.length && ((t === 'adore' && out[out.length - 1] === 'j') || (t === 'ادور' && out[out.length - 1] === 'جی'))) out[out.length - 1] = t === 'adore' ? 'jadore' : 'جادور';      // «j adore»، «جی ادور»
+    else out.push(t);
+  });
+  return out;
+}
+var SRW = srMap(), SRWN = 0;
+function srWord(x, toEn) {      // هر واژه یک بار ساخته می‌شود و بین همه‌ی ردیف‌ها مشترک است
+  var r = SRW[x]; if (r) return r;
+  if (++SRWN > 90000) { SRW = srMap(); SRWN = 0; }
+  var fa = HAS_FA.test(x);
+  return (SRW[x] = { x: x, fa: fa, k: fa ? fzKeyC(x) : '', e: fa && toEn ? srn(toEn(x)) : '' });
+}
+var SRV = srMap();      // همه‌ی واژه‌های نمایه و تعدادشان؛ برای جدا کردنِ نوشته‌های چسبیده («لاویه»)
+function searchIndex(tree, toEn) {
+  SRW = srMap(); SRWN = 0; SRV = srMap(); var idx = [], bc = srMap();
+  function words(str, set, arr, cap) { srn(str).split(' ').forEach(function (w) { if (w && !set[w] && arr.length < cap) { set[w] = 1; arr.push(srWord(w, toEn)); SRV[w] = (SRV[w] | 0) + 1; } }); }
+  tree.forEach(function (b) {
+    var bs = bc[b.id];
+    if (!bs) {
+      var set = srMap(), arr = [];
+      if (b.id !== 'other') {      // «سایر برندها» نامِ برند نیست؛ «سایر» و «برندها» نباید ۶۰۰۰ عطر را بیاورند
+        words(b.name, set, arr, 12);
+        var bo = null; try { bo = brandOf(srn(b.name).split(' ')); } catch (e) { }
+        if (bo) { (bo.al || []).forEach(function (a) { words(a.join(' '), set, arr, 12); }); if (bo.en) words(bo.en, set, arr, 12); }
+      }
+      bs = bc[b.id] = { arr: arr, set: set };
+    }
+    b.models.forEach(function (m) {
+      var ms = srMap(), mw = [], es = srMap(), me = [], os = srMap(), ow = [], pop = 0;
+      words(m.name, ms, mw, 10);
+      m.variants.forEach(function (v) {
+        var en = v.en; (!en ? [] : typeof en === 'string' ? [en] : Object.keys(en)).forEach(function (s) { words(s, es, me, 14); });
+        (v.key || []).forEach(function (w) { w = srn(w); if (w && !ms[w] && !bs.set[w]) words(w, os, ow, 12); });
+        (v.sizes || []).forEach(function (z) { pop += z && z.n ? z.n : 1; });
+      });
+      idx.push({ m: m, b: b, mw: mw, me: me, bw: bs.arr, ow: ow, n: mw.length || 1, pop: pop });
+    });
+  });
+  return idx;
+}
+var SR_P = 0;      // آخرین سنجش از راه «شروعِ واژه» بود؟
+function srScore(q, w) {
+  var x = w.x, t = q.t; SR_P = 0;
+  if (q.fa === w.fa) {
+    if (x === t) return 1;
+    if (q.pfx && x.length > t.length && x.indexOf(t) === 0 && (t.length >= 2 || q.last)) { SR_P = 1; return .86 - Math.min(.1, (x.length - t.length) * .02); }      // شروعِ واژه (فقط هنگام تایپ، نه در گفتار)؛ «دقیق» نیست، پس زیر .۸۷
+    if (w.fa) {
+      if (q.e && w.e && q.e === w.e) return .88;
+      if (q.k.length >= 2 && q.k === w.k && x.length >= 3 && skOk(t, x)) return .85;
+      if (t.length >= 4 && x.length >= 4 && ed1(t, x)) return .72;
+    } else if (t.length >= 4 && ed1(t, x)) return .72;
+    if (t.length >= 3 && x.length > t.length && x.indexOf(t, 1) > 0) return .55;      // نام چسبیده: «بلوشنل»
+    return 0;
+  }
+  if (q.fa) {      // واژه‌ی فارسی در برابر واژه‌ی لاتین
+    var e = q.e; if (!e) return 0;
+    if (e === x) return .88;
+    if (e.length >= 3 && x.indexOf(e) === 0) return .8;
+    if (e.length >= 4 && ed1(e, x)) return e.length >= 6 ? .78 : .65;
+    return 0;
+  }
+  if (q.f && q.f === x) return .88;      // واژه‌ی لاتین در برابر واژه‌ی فارسی
+  if (q.fk.length >= 2 && q.fk === w.k && x.length >= 3 && skOk(q.f, x)) return .8;
+  if (t.length >= 3 && w.e) { if (w.e === t) return .88; if (w.e.indexOf(t) === 0) return .8; if (t.length >= 4 && ed1(t, w.e)) return t.length >= 6 ? .78 : .65; }
   return 0;
 }
-var FZC = {}, FZN = 0;
-function fzKeyC(w) { var v = FZC[w]; if (v === undefined) { if (++FZN > 60000) { FZC = {}; FZN = 0; } v = FZC[w] = fzKey(w); } return v; }      // واژه‌ها تکرار می‌شوند؛ هر کدام یک بار
-function voiceRank(idx, alts, toEn) {
-  var best = {}, done = {};
-  alts.slice(0, 5).forEach(function (alt, ai) {
-    var toks = String(alt || '').split(' ').filter(function (t) { return t && !VC_STOP[t]; }); if (!toks.length) return;
-    var tk = toks.map(function (t) { var fa = HAS_FA.test(t); return { t: t, k: fa ? fzKeyC(t) : '', en: fa && toEn ? String(toEn(t) || '') : '', m: done[t] || (done[t] = {}) }; });
-    var w = 1 - .04 * ai;
-    for (var ei = 0; ei < idx.length; ei++) {
-      var e = idx[ei], W = e._w;
-      if (!W) W = e._w = e.h.split(' ').filter(Boolean).map(function (x) { return { x: x, k: HAS_FA.test(x) ? fzKeyC(x) : '' }; });
-      var sum = 0, ok = true;
-      for (var j = 0; j < tk.length; j++) {
-        var b = tk[j].m[ei];      // نتیجه‌ی همین واژه برای همین ردیف در حدس‌های دیگر هم یکی است
-        if (b === undefined) { b = 0; for (var q = 0; q < W.length && b < 1; q++) { var v = vcWord(tk[j], W[q]); if (v > b) b = v; } tk[j].m[ei] = b; }
-        if (!b) { ok = false; break; } sum += b;
-      }
-      if (!ok) continue;
-      var sc = (sum / tk.length - Math.min(.15, .012 * W.length)) * w;
-      if (!(best[ei] >= sc)) best[ei] = sc;
+function srBest(q, arr, mark) {
+  var b = 0;
+  for (var i = 0; i < arr.length; i++) { var v = srScore(q, arr[i]); if (v > b) { b = v; if (mark && (v >= .85 || SR_P)) mark.m = i; if (b >= 1) break; } }
+  return b;
+}
+var SRK = 0;
+function srSplits(toks) {      // «لاویه» → «لا ویه»: واژه‌ی ناشناخته (یا خیلی کم‌دیده) که از دو واژه‌ی شناخته‌شده ساخته شده؛ برای هر واژه یک نسخه
+  var res = [];
+  toks.forEach(function (t, k) {
+    if (res.length >= 3 || t.length < 5 || !HAS_FA.test(t) || SRV[t] > 2) return;
+    var bp = 0, bs = 0;
+    for (var p = 2; p <= t.length - 2; p++) {
+      var a = t.slice(0, p), b = t.slice(p), fa = SRV[a], fb = SRV[b];
+      if (fa && fb && Math.max(a.length, b.length) >= 3) { var sc = Math.min(fa, fb); if (sc > bs) { bs = sc; bp = p; } }
     }
+    if (bp) res.push(toks.slice(0, k).concat([t.slice(0, bp), t.slice(bp)], toks.slice(k + 1)));
   });
-  return Object.keys(best).map(function (k) { return { i: +k, s: best[k] }; }).sort(function (a, c) { return c.s - a.s; });
+  return res;
+}
+/* alts: چند حدس (متنِ نوشته یا حدس‌های تشخیص گفتار)؛ tools: {toEn(واژه‌ی فارسی)→انگلیسی, toFa(واژه‌ی انگلیسی)→فارسی}
+   خروجی: [{i, s, ex, bo, mn, all, cnt}] از بهترین؛
+   ex = همه‌ی واژه‌های نامِ مدل دقیق گفته شده؛ bo = فقط نامِ برند گفته شده؛ mn = ضعیف‌ترین واژه؛ all = همه‌ی واژه‌ها دقیقاً در نام هست */
+var SR_ALLB = .06;
+function searchRank(idx, alts, tools, opts) {
+  opts = opts || {}; tools = tools || {}; var best = {}, vars = [];
+  alts.slice(0, 5).forEach(function (alt, ai) {
+    var toks = srToks(alt); if (!toks.length) return;
+    var w = 1 - .04 * ai;
+    vars.push({ toks: toks, w8: w });
+    srSplits(toks).forEach(function (sp) { vars.push({ toks: sp, w8: w * .97 }); });
+    toks.forEach(function (t, k) { var al = SR_ALIAS[t]; if (al) vars.push({ toks: toks.slice(0, k).concat(al, toks.slice(k + 1)), w8: w * .97 }); });
+  });
+  var pfx = opts.prefixLast !== false;      // تایپ: شروعِ واژه هم حساب می‌شود؛ گفتار: نه (واژه‌ی نیمه‌کاره یعنی تشخیص اشتباه)
+  /* allowMiss: در دور دوم، یک واژه‌ی بی‌جواب («چنده»، «ارزان»، «تابستانی») نادیده گرفته می‌شود و امتیازِ عطر کم می‌شود */
+  function run(vr, allowMiss) {
+    var toks = vr.toks, w8 = vr.w8;
+    var hardN = toks.filter(function (t) { return !srSoft(t); }).length, anyNum = toks.some(srNum);
+    if (!anyNum && toks.every(function (t) { return SR_STOP[t]; })) return;      // فقط «عطر» یا «ادکلن مردانه»: چیزی برای جستجو نیست
+    if (allowMiss && hardN < 2) return;
+    var tk = toks.map(function (t, j) {
+      var w = srWord(t, tools.toEn), f = !w.fa && tools.toFa ? srn(tools.toFa(t)) : '';
+      return { t: t, fa: w.fa, k: w.k, e: w.e, f: f, fk: f ? fzKeyC(f) : '', last: pfx && !!opts.prefixLast && j === toks.length - 1, pfx: pfx, soft: hardN > 0 && srSoft(t) ? 1 : 0, key: ++SRK };
+    });
+    var qid = ++SRK;
+    for (var ei = 0; ei < idx.length; ei++) {
+      var e = idx[ei]; if (allowMiss && best[ei]) continue;
+      var sum = 0, ok = true, hit = {}, allx = true, cnt = 0, nb = 0, nbx = 0, nx = 0, mn = 9, bw = e.bw, miss = 0, dupc = 0, strong = 0;
+      if (bw._q !== qid) { bw._q = qid; bw._v = []; }
+      for (var j = 0; j < tk.length; j++) {
+        var q = tk[j], mk = { m: -1 }, rm = srBest(q, e.mw, mk), re = rm < 1 ? srBest(q, e.me, null) : 0, rb = bw._v[j];
+        if (rb === undefined) rb = bw._v[j] = srBest(q, bw, null);      // برند بین همه‌ی عطرهایش مشترک است؛ برای هر واژه یک بار
+        var rbs = rb >= .85 ? rb * .95 : rb * .7;      // نامِ برندِ درست از شباهتِ مبهم به نامِ یک عطرِ دیگر مهم‌تر است
+        var s = Math.max(rm, re * .92, rbs);
+        if (s < .5) s = Math.max(s, srBest(q, e.ow, null) * .35);
+        if (q.soft && s < .87) continue;      // «عطر»، «بده»، «مردانه»، «100»… فقط وقتی حساب می‌شوند که دقیق در نام باشند
+        if (s < .2) {
+          if (allowMiss && !miss && !q.soft) { miss = 1; continue; }
+          ok = false; break;
+        }
+        if (mk.m >= 0) { if (hit[mk.m] !== undefined && (rm < 1 || hit[mk.m] < 1)) dupc = 1; hit[mk.m] = Math.max(hit[mk.m] || 0, rm); }      // دو واژه‌ی جستجو روی یک واژه‌ی عطر، با املای نادقیق: «ورسایس اروس» → «ورسوس»
+        if (rb >= .99) nbx++;
+        if (rbs > 0 && rbs >= rm && rbs >= re * .92) nb++;
+        if (rm >= .99 || rb >= .99) nx++;
+        if (rm < .87 && re < .87 && rb < .87) allx = false;      // «دقیق» = نامِ مدل یا برند کامل گفته شده؛ شروعِ تایپ یا املای نزدیک دقیق نیست
+        if (s >= .85) strong++;
+        if (s < mn) mn = s;
+        sum += s; cnt++;
+      }
+      if (!ok || !cnt) continue;
+      if (miss && !strong) continue;      // بدون دست‌کم یک واژه‌ی مطمئن، حدس زدن بی‌معنی است
+      var hn = Object.keys(hit).length, cov = hn / e.n, ex = allx && cov >= 1 && !miss && !dupc, bo = nbx === cnt;
+      if (bo || (!hn && nb === cnt)) cov = 1;      // فقط نامِ برند گفته شده: همه‌ی عطرهای آن برند به یک اندازه نزدیک‌اند
+      var sc = (sum / cnt + .4 * cov) * w8 * (miss ? .75 : 1) * (dupc ? .9 : 1);
+      var o = best[ei]; if (!o || sc > o.s) best[ei] = { s: sc, ex: ex, bo: bo, mn: mn, all: nx === cnt && !miss ? 1 : 0, cnt: cnt, miss: miss, dupc: dupc };
+    }
+  }
+  vars.forEach(function (vr) { run(vr, false); });
+  if (Object.keys(best).length < 3) vars.forEach(function (vr) { run(vr, true); });
+  var ALLB = opts && typeof opts.allBonus === 'number' ? opts.allBonus : SR_ALLB;      // «همه‌ی واژه‌ها دقیق» کمی بالاتر می‌نشیند، ولی املای هم‌صدای یک نامِ کوتاه‌تر هم می‌تواند جلو بیفتد
+  var out = Object.keys(best).map(function (k) { var o = best[k]; return { i: +k, s: o.s, ex: o.ex, bo: o.bo, mn: o.mn, all: o.all, cnt: o.cnt, miss: o.miss, dupc: o.dupc, k: o.s + (o.all ? ALLB : 0) - (o.miss ? 5 : 0) /* نتیجه‌های «یک واژه‌شان نیامد» همیشه بعد از نتیجه‌های کامل */ }; });
+  out.sort(function (a, c) {
+    var d = c.k - a.k; if (d > 1e-9 || d < -1e-9) return d;
+    return (c.cnt - a.cnt) || (idx[c.i].pop - idx[a.i].pop) || (idx[a.i].m.name.length - idx[c.i].m.name.length) || (a.i - c.i);
+  });
+  return out;
 }
 
-root.Core = { voiceRank: voiceRank, fzKey: fzKey, explainTitle: explainTitle, useSz: useSz, sizeFromPage: sizeFromPage, nextDataCards: nextDataCards, RAWC: RAWC, stripPriceTail: stripPriceTail, marketStats: marketStats, marketView: marketView, histNew: histNew, histFix: histFix, histSnap: histSnap, histReport: histReport, purgeStored: purgeStored, setBlock: setBlock, REJ: REJ, vetReason: vetReason, reconcile: reconcile, CLEANSE: CLEANSE, cleanseText: cleanseText, cleanBrandName: cleanBrandName, itemUrl: itemUrl, STALE_MIN: STALE_MIN, fa2en: fa2en, en2fa: en2fa, enTokens: enTokens, titleEn: titleEn, tree: tree, brandOf: brandOf, specInfo: specInfo, enrichTitle: enrichTitle, genderOf: genderOf, nameCmp: nameCmp, CFG: CFG, newDb: newDb, dbIndex: dbIndex, ingest: ingest, ingestAsync: ingestAsync, buildList: buildList, normFa: normFa, parseTitle: parseTitle, aggregate: aggregate, SOURCES: SOURCES, extractCards: extractCards,
+root.Core = { searchIndex: searchIndex, searchRank: searchRank, srn: srn, fzKey: fzKey, explainTitle: explainTitle, useSz: useSz, sizeFromPage: sizeFromPage, nextDataCards: nextDataCards, RAWC: RAWC, stripPriceTail: stripPriceTail, marketStats: marketStats, marketView: marketView, histNew: histNew, histFix: histFix, histSnap: histSnap, histReport: histReport, purgeStored: purgeStored, setBlock: setBlock, REJ: REJ, vetReason: vetReason, reconcile: reconcile, CLEANSE: CLEANSE, cleanseText: cleanseText, cleanBrandName: cleanBrandName, itemUrl: itemUrl, STALE_MIN: STALE_MIN, fa2en: fa2en, en2fa: en2fa, enTokens: enTokens, titleEn: titleEn, tree: tree, brandOf: brandOf, specInfo: specInfo, enrichTitle: enrichTitle, genderOf: genderOf, nameCmp: nameCmp, CFG: CFG, newDb: newDb, dbIndex: dbIndex, ingest: ingest, ingestAsync: ingestAsync, buildList: buildList, normFa: normFa, parseTitle: parseTitle, aggregate: aggregate, SOURCES: SOURCES, extractCards: extractCards,
   wooSource: wooSource, digikalaSource: digikalaSource, htmlSource: htmlSource, letterOf: letterOf, median: median, priceFromText: priceFromText, similar: similar };
 if (typeof module !== 'undefined') module.exports = root.Core;
 })(typeof window !== 'undefined' ? window : globalThis);

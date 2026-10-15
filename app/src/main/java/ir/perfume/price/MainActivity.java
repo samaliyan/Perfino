@@ -47,6 +47,26 @@ public class MainActivity extends Activity {
     private final ExecutorService imgPool = Executors.newFixedThreadPool(3);
     private File imgDir;
     private Updater upd;
+    private Ota ota;
+    private final Ota.Net otaNet = new Ota.HttpNet(Ota.GITHUB);
+    private static final String ASSET_URL = "file:///android_asset/www/index.html";
+    private final android.os.Handler ui = new android.os.Handler(android.os.Looper.getMainLooper());
+    private volatile boolean otaBusy = false;
+    private OtaGuard guard;      // ناظرِ بسته‌ی بی‌نصب (منطقش در OtaGuard.java است و جدا آزمایش می‌شود)
+    private String otaPrefix = "";
+    private final Runnable otaDog = new Runnable() {
+        @Override public void run() { if (guard != null && web != null) guard.dogFired(); }
+    };
+
+    /** شماره‌ی نسخه‌ای که همین الان در صفحه اجرا می‌شود */
+    private int runCode() { return guard != null ? guard.runCode() : (upd == null ? 0 : upd.appCode()); }
+
+    /** u = آدرس بسته‌ی بی‌نصب، یا null = نسخه‌ی داخل APK. فقط روی رشته‌ی اصلی صدا زده می‌شود. */
+    private void loadStart(String u) {
+        if (web == null) return;
+        try { web.clearCache(true); } catch (Exception ignore) { }      // فایل‌های تازه‌ی همان مسیر، نه نسخه‌ی ذخیره‌شده‌ی قبلی
+        if (guard != null) guard.start(u); else web.loadUrl(ASSET_URL);
+    }
     private static final int REQ_VOICE = 7411;
     private static final int MAX_BYTES = 12 * 1024 * 1024;
     private static final String[] ALLOW_HOSTS = {"liliome.com", "digikala.com", "safirstores.com", "hilandbeauty.com"};
@@ -112,10 +132,13 @@ public class MainActivity extends Activity {
         web.setWebViewClient(new WebViewClient() {
             @Override
             public boolean shouldOverrideUrlLoading(WebView v, String u) {
-                return u == null || !u.startsWith("file:///android_asset/");   // صفحه‌ی برنامه هرگز به جای دیگری نمی‌رود
+                if (u == null) return true;
+                if (u.startsWith("file:///android_asset/")) return false;
+                return !(guard != null && guard.loaded() && otaPrefix.length() > 0 && u.startsWith(otaPrefix));   // صفحه‌ی برنامه هرگز به جای دیگری نمی‌رود
             }
             @Override
             public boolean onRenderProcessGone(WebView v, android.webkit.RenderProcessGoneDetail d) {
+                if (guard != null) guard.renderGone(d != null && d.didCrash());      // خرابیِ دوم در دو دقیقه: بسته‌ی بی‌نصب کنار گذاشته می‌شود (بسته شدن برای کمبود حافظه شمرده نمی‌شود)
                 runOnUiThread(new Runnable() { @Override public void run() { recreate(); } });   // WebView مرده قابل استفاده نیست؛ صفحه از نو ساخته می‌شود
                 return true;
             }
@@ -127,7 +150,34 @@ public class MainActivity extends Activity {
             }
         });
         web.addJavascriptInterface(new Bridge(), "Native");
-        web.loadUrl("file:///android_asset/www/index.html");
+        String start = null;
+        try {
+            ota = new Ota(getFilesDir(), upd.appCode());
+            otaPrefix = Ota.fileUrl(ota.rootDir()) + "/b";      // ota/b<شماره>/...
+            guard = new OtaGuard(ota, new OtaGuard.Env() {
+                @Override public void postDog(long ms) { ui.removeCallbacks(otaDog); ui.postDelayed(otaDog, ms); }
+                @Override public void cancelDog() { ui.removeCallbacks(otaDog); }
+                @Override public void load(String url) { if (web != null) web.loadUrl(url == null ? ASSET_URL : url); }
+                @Override public long now() { return android.os.SystemClock.elapsedRealtime(); }
+            }, upd.appCode());
+            start = ota.startUrl();      // null = نسخه‌ی داخل برنامه (یا بسته‌ی بی‌نصبِ خراب کنار گذاشته شد)
+        } catch (Exception e) {
+            start = null;
+        }
+        loadStart(start);
+    }
+
+    /** کارهای بروزرسانیِ بی‌نصب روی رشته‌ی خودشان اجرا می‌شوند (نه استخر مشترکِ دانلودِ قیمت‌ها که با بستنِ صفحه قطع می‌شود) */
+    private void startOta(String name, Runnable r) {
+        Thread t = new Thread(r, name);
+        t.setDaemon(true);
+        t.start();
+    }
+
+    private void evalJs(final String script) {
+        runOnUiThread(new Runnable() {
+            @Override public void run() { if (web != null) web.evaluateJavascript(script, null); }
+        });
     }
 
     public class Bridge {
@@ -315,6 +365,79 @@ public class MainActivity extends Activity {
         @JavascriptInterface public void updDownload() { if (upd != null) upd.download(); }
         @JavascriptInterface public boolean updInstall() { return upd != null && upd.install(); }
 
+        /* ----- بروزرسانی بدون نصب (Ota.java) ----- */
+        @JavascriptInterface public int nativeApi() { return Ota.NATIVE_API; }
+        @JavascriptInterface public int webCode() { return runCode(); }
+
+        /** آخرین بسته‌ی منتشرشده را می‌پرسد؛ نتیجه با window.__otaInfo({ok,state,code,v,cur,run}) یا {ok:false,reason:"net"|"none"} */
+        @JavascriptInterface
+        public void otaCheck() {
+            startOta("ota-check", new Runnable() {
+                @Override public void run() {
+                    String js;
+                    try {
+                        Ota.Info i = ota.fetchInfo(otaNet);
+                        js = "window.__otaInfo&&window.__otaInfo({\"ok\":true,\"state\":\"" + ota.state(i) + "\",\"code\":" + i.code + ",\"v\":\"" + i.v + "\",\"cur\":" + ota.webCode() + ",\"run\":" + runCode() + "})";
+                    } catch (Exception e) {
+                        String m = String.valueOf(e.getMessage());
+                        js = "window.__otaInfo&&window.__otaInfo({\"ok\":false,\"reason\":\"" + (m.startsWith("http 404") ? "none" : "net") + "\"})";
+                    }
+                    evalJs(js);
+                }
+            });
+        }
+
+        /** بسته‌ی تازه را می‌گیرد و بررسی می‌کند؛ نتیجه با __otaProg(درصد)، __otaReady(code) یا __otaErr() */
+        @JavascriptInterface
+        public void otaDownload() {
+            if (otaBusy) return;
+            otaBusy = true;
+            startOta("ota-download", new Runnable() {
+                @Override public void run() {
+                    try {
+                        Ota.Info i = ota.fetchInfo(otaNet);
+                        ota.install(otaNet, i, new Ota.Progress() {
+                            @Override public void pct(int p) { evalJs("window.__otaProg&&window.__otaProg(" + p + ")"); }
+                        });
+                        evalJs("window.__otaReady&&window.__otaReady(" + i.code + ")");
+                    } catch (Exception e) {
+                        evalJs("window.__otaErr&&window.__otaErr()");
+                    } finally {
+                        otaBusy = false;
+                    }
+                }
+            });
+        }
+
+        /** بسته‌ی دانلودشده را همین الان باز می‌کند (صفحه از نو بالا می‌آید) */
+        @JavascriptInterface
+        public boolean otaApply() {
+            runOnUiThread(new Runnable() {
+                @Override public void run() {
+                    try {
+                        String u = ota == null ? null : ota.beginNow();
+                        if (u == null || web == null) { evalJs("window.__otaErr&&window.__otaErr()"); return; }
+                        loadStart(u);
+                    } catch (Exception e) {
+                        evalJs("window.__otaErr&&window.__otaErr()");
+                    }
+                }
+            });
+            return true;
+        }
+
+        /** جاوااسکریپتِ صفحه‌ی بسته‌ی بی‌نصب (نسخه‌ی code) شروع به اجرا کرد: مهلتِ بالا آمدن بلندتر می‌شود (ساختن فهرست روی گوشی کند چند ثانیه است) */
+        @JavascriptInterface
+        public void otaBoot(String code) { if (guard != null) guard.boot(code); }
+
+        /** صفحه در شروع خطای جاوااسکریپت داد و دیگر «زنده‌ام» نخواهد گفت: به جای دو دقیقه، ۲۰ ثانیه صبر می‌کنیم */
+        @JavascriptInterface
+        public void otaErr(String code) { if (guard != null) guard.err(code); }
+
+        /** صفحه‌ی بسته‌ی بی‌نصب (نسخه‌ی code) سالم بالا آمد (بدون خطا و فهرست کشیده شد). گزارشِ صفحه‌ی کهنه یا صفحه‌ی APK نادیده گرفته می‌شود. */
+        @JavascriptInterface
+        public void otaOk(String code) { if (guard != null) guard.ok(code); }
+
         /** متن را در یک فایل ذخیره می‌کند (Downloads)؛ ارسال جدا با shareBackup. مسیر/نام جا را برمی‌گرداند؛ در خطا رشته‌ی خالی. */
         @JavascriptInterface
         public String saveText(final String name, final String text) {
@@ -495,8 +618,15 @@ public class MainActivity extends Activity {
     }
 
     @Override
+    protected void onPause() {
+        if (guard != null) guard.pause();
+        super.onPause();
+    }
+
+    @Override
     protected void onResume() {
         super.onResume();
+        if (guard != null) guard.resume();      // صفحه‌ی در پس‌زمینه کند یا متوقف بوده؛ مهلتِ کاملش را از نو دارد
         if (web != null) web.evaluateJavascript("window.__resume&&window.__resume()", null);
     }
 
@@ -512,6 +642,8 @@ public class MainActivity extends Activity {
 
     @Override
     protected void onDestroy() {
+        ui.removeCallbacks(otaDog);
+        if (guard != null) guard.cancel();
         pool.shutdownNow();
         imgPool.shutdownNow();
         if (web != null) { web.destroy(); web = null; }

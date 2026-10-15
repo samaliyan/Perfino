@@ -62,10 +62,10 @@ Online-shop titles are messy. A multi-stage pipeline keeps the list clean:
 - **Product photos** cached on the device, with a drawn bottle as fallback.
 
 ### Updates
-- On launch the app checks GitHub for a newer version, downloads it (about 20 MB; in manual mode only when you ask) and asks before installing.
-- During download the button is disabled and a progress bar is shown.
-- Automatic or manual update mode in Settings.
-- The “Install anyway” question after an update comes from Google Play Protect (the app comes from outside the Play Store); the app cannot switch it off. Settings contains simple steps to turn that scan off once.
+- **Updates without installing.** All screens and logic live in `assets/www`, so a normal update downloads only those files (about 115 KB, `www.zip` + `ota.json` in the `latest` release), checks size and SHA-256, and stores them in the app's own folder. Nothing is installed, so Android and Google Play Protect show no “Install anyway” question. If the new files do not start (no “I am alive” signal after a clean start, or three failed starts in a row), the app returns by itself to the previous working files, or to the version inside the APK. If there is no internet, the update is simply postponed; the APK flow is never started just because the check failed.
+- A full APK is needed only when the Java part changes (`api` in `www/version.json` is higher than `NATIVE_API` in `Ota.java`); then the old flow is used (download, confirm, install, and Play Protect may ask).
+- Automatic or manual update mode in Settings; the button is disabled during download and a progress bar is shown.
+- The “Install anyway” question comes from Google Play Protect (the app comes from outside the Play Store); the app cannot switch it off. Settings contains simple steps to turn that scan off once, for the rare APK updates.
 
 ## Install
 
@@ -183,10 +183,11 @@ Python tests need Playwright with Chromium. The Java code is compiled only by CI
 - **عکس محصول** روی گوشی نگه‌داری می‌شود و اگر نبود، یک بطری ترسیمی جایگزین می‌شود.
 
 ### به‌روزرسانی خود برنامه
-- هنگام باز شدن، برنامه از گیت‌هاب نسخهٔ جدید را بررسی و دانلود می‌کند (حدود ۲۰ مگابایت؛ در حالت دستی فقط وقتی بخواهید) و قبل از نصب می‌پرسد.
-- هنگام دانلود، دکمه غیرفعال می‌شود و نوار پیشرفت دیده می‌شود.
-- حالت خودکار یا دستی در تنظیمات.
-- سؤال «Install anyway» بعد از بروزرسانی کارِ Play Protect گوگل است (برنامه از فروشگاه گوگل نیامده) و برنامه نمی‌تواند خاموشش کند. در تنظیمات، مراحل ساده‌ی خاموش کردنِ آن اسکن (یک بار) نوشته شده است.
+- **بروزرسانی بدون نصب:** همه‌ی رابط و منطق برنامه در `assets/www` است؛ پس بروزرسانیِ معمولی فقط همان فایل‌ها (حدود ۱۱۵ کیلوبایت: `www.zip` و `ota.json` در Release با برچسب `latest`) را می‌گیرد، اندازه و SHA-256 را بررسی می‌کند و در پوشه‌ی خودِ برنامه می‌گذارد. چیزی نصب نمی‌شود، پس اندروید و Play Protect پنجره‌ی «Install anyway» نشان نمی‌دهند. اگر فایل‌های تازه سالم بالا نیایند (بدون خطا و با فهرستِ کشیده‌شده)، برنامه خودش به فایل‌های سالمِ قبلی و در نبودِ آن به نسخه‌ی داخل APK برمی‌گردد. اگر اینترنت نباشد، بروزرسانی فقط عقب می‌افتد و هرگز به‌خاطر ناموفق بودن بررسی، فایل APK دانلود نمی‌شود.
+- فقط وقتی بخش جاوا عوض شود (عدد `api` در `www/version.json` بالاتر از `NATIVE_API` در `Ota.java`) هنوز فایل APK لازم است؛ آن‌وقت همان روش قبلی (دانلود، تأیید، نصب) اجرا می‌شود و Play Protect ممکن است بپرسد.
+- هنگام باز شدن، برنامه نسخهٔ جدید را بررسی و دانلود می‌کند (در حالت دستی فقط وقتی بخواهید). هنگام دانلود، دکمه غیرفعال می‌شود و نوار پیشرفت دیده می‌شود. حالت خودکار یا دستی در تنظیمات.
+- سؤال «Install anyway» کارِ Play Protect گوگل است (برنامه از فروشگاه گوگل نیامده) و برنامه نمی‌تواند خاموشش کند. در تنظیمات، مراحل ساده‌ی خاموش کردنِ آن اسکن (یک بار) برای بروزرسانی‌های نادرِ APK نوشته شده است.
+- قاعده‌ی کار برای سازنده: اگر صفحه‌ها به تابع تازه‌ای در جاوا نیاز دارند، هم `NATIVE_API` و هم `api` در `version.json` را با هم بالا ببرید؛ وگرنه فقط فایل‌های وب را عوض کنید و بسته‌ی بی‌نصب خودکار ساخته می‌شود.
 
 ## نصب
 
@@ -220,8 +221,12 @@ app/src/main/assets/www/
   index.html   چیدمان و ظاهر
 app/src/main/java/ir/perfume/price/
   MainActivity.java   میزبان WebView، پل شبکه، حافظهٔ عکس
-  Updater.java        بروزرسانی خود برنامه (بررسی، دانلود با پیشرفت، نصب)
-tests/                تست‌های خودکار (Node و Playwright)
+  Updater.java        بروزرسانی خود برنامه با فایل APK (بررسی، دانلود با پیشرفت، نصب)
+  Ota.java            بروزرسانی بدون نصب (دانلود و بررسی بسته‌ی وب، برگشت خودکار؛ بدون وابستگی به اندروید)
+  OtaGuard.java       ناظر بسته‌ی بی‌نصب (مهلت‌ها، برگشت، گزارش‌های کهنه، مرگ پردازه‌ی صفحه؛ بدون وابستگی به اندروید)
+app/src/main/assets/www/version.json   نسخه و «api» برای بسته‌ی بی‌نصب
+tools/make-ota.sh     ساخت www.zip و ota.json در CI
+tests/                تست‌های خودکار (Node، Playwright، جاوا)
 ```
 
 ## اگر یک سایت ساختارش عوض شد
@@ -242,9 +247,12 @@ python3 tests/t53_viewer.py    # بزرگ‌نمایی و کشیدنِ عکس
 python3 tests/t54_fontscale.py # اندازهٔ نوشته روی کل برنامه (۴ شکل × ۴ اندازه × ۲ عرض)
 python3 tests/t55_voice.py     # گفتن نام عطر، نوار پایین، آخرین‌ها
 python3 tests/t3_flow.py       # روند کامل بروزرسانی
+python3 tests/t56_search_real.py   # جستجو روی ۱۲ هزار عطر واقعی (نیاز به /tmp/w/realdb.json)
+python3 tests/t57_ota.py       # بروزرسانی بدون نصب در رابط
+python3 tests/t58_ota_build.py # ساخت بسته، همخوانیِ نسخه‌ها و آزمایش‌های جاوای Ota.java و OtaGuard.java
 ```
 
-تست‌های پایتون به Playwright و Chromium نیاز دارند. کد جاوا فقط در CI ساخته می‌شود و در تست‌های خودکار اجرا نشده است.
+تست‌های پایتون به Playwright و Chromium نیاز دارند. `Ota.java` و `OtaGuard.java` (بدون وابستگی به اندروید) با JDK و ساعت ساختگی آزمایش می‌شوند؛ بقیه‌ی کد جاوا (`MainActivity`، `Updater`) فقط در CI ساخته می‌شود و روی گوشی واقعی در تست خودکار اجرا نشده است.
 
 ## محدودیت‌های شناخته‌شده
 
