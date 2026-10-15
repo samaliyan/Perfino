@@ -25,4 +25,13 @@ T(!arm.length,'ارمانو سروینو آرمانی نشد',names);
 var zk=tr.filter(function(b){return /زاکوتا/.test(b.name)});
 T(zk.length===1&&zk[0].models.length===2,'زاکوتاس و زاکوتیس یک برند با دو مدل',zk.map(function(b){return b.name+':'+b.models.length}));
 T(names.indexOf('جاکوتاس')>=0,'جاکوتاس برندِ جدا ماند',names);
+
+// دیویدوف/دایویدوف و ژوب/جوب: یک عطر در دو سایت با دو املا = یک گروه با دو فروشگاه
+var db2=C.newDb(),idx2=C.dbIndex(db2);
+C.ingest(db2,idx2,'liliome',[it('عطر ادکلن دیویدوف کول واتر مردانه ادو تویلت 125 میل',2000000,{b:['Davidoff (دیویدوف)']}),it('عطر ادکلن جوپ جامپ مردانه ادو تویلت 100 میل',1500000,{b:['Joop (جوپ)']})],true);
+C.ingest(db2,idx2,'digikala',[it('ادو تویلت مردانه دایویدوف کول واتر حجم 125 میلی لیتر',2100000,{b:['دایویدوف']}),it('ادو تویلت مردانه ژوب جامپ حجم 100 میلی لیتر',1600000,{b:['ژوب']})],true);
+db2.t.liliome=db2.t.digikala=Date.now();
+var l2=C.buildList(db2,['liliome','digikala'],{},0),t2=C.tree(l2,'fa',db2.wd);
+T(t2.length===2,'دو برند: دیویدوف و جوپ',t2.map(function(b){return b.name}));
+T(t2.every(function(b){return b.models.length===1&&b.models[0].variants[0].sizes[0].srcs.length===2}),'هر عطر در هر دو فروشگاه یکی شد',t2.map(function(b){return b.name+':'+b.models.length}));
 console.log(ok,'pass',bad,'fail');

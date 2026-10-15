@@ -47,6 +47,7 @@ public class MainActivity extends Activity {
     private final ExecutorService imgPool = Executors.newFixedThreadPool(3);
     private File imgDir;
     private Updater upd;
+    private static final int REQ_VOICE = 7411;
     private static final int MAX_BYTES = 12 * 1024 * 1024;
     private static final String[] ALLOW_HOSTS = {"liliome.com", "digikala.com", "safirstores.com", "hilandbeauty.com"};
 
@@ -399,6 +400,45 @@ public class MainActivity extends Activity {
             }
         }
 
+
+        /** گفتنِ نامِ عطر: پنجره‌ی تشخیص گفتارِ خودِ گوشی (گوگل) باز می‌شود؛ نیازی به مجوز میکروفون برای برنامه نیست. نتیجه در onActivityResult */
+        @JavascriptInterface
+        public void startVoice() {
+            runOnUiThread(new Runnable() {
+                @Override public void run() {
+                    try {
+                        Intent it = new Intent(android.speech.RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
+                        it.putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE_MODEL, android.speech.RecognizerIntent.LANGUAGE_MODEL_WEB_SEARCH);
+                        it.putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE, "fa-IR");
+                        it.putExtra(android.speech.RecognizerIntent.EXTRA_MAX_RESULTS, 6);
+                        it.putExtra(android.speech.RecognizerIntent.EXTRA_PROMPT, "نام عطر را بگویید");
+                        startActivityForResult(it, REQ_VOICE);
+                    } catch (Exception e) {
+                        if (web != null) web.evaluateJavascript("window.__voiceErr&&window.__voiceErr('fail')", null);
+                    }
+                }
+            });
+        }
+
+        /** برنامه‌ی Play Store را باز می‌کند (برای خاموش کردنِ اسکنِ Play Protect که هر بروزرسانی «Install anyway» می‌پرسد) */
+        @JavascriptInterface
+        public boolean openPlayStore() {
+            try {
+                final Intent it = getPackageManager().getLaunchIntentForPackage("com.android.vending");
+                if (it == null) return false;
+                it.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                final boolean[] res = new boolean[1];
+                final java.util.concurrent.CountDownLatch latch = new java.util.concurrent.CountDownLatch(1);
+                runOnUiThread(new Runnable() {
+                    @Override public void run() { try { startActivity(it); res[0] = true; } catch (Exception ignore) { } latch.countDown(); }
+                });
+                try { latch.await(2, java.util.concurrent.TimeUnit.SECONDS); } catch (InterruptedException ie) { return false; }
+                return res[0];
+            } catch (Exception e) {
+                return false;
+            }
+        }
+
         @JavascriptInterface
         public void copy(final String text) {
             runOnUiThread(new Runnable() {
@@ -429,6 +469,28 @@ public class MainActivity extends Activity {
                     }
                 }
             });
+        }
+    }
+
+
+    @Override
+    protected void onActivityResult(int req, int res, Intent data) {
+        super.onActivityResult(req, res, data);
+        if (req != REQ_VOICE || web == null) return;
+        if (res == RESULT_OK && data != null) {
+            java.util.ArrayList<String> l = data.getStringArrayListExtra(android.speech.RecognizerIntent.EXTRA_RESULTS);
+            org.json.JSONArray a = new org.json.JSONArray();
+            if (l != null) { for (int i = 0; i < l.size() && i < 8; i++) a.put(l.get(i)); }
+            String js = a.toString().replace("\u2028", "\\u2028").replace("\u2029", "\\u2029");
+            web.evaluateJavascript("window.__voiceRes&&window.__voiceRes(" + js + ")", null);
+        } else {
+            String code;
+            if (res == RESULT_CANCELED) code = "cancel";
+            else if (res == android.speech.RecognizerIntent.RESULT_NO_MATCH) code = "nomatch";
+            else if (res == android.speech.RecognizerIntent.RESULT_NETWORK_ERROR || res == android.speech.RecognizerIntent.RESULT_SERVER_ERROR) code = "net";
+            else if (res == android.speech.RecognizerIntent.RESULT_AUDIO_ERROR) code = "audio";
+            else code = "fail";
+            web.evaluateJavascript("window.__voiceErr&&window.__voiceErr('" + code + "')", null);
         }
     }
 

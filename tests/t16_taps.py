@@ -27,7 +27,7 @@ async def run(p,model):
     await click_row(pg,model,photo=True)
     v=await pg.evaluate("document.getElementById('vw').classList.contains('on')")
     chk(v,'%s: tap photo in brand list opens viewer'%model)
-    await pg.mouse.click(180,400); await pg.wait_for_timeout(200)
+    await pg.mouse.click(180,400); await pg.wait_for_timeout(450)
     chk(not await pg.evaluate("document.getElementById('vw').classList.contains('on')"),'%s: tap closes viewer'%model)
     chk((await pg.evaluate("__pp.nav"))['lvl']==0,'%s: still on brands after viewer'%model)
     # لمس برند
@@ -42,7 +42,7 @@ async def run(p,model):
     # لمس عکس مدل
     await click_row(pg,model,photo=True)
     chk(await pg.evaluate("document.getElementById('vw').classList.contains('on')"),'%s: tap photo in model list opens viewer'%model)
-    await pg.mouse.click(180,400); await pg.wait_for_timeout(200)
+    await pg.mouse.click(180,400); await pg.wait_for_timeout(450)
     # لمس مدل → جزئیات
     await click_row(pg,model)
     d=await pg.evaluate("(function(){var c=document.getElementById('dtc');return {on:document.getElementById('dt').classList.contains('on'),nm:(c.querySelector('.dnm')||{}).textContent,vars:[].map.call(c.querySelectorAll('.vr'),function(v){return {h:v.querySelector('.vh').textContent,z:[].map.call(v.querySelectorAll('.sz'),function(z){return z.innerText.replace(/\\s+/g,' ')})}})}})()")

@@ -50,27 +50,50 @@ svg{display:block}
 .ma .wh{position:relative;flex:1 1 auto;min-height:150px;touch-action:none;cursor:grab}
 .ma .rs{position:absolute;top:0;left:0;right:0;bottom:0;pointer-events:none;-webkit-mask-image:linear-gradient(transparent,#000 18%,#000 82%,transparent);mask-image:linear-gradient(transparent,#000 18%,#000 82%,transparent)}
 .ma .rs .wr{pointer-events:auto}
-.ma .sel{position:absolute;left:46px;right:12px;top:50%;height:52px;margin-top:-26px;border-radius:26px;background:var(--gl);border:1px solid var(--gb)}
-.ma .wr{position:absolute;right:0;top:50%;margin-top:-26px;height:52px;display:none;align-items:center;padding-right:26px;font-weight:700;font-size:22px;white-space:nowrap;transform-origin:right center;will-change:transform,opacity;max-width:calc((100% - 46px) / 1.12)}
+.ma .sel{position:absolute;left:calc(var(--sw) + 6px);right:12px;top:50%;height:calc(52px*var(--zs));margin-top:calc(-26px*var(--zs));border-radius:26px;background:var(--gl);border:1px solid var(--gb)}
+.ma .wr{position:absolute;right:0;top:50%;margin-top:calc(-26px*var(--zs));height:calc(52px*var(--zs));display:none;align-items:center;padding-right:26px;font-weight:700;font-size:calc(22px*var(--zs));white-space:nowrap;transform-origin:right center;will-change:transform,opacity;max-width:calc((100% - var(--sw) - 6px) / 1.12)}
 .ma .wt{display:block;min-width:0;overflow:hidden;text-overflow:ellipsis}
-.ma .ab{position:absolute;left:6px;top:8px;bottom:8px;width:30px;z-index:5}
+.ma .ab{position:absolute;left:2px;top:8px;bottom:8px;width:var(--sw);z-index:5}
 .ma .pn{flex:0 0 auto;margin:0 12px 12px;border-radius:28px;background:var(--gl);border:1px solid var(--gb);-webkit-backdrop-filter:blur(22px) saturate(160%);backdrop-filter:blur(22px) saturate(160%);display:flex;align-items:center;padding:16px;z-index:6;position:relative}
 .ma .pn>*+*{margin-inline-start:12px}
 .ma .tx{flex:1 1 0;min-width:0}
-.ma .nm{font-size:26px;font-weight:800;line-height:1.3;overflow-wrap:anywhere}
-.ma .tg{display:inline-block;margin-top:4px;font-size:12px;padding:2px 10px;border-radius:12px;background:var(--cb)}
+.ma .nm{font-size:calc(26px*var(--zs));font-weight:800;line-height:1.3;overflow-wrap:anywhere}
+.ma .tg{display:inline-block;margin-top:4px;font-size:calc(12px*var(--zs));padding:2px 10px;border-radius:12px;background:var(--cb)}
 .ma .ln{display:flex;justify-content:space-between;align-items:baseline;margin-top:8px;border-top:1px solid var(--cb);padding-top:6px;min-width:0}
 .ma .ln>*+*{margin-inline-start:8px}
-.ma .ln span{font-size:13px;opacity:.75;white-space:nowrap}
-.ma .ln b{font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap;font-size:26px}
+.ma .ln span{font-size:calc(13px*var(--zs));opacity:.75;white-space:nowrap}
+.ma .ln b{font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap;font-size:calc(26px*var(--zs))}
 .ma .ph{flex:0 0 96px;height:124px;flex:0 0 clamp(84px,27vw,112px);height:clamp(108px,34vw,140px);filter:drop-shadow(0 12px 16px rgba(0,0,0,.25))}
 .ma .ph .tile{width:100%;height:100%;border-radius:20px}
 
+
+.stp{margin:6px 0 10px;padding:0;list-style:none;counter-reset:s}
+.stp li{counter-increment:s;position:relative;padding:8px 40px 8px 0;line-height:1.9;font-size:14px}
+.stp li:before{content:counter(s,persian);position:absolute;right:0;top:9px;width:28px;height:28px;border-radius:50%;background:var(--ac);color:#0c0f1f;font-weight:800;font-size:14px;display:flex;align-items:center;justify-content:center;line-height:1}
+.cd{display:block;direction:ltr;text-align:center;unicode-bidi:isolate;width:fit-content;max-width:100%;margin:4px 0;padding:5px 12px;border-radius:10px;background:var(--cb);font-family:ui-monospace,Menlo,monospace;font-size:14px;font-weight:700;line-height:1.5}
+#updBox .updh{font-size:13px;color:var(--mu);line-height:1.8;margin:0 0 10px}
+/* نوار پایین: جستجو و گفتنِ نام عطر؛ بزرگ و همیشه در دسترس انگشت */
+:root{--dh:calc(82px + env(safe-area-inset-bottom,0px))}
+#dock{position:absolute;left:0;right:0;bottom:0;height:var(--dh);z-index:38;display:none;align-items:flex-start;gap:10px;padding:10px 12px 0;background:var(--bg);border-top:1px solid var(--cb)}
+body.dk #dock{display:flex}
+body.dk #sr{visibility:hidden;pointer-events:none}      /* جستجو حالا در نوار پایین است */
+body.dk #stage{bottom:var(--dh)}
+body.dk #toast,body.dk #updBox{bottom:calc(var(--dh) + 10px)}
+#dock button{height:60px;border-radius:30px;font:inherit;cursor:pointer;display:flex;align-items:center;gap:10px;margin:0;touch-action:manipulation}
+#dock button:active{transform:scale(.97)}
+#dkM{flex:0 0 auto;padding:0 22px;border:0;background:var(--ac);color:#0c0f1f;font-size:calc(18px*var(--zs));font-weight:800}
+#dkS{flex:1 1 0;min-width:0;padding:0 18px;border:1.5px solid var(--gb);background:var(--pill);color:var(--tx);font-size:calc(17px*var(--zs));font-weight:600;text-align:right}
+#dkS span,#dkM span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#dkS svg{flex:none;opacity:.8}
+#srm{flex:none;width:48px;height:48px;border-radius:50%;border:0;background:var(--ac);color:#0c0f1f;display:flex;align-items:center;justify-content:center;padding:0;cursor:pointer}
+.srvh{padding:12px 4px 6px;font-weight:700;line-height:1.9;color:var(--tx)}
+.srvh small{display:block;font-weight:400;color:var(--mu);font-size:13px}
+
 /* ---- ستون حروف ---- */
-.fs2{position:absolute;left:4px;width:30px;z-index:12;display:flex;flex-direction:column;justify-content:space-between;touch-action:none;cursor:pointer}
-.fs2 span{display:block;text-align:center;font-size:12px;font-weight:700;line-height:1;pointer-events:none;color:var(--ac);transition:transform .14s ease-out}
+.fs2{position:absolute;left:2px;width:var(--sw);border-radius:22px;background:rgba(127,127,127,.13);font-size:calc(16px*var(--zs));z-index:12;display:flex;flex-direction:column;justify-content:space-between;touch-action:none;cursor:pointer}
+.fs2 span{display:block;text-align:center;font-size:1em;font-weight:800;line-height:1;pointer-events:none;color:var(--ac);transition:transform .14s ease-out}
 .fs2 span.on{text-decoration:underline}
-.bub2{position:absolute;left:52px;width:62px;height:62px;border-radius:50%;background:var(--ac);color:#0c0f1f;font-size:34px;font-weight:800;display:flex;align-items:center;justify-content:center;z-index:13;opacity:0;transform:scale(.6);transition:opacity .15s,transform .25s cubic-bezier(.2,1.4,.4,1);pointer-events:none}
+.bub2{position:absolute;left:calc(var(--sw) + 12px);width:calc(62px*var(--zs));height:calc(62px*var(--zs));border-radius:50%;background:var(--ac);color:#0c0f1f;font-size:calc(34px*var(--zs));font-weight:800;display:flex;align-items:center;justify-content:center;z-index:13;opacity:0;transform:scale(.6);transition:opacity .15s,transform .25s cubic-bezier(.2,1.4,.4,1);pointer-events:none}
 .bub2.on{opacity:1;transform:scale(1)}
 
 /* ---- سربرگ لیست‌ها ---- */
@@ -91,20 +114,20 @@ svg{display:block}
 .rw>*+*{margin-inline-start:10px}
 .rw{display:flex;align-items:center;padding:8px 10px;border-radius:22px;background:var(--card);border:1px solid var(--cb)}
 .rw .tile{flex:0 0 44px;height:58px}
-.rw .tile{flex:0 0 clamp(38px,12vw,48px);height:clamp(50px,15.5vw,62px)}
+.rw .tile{flex:0 0 calc(clamp(38px,12vw,48px)*var(--zs));height:calc(clamp(50px,15.5vw,62px)*var(--zs))}
 .rw .m{flex:1 1 0;min-width:0}
-.rw .n{font-size:15px;font-size:clamp(13px,4.2vw,16px);font-weight:700;line-height:1.35;overflow:hidden;overflow-wrap:anywhere}
-.rw .tg{font-size:11px;color:var(--mu);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rw .n{font-size:calc(clamp(13px,4.2vw,16px)*var(--zs));font-weight:700;line-height:1.35;overflow:hidden;overflow-wrap:anywhere}
+.rw .tg{font-size:calc(11px*var(--zs));color:var(--mu);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .rw .pr{flex:0 1 auto;max-width:46%;text-align:left;font-variant-numeric:tabular-nums;white-space:nowrap}
-.rw .p1{font-size:17px;font-size:clamp(14px,4.8vw,19px);font-weight:800;line-height:1.25}
-.rw .p1 small{display:block;font-size:11px;color:var(--mu);font-weight:400;line-height:1.3}
-.rw .p2{font-size:11px;color:var(--mu);margin-top:1px;line-height:1.3}
+.rw .p1{font-size:calc(clamp(14px,4.8vw,19px)*var(--zs));font-weight:800;line-height:1.25}
+.rw .p1 small{display:block;font-size:calc(11px*var(--zs));color:var(--mu);font-weight:400;line-height:1.3}
+.rw .p2{font-size:calc(11px*var(--zs));color:var(--mu);margin-top:1px;line-height:1.3}
 .rw .p1 i{font-style:normal;display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--mu);opacity:.55;margin-inline-start:5px;vertical-align:middle}
 
 /* ---- مدل ج ---- */
-.mc .scl{padding:0 12px 0 42px}
-.mc .ghw{position:absolute;left:0;right:0;height:40px;display:flex;align-items:center}
-.mc .gh{display:inline-block;padding:0 16px;border-radius:14px;background:var(--gl);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);font-size:20px;font-weight:800;color:var(--ac);line-height:1.5}
+.mc .scl{padding:0 12px 0 calc(var(--sw) + 6px)}
+.mc .ghw{position:absolute;left:0;right:0;height:calc(40px*var(--zs));display:flex;align-items:center}
+.mc .gh{display:inline-block;padding:0 16px;border-radius:14px;background:var(--gl);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);font-size:calc(20px*var(--zs));font-weight:800;color:var(--ac);line-height:1.5}
 .mc .rw.v{position:absolute;left:0;right:0;opacity:0;transform:translateY(16px) scale(.97);transition:opacity .5s cubic-bezier(.2,.8,.2,1),transform .5s cubic-bezier(.2,.8,.2,1);box-shadow:0 6px 18px -10px rgba(30,40,110,.4)}
 .mc .rw.in{opacity:1;transform:none}
 .mc .n{max-height:calc(var(--h) - 34px)}
@@ -113,7 +136,7 @@ svg{display:block}
 :root[data-th="dark"] .mc{--ac:#a89bff}
 
 /* ---- مدل ز و ح ---- */
-.mg .scl{padding:112px 12px 420px 44px}
+.mg .scl{padding:112px 12px 420px calc(var(--sw) + 14px)}
 .mg .n{max-height:calc(var(--rh) - 34px)}
 .mg .rw{position:absolute;left:0;right:0;height:var(--rh);will-change:transform,opacity;transition:background-color .25s,border-color .25s,box-shadow .25s,color .25s}
 .mg .fs2{top:116px;bottom:24px}
@@ -159,7 +182,7 @@ svg{display:block}
 
 #sr{position:absolute;top:6px;left:10px;z-index:41;width:44px;height:44px;border-radius:50%;border:1px solid var(--gb);background:var(--pill);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);display:flex;align-items:center;justify-content:center;color:var(--tx);cursor:pointer;padding:0}
 #sr:active{transform:scale(.9)}
-:root{--zs:1}
+:root{--zs:1;--sw:min(calc(42px*var(--zs)),58px)}
 #dtc .dti,#dtc .dact,#dtc .vr,#dtc .dnote,#srr,#mkr,#sheet>*:not(.gr){zoom:var(--zs)}
 #dtc .sz{flex-wrap:wrap;gap:2px 12px}
 #dtc .zp{margin-inline-start:auto}
@@ -215,8 +238,8 @@ svg{display:block}
 .chips .ch{display:inline-flex;align-items:center;min-height:44px;padding:0 14px;border-radius:22px;border:1px solid var(--gb);background:var(--pill);font-size:13px;cursor:pointer;color:var(--tx)}
 .chips .ch::after{content:'×';margin-inline-start:10px;font-size:18px;color:var(--mu)}
 .bkrow{display:flex;gap:8px}
-#bkIn{flex:1;min-width:0;height:48px;border-radius:24px;border:1.5px solid var(--gb);background:var(--pill);color:var(--tx);font:inherit;font-size:16px;padding:0 16px;outline:none}
-#bkAdd{height:48px;min-width:76px;border-radius:24px;border:0;background:var(--ac);color:#0c0f1f;font:inherit;font-weight:800;cursor:pointer}
+#bkIn,#whyIn{flex:1;min-width:0;height:48px;border-radius:24px;border:1.5px solid var(--gb);background:var(--pill);color:var(--tx);font:inherit;font-size:16px;padding:0 16px;outline:none}
+#bkAdd,#whyGo{height:48px;min-width:76px;border-radius:24px;border:0;background:var(--ac);color:#0c0f1f;font:inherit;font-weight:800;cursor:pointer}
 #toast.on{opacity:1;transform:none}
 #updBox{position:absolute;left:16px;right:16px;bottom:calc(22px + env(safe-area-inset-bottom,0px));z-index:90;margin:0 auto;max-width:420px;padding:16px;border-radius:20px;background:var(--sheet);border:1.5px solid var(--ac);box-shadow:0 12px 40px rgba(0,0,0,.45);display:none}
 #updBox.on{display:block}
@@ -285,12 +308,16 @@ svg{display:block}
 .zp i{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--mu);opacity:.55;margin-inline-start:6px}
 .dnote{margin-top:14px;font-size:12px;color:var(--mu);text-align:center}
 /* عکس بزرگ */
-#vw{position:absolute;top:0;left:0;right:0;bottom:0;z-index:60;background:rgba(6,8,18,.94);display:none;align-items:center;justify-content:center;padding:18px;cursor:zoom-out}
+#vw{position:absolute;top:0;left:0;right:0;bottom:0;z-index:60;background:rgba(6,8,18,.94);display:none;align-items:center;justify-content:center;padding:70px 14px 120px;overflow:hidden;touch-action:none}
 #vw.on{display:flex}
-#vwb{width:100%;height:100%;display:flex;align-items:center;justify-content:center}
-#vwb img{max-width:100%;max-height:100%;object-fit:contain;border-radius:14px;background:#fff;transition:filter .3s}
+#vwb{width:100%;height:100%;display:flex;align-items:center;justify-content:center;touch-action:none}
+#vwb img{max-width:100%;max-height:100%;object-fit:contain;border-radius:14px;background:#fff;transition:filter .3s;will-change:transform;-webkit-user-drag:none;user-select:none}
 #vwb img:not(.big){filter:blur(1.2px)}
 #vwb .vfb{width:min(70vw,320px)}
+#vwx{position:absolute;top:calc(12px + env(safe-area-inset-top,0px));left:14px;height:48px;min-width:72px;padding:0 16px;border-radius:24px;border:1px solid rgba(255,255,255,.3);background:rgba(255,255,255,.14);color:#fff;font:inherit;font-size:15px;font-weight:700;cursor:pointer}
+#vwp,#vwn{position:absolute;top:50%;margin-top:-30px;width:56px;height:60px;border-radius:30px;border:1px solid rgba(255,255,255,.3);background:rgba(255,255,255,.14);color:#fff;font:inherit;font-size:36px;line-height:1;cursor:pointer;padding:0 0 4px;direction:ltr;unicode-bidi:isolate}
+#vwp{right:8px}#vwn{left:8px}
+#vwc{position:absolute;left:0;right:0;bottom:calc(84px + env(safe-area-inset-bottom,0px));text-align:center;color:#fff;font-size:16px;font-weight:700;padding:0 80px;pointer-events:none;unicode-bidi:plaintext}
 #vw .vh2{position:absolute;bottom:calc(18px + env(safe-area-inset-bottom,0px));left:0;right:0;text-align:center;font-size:13px;color:rgba(255,255,255,.7);pointer-events:none}
 
 .cv{display:inline-block;width:8px;height:8px;border-inline-end:2px solid var(--mu);border-bottom:2px solid var(--mu);transform:rotate(45deg);margin-inline-start:10px;opacity:.7;transition:transform .2s;vertical-align:2px}
@@ -322,12 +349,13 @@ svg{display:block}
   <button id="gear" aria-label="تنظیمات"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.2"/><path d="M19.4 13a7.6 7.6 0 0 0 0-2l2-1.6-2-3.4-2.4 1a7.4 7.4 0 0 0-1.7-1L15 3.4h-4l-.4 2.6a7.4 7.4 0 0 0-1.7 1l-2.4-1-2 3.4 2 1.6a7.6 7.6 0 0 0 0 2l-2 1.6 2 3.4 2.4-1c.5.4 1.1.7 1.7 1l.4 2.6h4l.4-2.6c.6-.3 1.2-.6 1.7-1l2.4 1 2-3.4z"/></svg></button>
   <button id="sr" aria-label="جستجو"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg></button>
   <button id="bk" aria-label="بازگشت"><svg width="13" height="20" viewBox="0 0 10 16" aria-hidden="true" style="transform:scaleX(-1)"><path d="M8 1L2 8l6 7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
-  <div id="srch" role="dialog" aria-label="جستجو"><div class="srh"><input id="srq" type="search" placeholder="نام عطر یا برند را بنویسید" autocomplete="off" enterkeyhint="search"><button id="srx">بستن</button></div><div class="srchips"><button id="mkOpen">گزارش بازار</button><button id="srFav">لیست مغازه ★ <span id="srFc"></span></button></div><div id="srr"></div></div>
+  <div id="dock"><button id="dkM" type="button" aria-label="گفتن نام عطر"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="2.5" width="6" height="12" rx="3"/><path d="M5 11.5a7 7 0 0 0 14 0M12 18.5V22"/></svg><span>بگویید</span></button><button id="dkS" type="button" aria-label="جستجوی عطر"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><span>جستجوی عطر</span></button></div>
+  <div id="srch" role="dialog" aria-label="جستجو"><div class="srh"><input id="srq" type="search" placeholder="نام عطر یا برند" autocomplete="off" enterkeyhint="search"><button id="srm" type="button" aria-label="گفتن نام عطر"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="2.5" width="6" height="12" rx="3"/><path d="M5 11.5a7 7 0 0 0 14 0M12 18.5V22"/></svg></button><button id="srx">بستن</button></div><div class="srchips"><button id="mkOpen">گزارش بازار</button><button id="srFav">لیست مغازه ★ <span id="srFc"></span></button></div><div id="srr"></div></div>
   <div id="mk" role="dialog" aria-label="گزارش بازار"><div class="srh"><h2 class="mkt">گزارش بازار</h2><button id="mkx">بستن</button></div><div class="mkt2" id="mkt2"><button type="button" data-t="sum">خلاصه</button><button type="button" data-t="cmp">مقایسه</button><button type="button" data-t="brand">برندها</button><button type="button" data-t="chg">تغییرات</button></div><div id="mkr"></div></div>
   <div id="dt" role="dialog" aria-label="جزئیات"><button id="dtx">بستن</button><div id="dtc"></div></div>
-  <div id="vw" role="dialog" aria-label="عکس بزرگ"><div id="vwb"></div><div class="vh2">برای بستن، روی صفحه بزنید</div></div>
+  <div id="vw" role="dialog" aria-label="عکس بزرگ"><div id="vwb"></div><button type="button" id="vwx">بستن</button><button type="button" id="vwp" aria-label="عطر قبلی">›</button><button type="button" id="vwn" aria-label="عطر بعدی">‹</button><div id="vwc"></div><div class="vh2">دو بار لمس: بزرگ‌نمایی · کشیدن: عطر بعدی · یک لمس: بستن</div></div>
   <div id="scm"></div>
-  <div id="updBox" role="dialog" aria-live="polite"><div id="updTx"></div><div class="upb" id="updPb"><i id="updPbi"></i></div><div class="updb"><button class="btn" id="updGo"><span>بله، نصب شود</span></button><button class="btn ghost" id="updLater"><span>بعداً</span></button></div></div>
+  <div id="updBox" role="dialog" aria-live="polite"><div id="updTx"></div><div class="updh" id="updH">اگر گوشی هشدار داد، همین گزینه را بزنید:<span class="cd">Install anyway</span></div><div class="upb" id="updPb"><i id="updPbi"></i></div><div class="updb"><button class="btn" id="updGo"><span>بله، نصب شود</span></button><button class="btn ghost" id="updLater"><span>بعداً</span></button></div></div>
   <div id="toast" role="status" aria-live="polite"></div>
   <div id="sheet" role="dialog" aria-label="تنظیمات">
     <div class="gr"></div>
@@ -349,12 +377,32 @@ svg{display:block}
     <div class="hint2">نام عطرها و حروف کنار فهرست به همین زبان نشان داده می‌شود. اگر سایت‌ها نام انگلیسی نداشته باشند، برنامه خودش از روی فارسی می‌سازد.</div>
     <h3>اندازه‌ی نوشته</h3>
     <div class="seg mods" id="sFs"><button data-v="0">معمولی<small>الف</small></button><button data-v="1">کمی بزرگ<small>الف</small></button><button data-v="2">بزرگ<small>الف</small></button><button data-v="3">خیلی بزرگ<small>الف</small></button></div>
-    <div class="hint2">روی صفحه‌ی جزئیات، جستجو و تنظیمات اثر می‌کند.</div>
+    <div class="hint2">روی همه‌ی صفحه‌ها اثر می‌کند: فهرست، حروف کنار صفحه، جزئیات، جستجو و تنظیمات.</div>
     <h3>نسخه‌ی برنامه</h3>
     <button class="btn" id="sUpd"><span>بررسی نسخه‌ی جدید</span></button>
     <div class="hint2" id="sUpdT"></div>
+    <button class="btn ghost" id="sPPBtn" aria-expanded="false"><span>چرا بعد از بروزرسانی می‌پرسد؟</span></button>
+    <div id="sPP" style="display:none">
+      <div class="hint2">این سؤال را خودِ برنامه نمی‌پرسد. برنامه‌ی امنیتیِ گوگل می‌پرسد، چون برنامه از فروشگاه گوگل نیامده.<br>برنامه نمی‌تواند آن را خاموش کند. ولی شما فقط یک بار می‌توانید روی گوشی خاموشش کنید:</div>
+      <ol class="stp">
+        <li>برنامه‌ی فروشگاه گوگل را باز کنید.<span class="cd">Play Store</span><button class="btn ghost" id="sPlay" type="button"><span>باز کردن فروشگاه گوگل</span></button></li>
+        <li>بالا، گوشه‌ی صفحه، روی عکس یا حرف اولِ حساب خودتان بزنید.</li>
+        <li>این گزینه را بزنید:<span class="cd">Play Protect</span></li>
+        <li>روی چرخ‌دنده‌ی بالای صفحه بزنید.</li>
+        <li>این گزینه را خاموش کنید:<span class="cd">Scan apps with Play Protect</span></li>
+        <li>اگر پرسید، تأیید کنید.</li>
+      </ol>
+      <div class="hint2">وقتی خاموش است، گوشی برنامه‌هایی را که از فروشگاه گوگل نیامده‌اند اسکن نمی‌کند. اگر پدرتان برنامه‌ی ناشناس نصب نمی‌کند، مشکلی نیست. هر وقت خواستید دوباره روشنش کنید.</div>
+      <div class="hint2">اگر نمی‌خواهید خاموش کنید: هر بار که پرسید، اول این را بزنید:<span class="cd">More details</span>بعد این را بزنید:<span class="cd">Install anyway</span></div>
+    </div>
     <button class="btn ghost" id="sAdvBtn" aria-expanded="false"><span>تنظیمات پیشرفته</span></button>
     <div id="sAdv" style="display:none">
+    <h3>چرا یک عطر نیست؟</h3>
+    <div class="hint2">نام عطر را بنویسید تا ببینید برنامه آن را از فروشگاه‌ها گرفته یا چرا کنار گذاشته است.</div>
+    <div class="bkrow"><input id="whyIn" type="text" placeholder="مثلاً کلینیک هپی" autocomplete="off"><button id="whyGo">بررسی</button></div>
+    <div id="whyOut"></div>
+    <button class="btn ghost" id="whyCovB"><span>آمار دریافت از هر فروشگاه</span></button>
+    <div id="whyCov"></div>
     <h3>پشتیبان و مشکلات</h3>
     <button class="btn ghost" id="sSamp" style="margin-top:0"><span>ذخیرهٔ پشتیبان همهٔ عنوان‌ها</span></button>
     <button class="btn ghost" id="sSend" disabled><span>ارسال پشتیبان (در صورت نیاز)</span></button>

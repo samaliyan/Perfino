@@ -54,9 +54,10 @@ Online-shop titles are messy. A multi-stage pipeline keeps the list clean:
 - **Your own control**: *blocked words* (anything containing them never enters the list and is removed immediately) and *hide this perfume* for single bad entries.
 
 ### Everyday use
+- **Speak the name**: a big bottom bar has a “Speak” button (the phone's own speech recognition, Persian). When the app is sure it opens the perfume directly; otherwise it lists the closest guesses. Search shows the last perfumes you looked at.
 - **Search** in Persian or English, with partial words.
 - **Shop list** (★): star perfumes to keep a personal shortlist.
-- **Four list styles**, light / dark / automatic theme, Persian or English names, and **four text sizes** for easier reading.
+- **Four list styles**, light / dark / automatic theme, Persian or English names, and **four text sizes** (they scale the whole app: lists, prices and the letter strip) for easier reading.
 - **Per-brand switches** to hide brands you do not sell (their images are not downloaded either).
 - **Product photos** cached on the device, with a drawn bottle as fallback.
 
@@ -64,6 +65,7 @@ Online-shop titles are messy. A multi-stage pipeline keeps the list clean:
 - On launch the app checks GitHub for a newer version, downloads it (about 20 MB; in manual mode only when you ask) and asks before installing.
 - During download the button is disabled and a progress bar is shown.
 - Automatic or manual update mode in Settings.
+- The “Install anyway” question after an update comes from Google Play Protect (the app comes from outside the Play Store); the app cannot switch it off. Settings contains simple steps to turn that scan off once.
 
 ## Install
 
@@ -173,9 +175,10 @@ Python tests need Playwright with Chromium. The Java code is compiled only by CI
 - **کنترل با خودتان**: «واژه‌های ممنوع» (هر عنوانی که آن را داشته باشد وارد فهرست نمی‌شود و همان لحظه برداشته می‌شود) و «پنهانش کن» برای یک مورد خراب.
 
 ### استفادهٔ روزمره
+- **گفتنِ نام عطر**: در نوار بزرگ پایین دکمهٔ «بگویید» هست (تشخیص گفتار خودِ گوشی، فارسی). اگر برنامه مطمئن باشد خودش عطر را باز می‌کند؛ وگرنه نزدیک‌ترین حدس‌ها را فهرست می‌کند. جستجوی خالی «آخرین‌هایی که دیدید» را نشان می‌دهد.
 - **جستجو** به فارسی یا انگلیسی، حتی با بخشی از نام.
 - **لیست مغازه** (ستاره): عطرهای مهم را ستاره بزنید تا فهرست شخصی بسازید.
-- **چهار شکل فهرست**، پوستهٔ روشن، تاریک یا خودکار، نام‌ها به فارسی یا انگلیسی و **چهار اندازهٔ نوشته** برای خواندن راحت‌تر.
+- **چهار شکل فهرست**، پوستهٔ روشن، تاریک یا خودکار، نام‌ها به فارسی یا انگلیسی و **چهار اندازهٔ نوشته** (روی کل برنامه اثر می‌کند: فهرست، قیمت و ستون حروف) برای خواندن راحت‌تر.
 - **خاموش کردن برند**: برندهایی که نمی‌فروشید دیده نمی‌شوند و عکسشان هم دانلود نمی‌شود.
 - **عکس محصول** روی گوشی نگه‌داری می‌شود و اگر نبود، یک بطری ترسیمی جایگزین می‌شود.
 
@@ -183,6 +186,7 @@ Python tests need Playwright with Chromium. The Java code is compiled only by CI
 - هنگام باز شدن، برنامه از گیت‌هاب نسخهٔ جدید را بررسی و دانلود می‌کند (حدود ۲۰ مگابایت؛ در حالت دستی فقط وقتی بخواهید) و قبل از نصب می‌پرسد.
 - هنگام دانلود، دکمه غیرفعال می‌شود و نوار پیشرفت دیده می‌شود.
 - حالت خودکار یا دستی در تنظیمات.
+- سؤال «Install anyway» بعد از بروزرسانی کارِ Play Protect گوگل است (برنامه از فروشگاه گوگل نیامده) و برنامه نمی‌تواند خاموشش کند. در تنظیمات، مراحل ساده‌ی خاموش کردنِ آن اسکن (یک بار) نوشته شده است.
 
 ## نصب
 
@@ -234,6 +238,9 @@ node tests/t35_vet.js          # بازرسی نام، شناخت برند و خ
 node tests/t37_hist.js         # منطق تاریخچهٔ قیمت و موجودی
 python3 tests/t36_features.py  # جستجو، لیست مغازه، پنهان کردن، واژهٔ ممنوع، اندازهٔ نوشته
 python3 tests/t38_market.py    # صفحهٔ گزارش بازار
+python3 tests/t53_viewer.py    # بزرگ‌نمایی و کشیدنِ عکس
+python3 tests/t54_fontscale.py # اندازهٔ نوشته روی کل برنامه (۴ شکل × ۴ اندازه × ۲ عرض)
+python3 tests/t55_voice.py     # گفتن نام عطر، نوار پایین، آخرین‌ها
 python3 tests/t3_flow.py       # روند کامل بروزرسانی
 ```
 
