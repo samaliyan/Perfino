@@ -3,11 +3,12 @@
 'use strict';
 
 /* ---------- متن ---------- */
-function decodeEnt(s) {
-  return s.replace(/&#(\d+);/g, function (m, n) { return String.fromCharCode(+n); })
-    .replace(/&#x([0-9a-f]+);/gi, function (m, n) { return String.fromCharCode(parseInt(n, 16)); })
-    .replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&nbsp;/g, ' ')
-    .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&[a-z]+;/g, ' ');
+var HTML_ENT = Object.assign(Object.create(null), { amp: '&', quot: '"', apos: "'", nbsp: ' ', lt: '<', gt: '>', hellip: '…', laquo: '«', raquo: '»', ndash: '–', mdash: '—', lsquo: '‘', rsquo: '’', ldquo: '“', rdquo: '”', bull: '•', middot: '·', copy: '©', reg: '®', zwnj: '\u200c', zwj: '\u200d' });      // بدونِ prototype: «&constructor;» نباید تابع شود
+function decodeEnt(s) {      // یک بار می‌خواند (نه چندبار)؛ «&amp;lt;» می‌شود «&lt;» نه «<». موجودیتِ ناشناخته = فاصله
+  return s.replace(/&(#\d+|#x[0-9a-f]+|[a-z]+);/gi, function (m, e) {
+    if (e.charAt(0) === '#') { var n = e.charAt(1).toLowerCase() === 'x' ? parseInt(e.slice(2), 16) : +e.slice(1); try { return n > 0 && n <= 0x10ffff ? String.fromCodePoint(n) : ' '; } catch (x) { return ' '; } }
+    var v = HTML_ENT[e.toLowerCase()]; return v === undefined ? ' ' : v;
+  });
 }
 var NF_C = {}, NF_N = 0;
 function normFa(s, keepAlef) {
@@ -20,7 +21,7 @@ function normFa(s, keepAlef) {
   return normFa0(raw, keepAlef);
 }
 function normFa0(s, keepAlef) {
-  s = decodeEnt(String(s == null ? '' : s));
+  s = decodeEnt(String(s == null ? '' : s)); if (/&(#\d+|#x[0-9a-f]+|[a-z]+);/i.test(s)) s = decodeEnt(s);      // «&amp;amp;» (دوبار رمزشده) هم
   s = s.replace(/[\u200b\u00ad\u2060\ufeff]/g, '').replace(/\u2011/g, '-');
   if (/[\ufb50-\ufdff\ufe70-\ufeff]/.test(s)) s = s.normalize('NFKC');           // شکل‌های نمایشیِ عربی → حروف عادی
   s = s.replace(/[۰-۹]/g, function (c) { return String(c.charCodeAt(0) - 1776); })
@@ -1785,7 +1786,7 @@ function nextDataCards(doc, pageUrl) {
       if (p.isTester) title = 'تستر ' + title;
       var pr = +p.priceWithOffer > 0 ? +p.priceWithOffer : +p.price, out0 = p.isAvailable === false || p.canBuy === false || !(pr > 0);
       var u = p.frontEndUrl ? urlJoin(pageUrl, p.frontEndUrl) : '';
-      out.push({ u: u, t: title, price: out0 ? 0 : pr, st: out0 ? 1 : 0, img: p.imageUrl ? urlJoin(pageUrl, p.imageUrl) : '' });
+      out.push({ u: u, t: title, price: out0 ? 0 : pr, st: out0 ? 1 : 0, np: !(pr > 0) && p.isAvailable !== false && p.canBuy !== false ? 1 : 0, img: p.imageUrl ? urlJoin(pageUrl, p.imageUrl) : '' });      // np: موجود است ولی قیمتی ننوشته (در جستجوی زنده «قیمت در سایت»)
     });
   });
   return out;
@@ -1957,6 +1958,196 @@ var SOURCES = [
   { id: 'hiland', name: 'هایلند', run: function (net, rep, mode) { return wooOrHtml('https://hilandbeauty.com', 'https://hilandbeauty.com/fa/%D8%B9%D8%B7%D8%B1-%D9%88-%D8%A7%D8%AF%DA%A9%D9%84%D9%86', net, rep, mode); } }
 ];
 
+/* ---------- جستجوی زنده در خودِ سایت‌ها ----------
+   وقتی عطر در فهرستِ گوشی پیدا نشد (یا ضعیف بود)، همان نامِ گفته‌شده از خودِ سایت‌ها پرسیده می‌شود؛ شاید سایت منظور را بهتر بفهمد.
+   خروجی: { items: [{s: شناسه‌ی سایت, t: عنوان, price: تومان (۰ = ناموجود), img, u: آدرس صفحه}], notes: {شناسه‌ی سایت: 'ok'|'none'|'fail'} } */
+var LIVE_HTML = { liliome: ['/?s={q}&post_type=product'], hiland: ['/fa/search?q={q}'], safir: ['/search?q={q}', '/?s={q}'] };      // جستجوی صفحه‌ای (وقتی رابطِ ووکامرس نیست)
+function liveHit(title, terms, tools) {      // عنوان با دست‌کم یک واژه‌ی اصلی بخواند؛ املای نزدیک («ساواژ»↔«ساواج») و واژه‌ی لاتین (با برگردان به فارسی) هم قبول است
+  var t = srn(title); if (!t) return false;
+  var tw = t.split(' ').filter(Boolean), ws = [], ns = [];
+  terms.forEach(function (w) { var x = srn(w); if (!x) return; (srNum(x) ? ns : ws).push(x); });
+  if (!ws.length) return ns.some(function (n) { return tw.indexOf(n) >= 0; });      // فقط شماره («212»): واژه‌ی کاملِ شماره باشد، نه تکه‌ای از «2120»
+  function near(v) {
+    if (t.indexOf(v) >= 0) return true;
+    var fv = simFold(v);
+    return v.length >= 3 && tw.some(function (u) { return u.length >= 3 && (simWord(u, v) >= .75 || simWord(simFold(u), fv) >= .75); });
+  }
+  return ws.some(function (x) {
+    if (near(x)) return true;
+    if (tools && !HAS_FA.test(x) && tools.toFa) { var f = srn(tools.toFa(x)); if (f && f !== x && near(f)) return true; }
+    if (tools && HAS_FA.test(x) && tools.toEn) { var e = srn(tools.toEn(x)); if (e && e !== x && !HAS_FA.test(e) && near(e)) return true; }
+    return false;
+  });
+}
+var LIVE_BASE = { liliome: 'https://liliome.com', safir: 'https://www.safirstores.com', hiland: 'https://hilandbeauty.com' };
+var SIZES_COMMON = srMap(); '30 35 40 45 50 60 75 80 85 90 100 110 120 125 150 200 250 300 500'.split(' ').forEach(function (w) { SIZES_COMMON[w] = 1; });
+function liveTerms(text) {      // فقط واژه‌های اصلی: «عطر»، «چنده»، «۱۰۰ میل» در جستجوی سایت جواب را خالی می‌کند؛ شماره‌ی نام («شنل ۵»، «۲۱۲») می‌ماند
+  var seen = {}, out = [], toks = srToks(String(text || '').replace(/[0-9۰-۹٠-٩]+\s?[.٫,]\s?[0-9۰-۹٠-٩]+/g, ' '));      // «3.4 oz» اندازه است، نه شماره‌ی نام
+  toks.forEach(function (t, j) {
+    var nameNum = /^\d+$/.test(t) && (+t < 20 || +t > 250) && t.length <= 5 && !SR_UNIT[toks[j + 1]];
+    if (t.length >= 2 && !SR_STOP[t] && !SR_CONN[t] && !SR_NUM[t] && !srNum(t) && !seen[t]) { seen[t] = 1; out.push(t); }
+    else if (nameNum && !seen[t]) { seen[t] = 1; out.push(t); }
+  });
+  if (!out.length) toks.forEach(function (t, j) { if (/^\d{3,5}$/.test(t) && !SIZES_COMMON[t] && !SR_UNIT[toks[j + 1]] && !seen[t] && out.length < 2) { seen[t] = 1; out.push(t); } });      // فقط عدد («۲۱۲»، «۴۷۱۱»): اگر اندازه‌ی رایجِ بطری نیست، نامِ عطر است
+  return out.slice(0, 6).map(function (t) { return t.slice(0, 40); });
+}
+function wooLivePrice(it) {      // همان قاعده‌ی دریافتِ کامل (wooSource): ۰ = ناموجود، ۱- = قیمتش در سایت است (بازه‌ی قیمت یا بدون عدد)، بقیه = قیمت به تومان
+  var pr = it.prices || {}, minor = pr.currency_minor_unit == null ? 0 : +pr.currency_minor_unit, v = parseFloat(pr.price) / Math.pow(10, minor);
+  if (!(v > 0) && it.price_html && !OUT_RE.test(normFa(stripTags(it.price_html))) && !/تماس|\bcall\b|unavailable/i.test(stripTags(it.price_html))) { var pt = priceFromText(stripTags(it.price_html)).nums.filter(function (x) { return x > 0; }); if (pt.length) { var f0 = pt[0]; v = Math.min.apply(null, pt.filter(function (x) { return x >= f0 / 2.5 && x <= f0 * 2.5; })); } }
+  var cur = String(pr.currency_code || '').toUpperCase();
+  if (cur === 'IRHT') v = v * 1000; else if (cur === 'IRHR') v = v * 100; else if (/IRR|ریال/i.test(cur || pr.currency_symbol || '')) v = v / 10;
+  if (cur && !/^(IRT|IRR|IRHT|IRHR)$/.test(cur) && !/تومان|ریال/.test(pr.currency_symbol || '')) v = 0;
+  if (typeof it.is_in_stock !== 'boolean' || it.is_in_stock === false || it.is_purchasable === false || it.is_on_backorder === true) return 0;      // ناموجود
+  if (it.price_html && OUT_RE.test(normFa(stripTags(it.price_html)))) return 0;
+  if (!(v > 0)) return -1;      // موجود است ولی قیمتی ننوشته («تماس بگیرید») یا به تومان نیست: قیمتش در خودِ سایت است
+  if (pr.price_range && pr.price_range.min_amount !== pr.price_range.max_amount) return -1;      // محصولِ چنداندازه‌ای: قیمتِ یک عدد نیست
+  if (v > 4e8) return -1;      // عددِ نامعقول (ارزِ اشتباه): قیمت نشان داده نشود
+  return Math.round(v);
+}
+async function wooLive(srcId, base, terms, net, tools) {
+  var longest = terms.filter(function (w) { return !srNum(w); }).sort(function (a, b) { return b.length - a.length; })[0];
+  var qs = [terms.join(' ')];      // اول همه‌ی واژه‌ها؛ بعد برگردانِ فارسیِ واژه‌های لاتین؛ نشد، بلندترین واژه به‌تنهایی
+  if (tools && tools.toFa && terms.some(function (w) { return !HAS_FA.test(w) && !srNum(w); })) {
+    var fa = terms.map(function (w) { return HAS_FA.test(w) || srNum(w) ? w : (srn(tools.toFa(w)) || w); }).join(' ');
+    if (qs.indexOf(fa) < 0) qs.push(fa);
+  }
+  if (terms.length > 1 && longest && qs.indexOf(longest) < 0) qs.push(longest);
+  var gotAny = false, apiDead = METHOD[base] === 'html';      // سایتی که رابطِ ووکامرس ندارد دوباره از همان راه پرسیده نمی‌شود
+  for (var qi = 0; qi < qs.length; qi++) {
+    var a;
+    if (!apiDead) {
+      var url = base + '/wp-json/wc/store/v1/products?per_page=12&search=' + encodeURIComponent(qs[qi]) + '&_fields=id,name,permalink,images,prices,is_in_stock,is_purchasable,is_on_backorder,price_html,categories,type';
+      var r = await getR(net, url, { Accept: 'application/json' }, 2); a = r.status === 200 ? parseJson(r.body) : undefined;
+      if (!Array.isArray(a)) apiDead = true;
+    }
+    if (apiDead) {      // رابطِ ووکامرس بسته است: صفحه‌ی جستجوی خودِ سایت (هر سایت آدرسِ خودش را دارد)
+      if (qi >= 2) break;
+      var tpls = LIVE_HTML[srcId] || ['/?s={q}&post_type=product'];
+      for (var ti = 0; ti < tpls.length; ti++) {
+        try {
+          var h = await getR(net, base + tpls[ti].replace('{q}', encodeURIComponent(qs[qi])), { Accept: 'text/html' }, 2);
+          if (h.status === 200 && typeof DOMParser !== 'undefined') {
+            var doc = new DOMParser().parseFromString(h.body, 'text/html'), cards = nextDataCards(doc, base + '/'); if (!cards.length) cards = extractCards(doc, base + '/');
+            var o2 = cards.filter(function (c) { return c && c.t && titleLooksPerfume(c.t) && liveHit(c.t, terms, tools); }).slice(0, 12).map(function (c) { return { s: srcId, t: c.t, price: c.price > 0 ? c.price : (c.st === 1 && !c.np ? 0 : -1), img: c.img || '', u: itemUrl(srcId, c.u) || '' }; });      // وقتی چیزی پیدا نشود بعضی سایت‌ها «پرفروش‌ها» را نشان می‌دهند؛ فقط ردیف‌هایی که واژه‌ی گفته‌شده را دارند
+            if (o2.length) return { items: o2, note: 'ok' };
+            gotAny = true;
+          }
+        } catch (e) { }
+      }
+      continue;
+    }
+    gotAny = true;
+    var out = [];
+    a.forEach(function (it) {
+      if (!it || typeof it !== 'object' || !it.name) return;
+      var cats = (it.categories || []).map(function (c) { return c && c.name || ''; }).join(' ');
+      if (!titleLooksPerfume(it.name + ' ' + cats)) return;
+      var im = it.images && it.images[0];
+      out.push({ s: srcId, t: stripTags(it.name), price: wooLivePrice(it), img: im ? (im.thumbnail || im.src || '') : '', u: itemUrl(srcId, it.permalink) || '' });
+    });
+    if (out.length) return { items: out, note: 'ok' };
+  }
+  return { items: [], note: gotAny ? 'none' : 'fail' };
+}
+async function digikalaLive(terms, net) {
+  var q = terms.join(' '), urls = ['https://api.digikala.com/v1/categories/perfume/search/?page=1&q=' + encodeURIComponent(q), 'https://api.digikala.com/v1/search/?page=1&q=' + encodeURIComponent(q)];
+  var gotAny = false;
+  for (var i = 0; i < urls.length; i++) {
+    var r = await getR(net, urls[i], { Accept: 'application/json' }, 2), j = r.status === 200 ? parseJson(r.body) : undefined, d = j && j.data;
+    if (!d || !Array.isArray(d.products)) continue;
+    gotAny = true;
+    var out = [];
+    d.products.forEach(function (p) {
+      if (!p || typeof p !== 'object') return;
+      var title = p.title_fa || p.title_en || ''; if (!title || (i > 0 && !titleLooksPerfume(title))) return;
+      var dv = p.default_variant, rial = dv && dv.price && dv.price.selling_price, avail = !(p.status && p.status !== 'marketable') && !!dv && typeof dv === 'object' && !Array.isArray(dv) && !(dv.status && !/marketable|available/i.test(String(dv.status)));
+      var img = p.images && p.images.main && p.images.main.url && p.images.main.url[0] || '';
+      out.push({ s: 'digikala', t: title, price: !avail ? 0 : (rial > 0 && rial / 10 <= 4e8) ? Math.round(rial / 10) : -1, img: img ? img.replace(/h_\d+,w_\d+/, 'h_360,w_360') : '', u: itemUrl('digikala', p.id) || '' });
+    });
+    if (out.length) return { items: out.slice(0, 12), note: 'ok' };
+  }
+  return { items: [], note: gotAny ? 'none' : 'fail' };
+}
+async function liveSearch(text, net, srcIds, tools) {
+  var terms = liveTerms(String(text || '').slice(0, 120)), notes = {}, items = [];
+  if (!terms.length) return { items: [], notes: {}, terms: terms };
+  function lim(pr) { var tm; return Promise.race([pr, new Promise(function (res) { tm = setTimeout(function () { res({ items: [], note: 'fail' }); }, 20000); })]).then(function (r) { clearTimeout(tm); return r; }); }      // مهلتِ ۲۰ ثانیه؛ بعد از جواب پاک می‌شود
+  var ids = (srcIds && srcIds.length ? srcIds : Object.keys(LIVE_BASE).concat(['digikala']));
+  var jobs = ids.map(function (id) {
+    var pr = id === 'digikala' ? digikalaLive(terms, net) : (LIVE_BASE[id] ? wooLive(id, LIVE_BASE[id], terms, net, tools) : Promise.resolve({ items: [], note: 'none' }));
+    return lim(pr.catch(function () { return { items: [], note: 'fail' }; })).then(function (r) { notes[id] = r.note; return r.items; });
+  });
+  var res = await Promise.all(jobs);
+  res.forEach(function (a) { items = items.concat(a); });
+  return { items: items, notes: notes, terms: terms };
+}
+
+/* ---------- خبرهای سایت‌ها (مجله/وبلاگِ همان فروشگاه‌ها) ----------
+   هر سایت اول با رابطِ وردپرس (wp-json) و اگر نشد با خوراکِ RSS خوانده می‌شود. فقط آدرس‌های همان چهار سایتِ برنامه.
+   خروجی: { items: [{s, sn, t, d(ms), u, x, img}], notes: {شناسه: 'ok'|'none'|'fail'} } */
+var NEWS_SRC = [
+  { id: 'liliome', name: 'لیلیوم', base: 'https://liliome.com', filter: false },
+  { id: 'safir', name: 'سفیر', base: 'https://www.safirstores.com', filter: false },
+  { id: 'hiland', name: 'هایلند', base: 'https://hilandbeauty.com', filter: false },
+  { id: 'digikala', name: 'مجله‌ی دیجی‌کالا', base: 'https://www.digikala.com/mag', filter: true, search: 'عطر' }
+];
+var NEWS_RE = /عطر|ادکلن|ادکلون|پرفیوم|پارفوم|رایحه|بوی |ادو ?تویلت|ادو ?پرفیوم|fragrance|perfume|parfum/i;
+function newsText(h, n) {      // برای نمایش است نه جستجو: نیم‌فاصله و رقمِ فارسی دست‌نخورده می‌ماند؛ فقط برچسب‌ها برداشته و «ي/ك» عربی درست می‌شود
+  var t = stripTags(h).replace(/[\u200b\u2060\ufeff\u00ad]/g, '').replace(/ي/g, 'ی').replace(/ك/g, 'ک').replace(/\s+/g, ' ').trim();
+  return t.length > n ? t.slice(0, n).replace(/\s+\S*$/, '') + '…' : t;
+}
+function newsImg(u) { u = String(u || '').trim(); if (/^http:\/\//i.test(u)) u = 'https://' + u.slice(7); return /^https:\/\//i.test(u) && u.length < 600 ? u : ''; }      // عکسِ ناامن (http) بارگذاری نمی‌شود؛ همه‌ی سایت‌ها https دارند
+function newsDate(d) { var now = Date.now(); return d > 0 && d <= now + 864e5 ? Math.min(d, now) : 0; }      // اختلافِ ساعتِ کم: همین حالا؛ تاریخِ آینده‌ی دور (ساعتِ اشتباهِ سایت): نامعلوم تا برای همیشه «تازه‌ترین» نماند
+function newsFromWp(a, src) {
+  var out = [];
+  a.forEach(function (p) {
+    if (!p || typeof p !== 'object') return;
+    var t = newsText(p.title && p.title.rendered, 140), u = itemUrl(src.id, p.link); if (!t || !u) return;
+    var d = newsDate(Date.parse(p.date_gmt ? p.date_gmt + 'Z' : p.date)), img = '';
+    try { var fm = p._embedded && p._embedded['wp:featuredmedia'] && p._embedded['wp:featuredmedia'][0]; if (fm) { var sz = fm.media_details && fm.media_details.sizes; img = (sz && ((sz.medium_large && sz.medium_large.source_url) || (sz.medium && sz.medium.source_url))) || fm.source_url || ''; } } catch (e) { }
+    out.push({ s: src.id, sn: src.name, t: t, d: d, u: u, x: newsText(p.excerpt && p.excerpt.rendered, 130), img: newsImg(img) });
+  });
+  return out;
+}
+function newsFromRss(xml, src) {
+  var out = [];
+  if (typeof DOMParser === 'undefined') return out;
+  var doc; try { doc = new DOMParser().parseFromString(String(xml || ''), 'text/xml'); } catch (e) { return out; }
+  if (!doc || doc.querySelector('parsererror')) return out;
+  Array.prototype.forEach.call(doc.querySelectorAll('item'), function (it) {
+    function tx(n) { var e = it.getElementsByTagName(n)[0]; return e ? e.textContent : ''; }
+    var t = newsText(tx('title'), 140), u = itemUrl(src.id, String(tx('link')).trim()); if (!t || !u) return;
+    var raw = tx('content:encoded') || tx('description'), im = '', m = /<img[^>]+src=["']([^"']+)["']/i.exec(raw);
+    var enc = it.getElementsByTagName('enclosure')[0], mc = it.getElementsByTagName('media:content')[0];
+    im = (enc && /image/i.test(enc.getAttribute('type') || 'image') && enc.getAttribute('url')) || (mc && mc.getAttribute('url')) || (m && m[1]) || '';
+    out.push({ s: src.id, sn: src.name, t: t, d: newsDate(Date.parse(tx('pubDate'))), u: u, x: newsText(tx('description'), 130), img: newsImg(im) });
+  });
+  return out;
+}
+async function newsOne(src, net) {
+  var gotAny = false, items = [];
+  var u1 = src.base + '/wp-json/wp/v2/posts?per_page=10&_embed=1' + (src.search ? '&search=' + encodeURIComponent(src.search) : '');
+  var r = await getR(net, u1, { Accept: 'application/json' }, 2), a = r.status === 200 ? parseJson(r.body) : undefined;
+  if (Array.isArray(a)) { gotAny = true; items = newsFromWp(a, src); }
+  if (!items.length) {
+    var r2 = await getR(net, src.base + '/feed/' + (src.search ? '?s=' + encodeURIComponent(src.search) : ''), { Accept: 'application/rss+xml, application/xml, text/xml' }, 2);
+    if (r2.status === 200 && /<(rss|feed)[\s>]/i.test(String(r2.body).slice(0, 600))) { gotAny = true; items = newsFromRss(r2.body, src); }
+  }
+  if (src.filter) items = items.filter(function (x) { return NEWS_RE.test(x.t + ' ' + x.x); });
+  return { items: items, note: items.length ? 'ok' : (gotAny ? 'none' : 'fail') };
+}
+async function fetchNews(net, srcIds) {
+  var notes = {}, all = [];
+  var jobs = NEWS_SRC.filter(function (s) { return !srcIds || srcIds.indexOf(s.id) >= 0; }).map(function (src) {
+    var tm, pr = Promise.race([newsOne(src, net).catch(function () { return { items: [], note: 'fail' }; }), new Promise(function (res) { tm = setTimeout(function () { res({ items: [], note: 'fail' }); }, 25000); })]).then(function (r) { clearTimeout(tm); return r; });
+    return pr.then(function (r) { notes[src.id] = r.note; return r.items.sort(function (a, b) { return b.d - a.d; }).slice(0, 4); });      // از هر سایت حداکثر چهار خبرِ تازه؛ یک سایت همه‌جا را نگیرد
+  });
+  (await Promise.all(jobs)).forEach(function (a) { all = all.concat(a); });
+  all.sort(function (a, b) { return b.d - a.d; });
+  var seen = {}; all = all.filter(function (x) { var k = x.u; if (seen[k]) return false; seen[k] = 1; return true; });
+  return { items: all.slice(0, 12), notes: notes };
+}
+
 /* ---------- تاریخچه‌ی قیمت و موجودی (برای «گزارش بازار») ----------
    h.d["gid|ml"] = { n: نام, l: برچسب, f: اولین‌بار, s: آخرین‌بار دیده شد, c: تعداد فروشگاه، cm/ct: بیشترین تعداد و زمانش,
                      p: [[زمان، قیمت]...], m/mt: شمارنده‌ی «دیده نشد», o: از این زمان ناموجود, r: دوباره موجود شد در }              */
@@ -1968,11 +2159,11 @@ function histFix(h) {                       // داده‌ی خراب یا نا�
   Object.keys(h.d).forEach(function (k) {
     var e = h.d[k], okp = e && typeof e === 'object' && Array.isArray(e.p) && e.p.length && e.p.every(function (x) { return Array.isArray(x) && x[0] > 0 && x[1] > 0; });
     if (!okp || k.indexOf('|') < 0 || !(+k.split('|')[1] > 0)) { delete h.d[k]; return; }
-    e.n = String(e.n == null ? '' : e.n); e.l = String(e.l == null ? '' : e.l); e.s = +e.s || 0; e.f = +e.f || 0; e.c = +e.c || 0; e.cm = +e.cm || 0; e.ct = +e.ct || 0; e.o = +e.o || 0; e.r = +e.r || 0; e.m = +e.m || 0; e.mt = +e.mt || 0;
+    e.n = String(e.n == null ? '' : e.n); e.l = String(e.l == null ? '' : e.l); e.b = typeof e.b === 'string' ? e.b : ''; e.hm = typeof e.hm === 'string' ? e.hm : ''; e.s = +e.s || 0; e.f = +e.f || 0; e.c = +e.c || 0; e.cm = +e.cm || 0; e.ct = +e.ct || 0; e.o = +e.o || 0; e.r = +e.r || 0; e.m = +e.m || 0; e.mt = +e.mt || 0;
   });
   return h;
 }
-function histSnap(h, list, srcSig, now, labFn, blkSig) {
+function histSnap(h, list, srcSig, now, labFn, blkSig, metaFn) {      // metaFn(g) → {b: شناسه‌ی برند, m: شناسه‌ی مدل}؛ برای اینکه عطرِ ناموجود هم از «برندِ خاموش» و «پنهان‌شده» جدا شود
   now = now || Date.now();
   if (!h || !h.d || !list || !list.length) return { skipped: 'empty' };
   if (h.t && now < h.t) { if (h.t - now > 2 * H_DAY) { h.t = now; Object.keys(h.d).forEach(function (k) { var e = h.d[k]; ['s', 'f', 'ct', 'o', 'r', 'mt'].forEach(function (f) { if (e[f] > now) e[f] = now; }); e.p.forEach(function (q) { if (q[0] > now) q[0] = now; }); }); } else return { skipped: 'clock' }; }      // کمی عقب‌رفتنِ ساعت: نادیده؛ پرشِ بزرگِ ساعت به آینده (و برگشتنش) نباید تاریخچه را برای همیشه قفل کند
@@ -1991,13 +2182,13 @@ function histSnap(h, list, srcSig, now, labFn, blkSig) {
     var nk = h.d[k].n + '|' + k.split('|')[1] + '|' + h.d[k].l; absent[nk] = absent[nk] === undefined ? k : null;      // اگر چند ردیفِ هم‌نام باشد، حدس نمی‌زنیم
   });
   Object.keys(present).forEach(function (k) {
-    var g = present[k][0], z = present[k][1], e = h.d[k], ns = z.srcs.length, lab = labFn ? labFn(g) : '';
+    var g = present[k][0], z = present[k][1], e = h.d[k], ns = z.srcs.length, lab = labFn ? labFn(g) : '', mt = metaFn ? (metaFn(g) || {}) : {};
     if (!e) {
       var ak = absent[g.name + '|' + z.ml + '|' + lab];
       if (ak && h.d[ak] && !present[ak]) { e = h.d[k] = h.d[ak]; delete h.d[ak]; absent[g.name + '|' + z.ml + '|' + lab] = 0; }
-      else { h.d[k] = { n: g.name, l: lab, f: chg ? 0 : now, s: now, c: ns, cm: ns, ct: now, p: [[now, z.price]] }; return; }      // با عوض شدنِ سایت‌های روشن، چیزِ دیده‌شده «تازه» نیست
+      else { h.d[k] = { n: g.name, l: lab, b: mt.b || '', hm: mt.m || '', f: chg ? 0 : now, s: now, c: ns, cm: ns, ct: now, p: [[now, z.price]] }; return; }      // با عوض شدنِ سایت‌های روشن، چیزِ دیده‌شده «تازه» نیست
     }
-    e.n = g.name; e.l = lab; e.s = now; e.m = 0; e.mt = 0;
+    e.n = g.name; e.l = lab; e.s = now; e.m = 0; e.mt = 0; if (mt.b) { e.b = mt.b; e.hm = mt.m || ''; }
     if (e.o) { if (now - e.o >= 6 * 3600000) e.r = now; e.o = 0; }
     e.c = ns; if (chg || !e.cm || ns >= e.cm || now - (e.ct || 0) > 14 * H_DAY) { e.cm = ns; e.ct = now; }
     var p = e.p = Array.isArray(e.p) ? e.p : [], last = p[p.length - 1];
@@ -2021,7 +2212,7 @@ function histSnap(h, list, srcSig, now, labFn, blkSig) {
 function histReport(h, list, now, o) {
   now = now || Date.now(); o = o || {};
   var thr = o.thr || 0.08, R = { span: h && h.t0 ? (now - h.t0) / H_DAY : 0, up: [], down: [], gone: [], back: [], low: [], fresh: [], gap: [], trend: { n: 0, up: 0, down: 0, same: 0, med: 0 } };
-  var cur = {}, pcs = [];
+  var cur = {}, pcs = [], sameSet = !o.sig || !h || h.as === o.sig;
   (list || []).forEach(function (g) { g.sizes.forEach(function (z) {
     cur[g.id + '|' + z.ml] = z;
     var used = z.srcs.filter(function (r) { return r.used !== false; });
@@ -2032,23 +2223,23 @@ function histReport(h, list, now, o) {
     }
   }); });
   if (h && h.d) Object.keys(h.d).forEach(function (k) {
-    var e = h.d[k], gid = k.split('|')[0], ml = +k.split('|')[1], base = { k: k, gid: gid, name: e.n, l: e.l || '', ml: ml };
-    var isCur = !!cur[k];
+    var e = h.d[k], gid = k.split('|')[0], ml = +k.split('|')[1], base = { k: k, gid: gid, name: e.n, l: e.l || '', ml: ml, b: e.b || '', hm: e.hm || '' };
+    var isCur = !!cur[k], curNow = isCur && cur[k].price > 0 ? cur[k].price : 0, curP = sameSet ? curNow : 0;      // قیمتِ همین حالا (نقطه‌ی تاریخچه فقط با ۲٪ تغییر ثبت می‌شود)؛ اگر سایت‌های روشن عوض شده و هنوز عکسِ تازه گرفته نشده، قیمتِ سایتِ دیگر را با قیمتِ قبلی نمی‌سنجیم
     if (isCur) { base.n = cur[k].srcs.length; base.stores = cur[k].srcs.map(function (r) { return r.s; }); base.pts = (e.p || []).slice(-8).map(function (q) { return q[1]; }); }
     if (isCur && e.p && e.p.length) {
       var last = e.p[e.p.length - 1], ref = null;                   // قدیمی‌ترین نقطه‌ی ۳۰ روز اخیر
       for (var i = 0; i < e.p.length; i++) if (now - e.p[i][0] <= 30 * H_DAY) { ref = e.p[i]; break; }
       if (!ref) ref = last;
       if (ref !== last || e.p.length > 1) {
-        var from = ref[1], to = last[1], pc = (to - from) / from;
+        var from = ref[1], to = curP || last[1], pc = (to - from) / from;
         R.trend.n++; pcs.push(pc); if (pc >= 0.02) R.trend.up++; else if (pc <= -0.02) R.trend.down++; else R.trend.same++;
         if (Math.abs(pc) >= thr && Math.abs(to - from) >= 20000) { var rec = Object.assign({}, base, { from: from, to: to, pct: pc, ago: (now - ref[0]) / H_DAY }); (pc > 0 ? R.up : R.down).push(rec); }
       }
     }
     if (!isCur && e.o && now - e.o <= 30 * H_DAY) R.gone.push(Object.assign({}, base, { was: e.cm || 0, ago: (now - e.o) / H_DAY, price: e.p && e.p.length ? e.p[e.p.length - 1][1] : 0 }));
-    if (isCur && e.r && now - e.r <= 14 * H_DAY) R.back.push(Object.assign({}, base, { ago: (now - e.r) / H_DAY, price: e.p[e.p.length - 1][1] }));
-    if (isCur && e.cm > e.c && now - (e.ct || 0) <= 14 * H_DAY) R.low.push(Object.assign({}, base, { was: e.cm, now: e.c, price: e.p[e.p.length - 1][1] }));
-    if (isCur && R.span >= 3 && e.f && e.f > h.t0 + 0.5 * H_DAY && now - e.f <= 7 * H_DAY) R.fresh.push(Object.assign({}, base, { ago: (now - e.f) / H_DAY, price: e.p[e.p.length - 1][1] }));
+    if (isCur && e.r && now - e.r <= 14 * H_DAY) R.back.push(Object.assign({}, base, { ago: (now - e.r) / H_DAY, price: curNow || e.p[e.p.length - 1][1] }));
+    if (isCur && e.cm > e.c && now - (e.ct || 0) <= 14 * H_DAY) R.low.push(Object.assign({}, base, { was: e.cm, now: e.c, price: curNow || e.p[e.p.length - 1][1] }));
+    if (isCur && R.span >= 3 && e.f && e.f > h.t0 + 0.5 * H_DAY && now - e.f <= 7 * H_DAY) R.fresh.push(Object.assign({}, base, { ago: (now - e.f) / H_DAY, price: curNow || e.p[e.p.length - 1][1] }));
   });
   R.up.sort(function (a, b) { return b.pct - a.pct; }); R.down.sort(function (a, b) { return a.pct - b.pct; });
   R.gone.sort(function (a, b) { return a.ago - b.ago; }); R.back.sort(function (a, b) { return a.ago - b.ago; });
@@ -2128,9 +2319,11 @@ var SR_STOP = srMap(); ('عطر ادکلن ادکلون ادو ادوپرفیو�
 var SR_CONN = srMap(); ('de du di la le the of by and for pour with دو دی د لا لو لی ال بای پور ان اند').split(' ').forEach(function (w) { SR_CONN[w] = 1; });      // واژه‌های ربطیِ نام‌ها؛ اگر در ردیفی نبودند، رد کردنِ آن ردیف دلیل نمی‌شود
 var SR_NUM = srMap(); ('صد دویست سیصد پانصد پنجاه شصت هفتاد هشتاد نود بیست سی چهل لیتر لیتری سی‌سی اونس گرم گرمی میلی‌لیتر mg ccm fl').split(' ').forEach(function (w) { SR_NUM[w] = 1; });      // اندازه‌های رایج («ساواج صد میل»)؛ فقط وقتی دقیق در نام باشند حساب می‌شوند
 ('چنده چقدره چقدر چند موجوده موجود دارید داری دارین دارم میخوام میخواستم میخرم بخرم خرید فروش موجودی ارزان ارزون گرون گران جدید تازه خوب بهترین بهتر').split(' ').forEach(function (w) { SR_STOP[w] = 1; });      // حرف‌های روزمره‌ی «ساواج چنده؟»؛ نبودنشان در نام دلیلِ رد کردنِ عطر نیست
+var SR_UNIT = srMap(); ('میل میلی ml cc oz اونس لیتر لیتری گرم گرمی سی‌سی میلی‌لیتر mg ccm fl').split(' ').forEach(function (w) { SR_UNIT[w] = 1; });      // بعد از عدد بیاید یعنی اندازه است، نه شماره‌ی نام
 function srNum(t) { return /^\d+([.,]\d+)?$/.test(t); }      // هر عددی («45»، «250»، «3.4») اندازه است؛ فقط وقتی در نام باشد حساب می‌شود («212»، «نامبر 5»)
 function srSoft(t) { return SR_STOP[t] || SR_CONN[t] || SR_NUM[t] || srNum(t); }
 var SR_PNUM = srMap(); (function () { var o = { یک: 1, دو: 2, سه: 3, چهار: 4, پنج: 5, شش: 6, هفت: 7, هشت: 8, نه: 9, ده: 10, یازده: 11, دوازده: 12, سیزده: 13, نوزده: 19 }; for (var k in o) SR_PNUM[k] = String(o[k]); })();
+var SR_PNUM2 = srMap(); ('چهار 4 پنج 5 شش 6 هفت 7 هشت 8 نوزده 19').split(' ').forEach(function (w, i, a) { if (i % 2 === 0) SR_PNUM2[w] = a[i + 1]; });      // عددهای بی‌ابهام (نه «یک/دو/سه/نه/ده» که واژه‌ی معمولی‌اند)
 var SR_NOP = srMap(); ('نامبر نمبر شماره number no n').split(' ').forEach(function (w) { SR_NOP[w] = 1; });      // «نامبر پنج» = «نامبر 5» (شنل)
 var SR_ABBR = srMap(); (function () { var o = { ysl: 'ایو سن لوران', ck: 'کالوین کلین', jlo: 'جنیفر لوپز', jpg: 'ژان پل گوتیه', dg: 'دولچه گابانا', hb: 'هوگو بوس' }; for (var k in o) SR_ABBR[k] = o[k].split(' '); })();      // نام کوتاهِ برندها
 var SR_ALIAS = srMap(); (function () { var o = { 'جادور': 'ژدو', 'ژادور': 'ژدو', 'ژدور': 'ژدو', jadore: 'ژدو', terre: 'تق', 'ترد': 'تق', 'ترا': 'تق', y: 'وای' }; for (var k in o) SR_ALIAS[k] = [o[k]]; })();      // نامِ معروفی که در داده با املای دیگری ثبت شده («ژدو» = جادور دیور)؛ فقط یک نسخه‌ی اضافه از جستجو ساخته می‌شود
@@ -2186,7 +2379,7 @@ function srWord(x, toEn) {      // هر واژه یک بار ساخته می‌�
 }
 var SRV = srMap();      // همه‌ی واژه‌های نمایه و تعدادشان؛ برای جدا کردنِ نوشته‌های چسبیده («لاویه»)
 function searchIndex(tree, toEn) {
-  SRW = srMap(); SRWN = 0; SRV = srMap(); var idx = [], bc = srMap();
+  SRW = srMap(); SRWN = 0; SRV = srMap(); SIMV = null; var idx = [], bc = srMap();
   function words(str, set, arr, cap) { srn(str).split(' ').forEach(function (w) { if (w && !set[w] && arr.length < cap) { set[w] = 1; arr.push(srWord(w, toEn)); SRV[w] = (SRV[w] | 0) + 1; } }); }
   tree.forEach(function (b) {
     var bs = bc[b.id];
@@ -2257,6 +2450,124 @@ function srSplits(toks) {      // «لاویه» → «لا ویه»: واژه�
   });
   return res;
 }
+/* ---------- شبیه‌ها: وقتی جوابِ «دقیق» کم است ----------
+   تشخیصِ گفتار حرف‌های هم‌صدا را قاطی می‌کند (س/ص/ث، ز/ذ/ض/ظ، ت/ط، ه/ح، غ/ق…) و حرف‌های صدادار (ا و ی) را می‌اندازد یا اضافه می‌کند.
+   برای هر واژه‌ی گفته‌شده نزدیک‌ترین واژه‌های نمایه با «فاصله‌ی ویرایشِ وزن‌دار» پیدا می‌شود: عوض شدنِ حرفِ هم‌صدا تقریباً رایگان، افتادنِ صدادار ارزان، غلطِ واقعی گران. */
+var SIMC = srMap(); (function () {
+  [['سصث', 0], ['زذضظ', 0], ['تط', 0], ['اآعأإ', .1], ['هح', .2], ['غق', .2], ['وؤ', .2], ['یئ', .2], ['کگ', .3], ['پب', .3], ['جچژ', .35], ['زژ', .4], ['شچ', .5], ['دت', .6], ['خک', .6], ['خه', .6], ['نم', .8]].forEach(function (g) {
+    for (var i = 0; i < g[0].length; i++) for (var j = 0; j < g[0].length; j++) if (i !== j) SIMC[g[0][i] + g[0][j]] = g[1];
+  });
+})();
+var SIMI = srMap(); 'ا آ و ی ئ ع ؤ أ إ'.split(' ').forEach(function (c) { SIMI[c] = .35; }); SIMI['ه'] = .5;
+function simIns(c) { var v = SIMI[c]; return v === undefined ? 1 : v; }
+function simFold(w) { return w.replace(/(.)\1+/g, '$1'); }
+function wlev(a, b, mx) {      // فاصله‌ی ویرایشِ وزن‌دار؛ بیشتر از سقف یعنی mx+1
+  var la = a.length, lb = b.length, prev = [0], cur = [], i, j;
+  for (j = 1; j <= lb; j++) prev[j] = prev[j - 1] + simIns(b[j - 1]);
+  for (i = 1; i <= la; i++) {
+    var ca = a[i - 1], lo; cur[0] = prev[0] + simIns(ca); lo = cur[0];
+    for (j = 1; j <= lb; j++) {
+      var cb = b[j - 1], sc = ca === cb ? 0 : (SIMC[ca + cb] !== undefined ? SIMC[ca + cb] : 1);
+      var v = Math.min(prev[j] + simIns(ca), cur[j - 1] + simIns(cb), prev[j - 1] + sc);
+      cur[j] = v; if (v < lo) lo = v;
+    }
+    if (lo > mx) return mx + 1;
+    var t = prev; prev = cur; cur = t;
+  }
+  return prev[lb];
+}
+function simWord(q, w) {      // شباهتِ دو واژه‌ی هم‌خط، ۰ تا ۱
+  if (q === w) return 1;
+  var la = q.length, lb = w.length, m = Math.max(la, lb);
+  if (m < 2 || Math.abs(la - lb) > 3) return 0;
+  var mx = m <= 3 ? .4 : m <= 4 ? .6 : m <= 6 ? 1.3 : 2;      // واژه‌ی کوتاه فقط با یک تغییرِ ارزان (صدادار یا هم‌صدا) جور می‌شود
+  var d = wlev(q, w, mx); if (d > mx) return 0;
+  return m <= 3 ? .85 : 1 - d / m;
+}
+var SIMV = null, SIMG = null, SIMK = null;
+function simSkel(w) {      // حروفِ بی‌صدا با هم‌صداها یکی‌شده؛ «ساواج» و «سووج» هر دو «سج»
+  return w.replace(/[صث]/g, 'س').replace(/[ذظض]/g, 'ز').replace(/ط/g, 'ت').replace(/ق/g, 'غ').replace(/گ/g, 'ک').replace(/ب/g, 'پ').replace(/ژ/g, 'ز').replace(/چ/g, 'ج').replace(/ح/g, 'ه').replace(/[اآأإوؤیئهع]/g, '').replace(/(.)\1+/g, '$1');
+}
+function simVocab() {
+  if (SIMV) return SIMV;
+  SIMV = []; SIMG = srMap(); SIMK = srMap();
+  Object.keys(SRV).forEach(function (w) {
+    if (w.length < 2 || SR_STOP[w] || srNum(w)) return;
+    var v = { x: w, p: simFold(w), fa: HAS_FA.test(w), k: HAS_FA.test(w) ? simSkel(w) : '' }, n = SIMV.push(v) - 1;
+    if (!v.fa) { for (var i = 0; i + 1 < v.p.length; i++) { var g = v.p.substr(i, 2), a = SIMG[g] || (SIMG[g] = []); if (a[a.length - 1] !== n) a.push(n); } return; }
+    (SIMK[v.k] || (SIMK[v.k] = [])).push(n);
+    for (var j = 0; j + 1 < v.k.length; j++) { var g2 = 'k' + v.k.substr(j, 2), a2 = SIMG[g2] || (SIMG[g2] = []); if (a2[a2.length - 1] !== n) a2.push(n); }
+  });
+  return SIMV;
+}
+function simCands(f) {      // واژه‌هایی از نمایه که احتمالاً به f نزدیک‌اند؛ فقط همین‌ها با فاصله‌ی ویرایش سنجیده می‌شوند
+  var cnt = {}, out = [], got = {}, fa = HAS_FA.test(f), key = fa ? simSkel(f) : f, pre = fa ? 'k' : '', need = key.length <= 4 ? 1 : 2;
+  function add(n) { if (!got[n]) { got[n] = 1; out.push(SIMV[n]); } }
+  if (fa) { var ex = SIMK[key]; if (ex) ex.forEach(add); }
+  for (var i = 0; i + 1 < key.length; i++) { var a = SIMG[pre + key.substr(i, 2)]; if (a) for (var k = 0; k < a.length; k++) { var n = a[k]; cnt[n] = (cnt[n] | 0) + 1; if (cnt[n] === need) add(n); } }
+  return out;
+}
+function simInv(idx) {      // واژه → ردیف‌هایی که آن را دارند (یک بار برای هر نمایه)
+  if (idx._inv) return idx._inv;
+  var inv = srMap();
+  idx.forEach(function (e, ei) {
+    [e.mw, e.bw, e.me].forEach(function (arr, k) {
+      for (var i = 0; i < arr.length; i++) { var w = arr[i].x, a = inv[w] || (inv[w] = []); if (a[a.length - 1] !== ei * 4 + k) a.push(ei * 4 + k); }
+    });
+  });
+  idx._inv = inv; return inv;
+}
+/* خروجی: [{i, s, sim:true}] به ترتیبِ شباهت؛ skip = ردیف‌هایی که قبلاً آمده‌اند */
+function searchSimilar(idx, alts, tools, skip, limit) {
+  tools = tools || {}; var vocab = simVocab(), inv = simInv(idx), acc = {}, W = [1, .95, .85];
+  alts.slice(0, 3).forEach(function (alt, ai) {
+    var toks = srToks(alt).filter(function (t) { return !SR_STOP[t] && !SR_CONN[t] && !srNum(t) && t.length >= 2; }); if (!toks.length) return;
+    toks = toks.slice(0, 6); var aw = 1 - .05 * ai, nt = toks.length, per = {};
+    toks = toks.filter(function (t) { return simFold(t).length >= 2 && !(!HAS_FA.test(t) && t.length >= 4 && !/[aeiouy]/.test(t)); });      // «ززززز»، «xqzv»: بی‌معنی؛ شبیه‌یابی روی آن‌ها فقط فهرستِ بی‌ربط می‌دهد
+    if (!toks.length) return;
+    nt = toks.length;
+    toks.forEach(function (t, j) {
+      var forms = [];
+      if (HAS_FA.test(t)) forms.push(simFold(t)); else { forms.push(t); var f = tools.toFa ? srn(tools.toFa(t)) : ''; if (f && HAS_FA.test(f)) f.split(' ').forEach(function (x) { if (x.length >= 2) forms.push(simFold(x)); }); }
+      var hits = [];
+      var seen = {};
+      forms.forEach(function (f2) {
+        var fa2 = HAS_FA.test(f2);
+        simCands(f2).forEach(function (v) {
+          if (v.fa !== fa2) return;
+          var sv = simWord(f2, v.p); if (sv >= .6 && (seen[v.x] === undefined || sv > seen[v.x])) seen[v.x] = sv;
+        });
+      });
+      Object.keys(seen).forEach(function (x) { hits.push([x, seen[x]]); });
+      hits.forEach(function (h) {
+        var lst = inv[h[0]]; if (!lst) return;
+        for (var i = 0; i < lst.length; i++) {
+          var ei = lst[i] >> 2, k = lst[i] & 3, v = h[1] * (W[k] || .8), a = acc[ei] || (acc[ei] = { t: [] });
+          var cur = a.t[ai * 8 + j]; if (cur === undefined || v > cur) a.t[ai * 8 + j] = v;
+          if (k === 0) { (a.m || (a.m = {}))[h[0]] = 1; }
+        }
+      });
+    });
+    acc._nt = acc._nt || {}; acc._nt[ai] = [nt, aw];
+  });
+  var out = [];
+  Object.keys(acc).forEach(function (k) {
+    if (k === '_nt') return;
+    var ei = +k, a = acc[k], best = 0;
+    for (var ai = 0; ai < 3; ai++) {
+      var nw = acc._nt[ai]; if (!nw) continue;
+      var sum = 0, got = 0, strong = 0;
+      for (var j = 0; j < nw[0]; j++) { var v = a.t[ai * 8 + j]; if (v) { sum += v; got++; if (v >= .75) strong++; } }
+      if (!got || (!strong && got < 2)) continue;
+      var e = idx[ei], mh = a.m ? Object.keys(a.m).length : 0, cov = Math.min(1, mh / (e.n || 1));
+      var sc = (sum / nw[0]) * (.55 + .45 * cov) * nw[1] * (got < nw[0] ? .9 : 1);
+      if (sc > best) best = sc;
+    }
+    if (best >= .45 && !(skip && skip[ei])) out.push({ i: ei, s: best, sim: true });
+  });
+  out.sort(function (a, c) { return (c.s - a.s) || (idx[c.i].pop - idx[a.i].pop) || (a.i - c.i); });
+  return limit ? out.slice(0, limit) : out;
+}
 /* alts: چند حدس (متنِ نوشته یا حدس‌های تشخیص گفتار)؛ tools: {toEn(واژه‌ی فارسی)→انگلیسی, toFa(واژه‌ی انگلیسی)→فارسی}
    خروجی: [{i, s, ex, bo, mn, all, cnt}] از بهترین؛
    ex = همه‌ی واژه‌های نامِ مدل دقیق گفته شده؛ bo = فقط نامِ برند گفته شده؛ mn = ضعیف‌ترین واژه؛ all = همه‌ی واژه‌ها دقیقاً در نام هست */
@@ -2269,22 +2580,24 @@ function searchRank(idx, alts, tools, opts) {
     vars.push({ toks: toks, w8: w });
     srSplits(toks).forEach(function (sp) { vars.push({ toks: sp, w8: w * .97 }); });
     toks.forEach(function (t, k) { var al = SR_ALIAS[t]; if (al) vars.push({ toks: toks.slice(0, k).concat(al, toks.slice(k + 1)), w8: w * .97 }); });
+    if (toks.length >= 2) toks.forEach(function (t, k) { if (k > 0 && SR_PNUM2[t]) vars.push({ toks: toks.slice(0, k).concat([SR_PNUM2[t]], toks.slice(k + 1)), w8: w * .97, hk: toks[k - 1] !== 'و' && !SR_NUM[toks[k - 1]] && !SR_UNIT[toks[k + 1]] ? k : -1 }); });      // «شنل پنج» = «شنل 5»؛ عددِ این نسخه «سخت» است (در نامِ عطر باید باشد) تا «فقط برند» جوابِ قطعی حساب نشود
   });
+  var anyNh = false, bestU = {}, usedPen = false;      // anyNh: دست‌کم یک عطر شماره‌ی گفته‌شده را در نامش دارد؛ فقط آن وقت عطرِ بی‌شماره جریمه می‌شود
   var pfx = opts.prefixLast !== false;      // تایپ: شروعِ واژه هم حساب می‌شود؛ گفتار: نه (واژه‌ی نیمه‌کاره یعنی تشخیص اشتباه)
   /* allowMiss: در دور دوم، یک واژه‌ی بی‌جواب («چنده»، «ارزان»، «تابستانی») نادیده گرفته می‌شود و امتیازِ عطر کم می‌شود */
   function run(vr, allowMiss) {
     var toks = vr.toks, w8 = vr.w8;
-    var hardN = toks.filter(function (t) { return !srSoft(t); }).length, anyNum = toks.some(srNum);
+    var hk = vr.hk === undefined ? -1 : vr.hk, hardN = toks.filter(function (t, j) { return !srSoft(t) || j === hk; }).length, anyNum = toks.some(srNum);
     if (!anyNum && toks.every(function (t) { return SR_STOP[t]; })) return;      // فقط «عطر» یا «ادکلن مردانه»: چیزی برای جستجو نیست
     if (allowMiss && hardN < 2) return;
     var tk = toks.map(function (t, j) {
       var w = srWord(t, tools.toEn), f = !w.fa && tools.toFa ? srn(tools.toFa(t)) : '';
-      return { t: t, fa: w.fa, k: w.k, e: w.e, f: f, fk: f ? fzKeyC(f) : '', last: pfx && !!opts.prefixLast && j === toks.length - 1, pfx: pfx, soft: hardN > 0 && srSoft(t) ? 1 : 0, key: ++SRK };
+      return { t: t, fa: w.fa, k: w.k, e: w.e, f: f, fk: f ? fzKeyC(f) : '', last: pfx && !!opts.prefixLast && j === toks.length - 1, pfx: pfx, soft: hardN > 0 && srSoft(t) && j !== hk ? 1 : 0, key: ++SRK };
     });
-    var qid = ++SRK;
+    var qid = ++SRK, needNum = hardN > 0 && toks.some(function (t, j) { return /^\d+$/.test(t) && (+t < 20 || +t > 250) && !SR_UNIT[toks[j + 1]] && j !== hk; });      // شماره‌ی نام (۵، ۱۹، ۲۱۲)؛ نه اندازه‌ی ۳۰ تا ۲۵۰ میل و نه عددی که «میل» دنبالش آمده
     for (var ei = 0; ei < idx.length; ei++) {
       var e = idx[ei]; if (allowMiss && best[ei]) continue;
-      var sum = 0, ok = true, hit = {}, allx = true, cnt = 0, nb = 0, nbx = 0, nx = 0, mn = 9, bw = e.bw, miss = 0, dupc = 0, strong = 0;
+      var sum = 0, ok = true, hit = {}, allx = true, cnt = 0, nb = 0, nbx = 0, nx = 0, mn = 9, bw = e.bw, miss = 0, dupc = 0, strong = 0, nh = 0;
       if (bw._q !== qid) { bw._q = qid; bw._v = []; }
       for (var j = 0; j < tk.length; j++) {
         var q = tk[j], mk = { m: -1 }, rm = srBest(q, e.mw, mk), re = rm < 1 ? srBest(q, e.me, null) : 0, rb = bw._v[j];
@@ -2299,6 +2612,7 @@ function searchRank(idx, alts, tools, opts) {
         }
         if (mk.m >= 0) { if (hit[mk.m] !== undefined && (rm < 1 || hit[mk.m] < 1)) dupc = 1; hit[mk.m] = Math.max(hit[mk.m] || 0, rm); }      // دو واژه‌ی جستجو روی یک واژه‌ی عطر، با املای نادقیق: «ورسایس اروس» → «ورسوس»
         if (rb >= .99) nbx++;
+        if (q.soft && srNum(q.t) && (rm >= .99 || re >= .99 || rb >= .99)) nh++;      // عددی که دقیق در نامِ عطر (یا برند: «Bond No. 9») هست («شنل ۵» ← «نامبر ۵»)
         if (rbs > 0 && rbs >= rm && rbs >= re * .92) nb++;
         if (rm >= .99 || rb >= .99) nx++;
         if (rm < .87 && re < .87 && rb < .87) allx = false;      // «دقیق» = نامِ مدل یا برند کامل گفته شده؛ شروعِ تایپ یا املای نزدیک دقیق نیست
@@ -2310,22 +2624,42 @@ function searchRank(idx, alts, tools, opts) {
       if (miss && !strong) continue;      // بدون دست‌کم یک واژه‌ی مطمئن، حدس زدن بی‌معنی است
       var hn = Object.keys(hit).length, cov = hn / e.n, ex = allx && cov >= 1 && !miss && !dupc, bo = nbx === cnt;
       if (bo || (!hn && nb === cnt)) cov = 1;      // فقط نامِ برند گفته شده: همه‌ی عطرهای آن برند به یک اندازه نزدیک‌اند
-      var sc = (sum / cnt + .4 * cov) * w8 * (miss ? .75 : 1) * (dupc ? .9 : 1);
-      var o = best[ei]; if (!o || sc > o.s) best[ei] = { s: sc, ex: ex, bo: bo, mn: mn, all: nx === cnt && !miss ? 1 : 0, cnt: cnt, miss: miss, dupc: dupc };
+      var sc0 = (sum / cnt + .4 * cov) * w8 * (miss ? .75 : 1) * (dupc ? .9 : 1), pen = needNum && !nh, sc = sc0 * (pen ? .8 : 1);      // «شنل ۵»: عطرِ بی‌شماره نباید با «فقط برند» جلوی «نامبر ۵» بنشیند
+      if (needNum && nh) anyNh = true;
+      var rec = { s: sc, ex: ex, bo: bo, mn: mn, all: nx === cnt && !miss ? 1 : 0, cnt: cnt, miss: miss, dupc: dupc };
+      var o = best[ei]; if (!o || sc > o.s) best[ei] = rec;
+      if (pen) { usedPen = true; var ou = bestU[ei]; if (!ou || sc0 > ou.s) bestU[ei] = { s: sc0, ex: ex, bo: bo, mn: mn, all: rec.all, cnt: cnt, miss: miss, dupc: dupc }; }
     }
   }
   vars.forEach(function (vr) { run(vr, false); });
   if (Object.keys(best).length < 3) vars.forEach(function (vr) { run(vr, true); });
+  if (usedPen && !anyNh) Object.keys(bestU).forEach(function (k) { var o = best[k], u = bestU[k]; if (!o || u.s > o.s) best[k] = u; });      // هیچ عطری آن شماره را ندارد: جریمه معنا ندارد (اندازه یا شماره‌ی ناآشنا)
   var ALLB = opts && typeof opts.allBonus === 'number' ? opts.allBonus : SR_ALLB;      // «همه‌ی واژه‌ها دقیق» کمی بالاتر می‌نشیند، ولی املای هم‌صدای یک نامِ کوتاه‌تر هم می‌تواند جلو بیفتد
   var out = Object.keys(best).map(function (k) { var o = best[k]; return { i: +k, s: o.s, ex: o.ex, bo: o.bo, mn: o.mn, all: o.all, cnt: o.cnt, miss: o.miss, dupc: o.dupc, k: o.s + (o.all ? ALLB : 0) - (o.miss ? 5 : 0) /* نتیجه‌های «یک واژه‌شان نیامد» همیشه بعد از نتیجه‌های کامل */ }; });
   out.sort(function (a, c) {
     var d = c.k - a.k; if (d > 1e-9 || d < -1e-9) return d;
     return (c.cnt - a.cnt) || (idx[c.i].pop - idx[a.i].pop) || (idx[a.i].m.name.length - idx[c.i].m.name.length) || (a.i - c.i);
   });
+  /* شبیه‌ها: اگر نتیجه‌ی کاملِ کم است، نزدیک‌ترین‌ها به املا/تلفظ هم می‌آیند (بعد از نتیجه‌های کامل و قبل از نتیجه‌های ناقص).
+     opts.similar = حداکثر تعداد شبیه؛ هر کدام sim:true دارد تا صفحه بتواند جدا نشانش دهد */
+  var want = opts && typeof opts.similar === 'number' ? opts.similar : 0;
+  if (want > 0) {
+    var good = 0; out.forEach(function (o) { if (!o.miss && o.k >= 1) good++; });
+    if (good < (opts.simBelow || 8)) {
+      var skip = {}; out.forEach(function (o) { skip[o.i] = 1; });
+      var sims = searchSimilar(idx, alts, tools, skip, want);
+      if (sims.length) {
+        var full = [], part = []; out.forEach(function (o) { (o.miss ? part : full).push(o); });
+        var sm = sims.map(function (x) { return { i: x.i, s: x.s, ex: false, bo: false, mn: x.s, all: 0, cnt: 0, miss: 0, dupc: 0, k: x.s, sim: true }; }), tail = [], a = 0, b = 0;
+        while (a < part.length || b < sm.length) tail.push(b >= sm.length || (a < part.length && part[a].s >= sm[b].s) ? part[a++] : sm[b++]);      // ناقص‌ها و شبیه‌ها به ترتیبِ امتیازِ خودشان
+        out = full.concat(tail);
+      }
+    }
+  }
   return out;
 }
 
-root.Core = { searchIndex: searchIndex, searchRank: searchRank, srn: srn, fzKey: fzKey, explainTitle: explainTitle, useSz: useSz, sizeFromPage: sizeFromPage, nextDataCards: nextDataCards, RAWC: RAWC, stripPriceTail: stripPriceTail, marketStats: marketStats, marketView: marketView, histNew: histNew, histFix: histFix, histSnap: histSnap, histReport: histReport, purgeStored: purgeStored, setBlock: setBlock, REJ: REJ, vetReason: vetReason, reconcile: reconcile, CLEANSE: CLEANSE, cleanseText: cleanseText, cleanBrandName: cleanBrandName, itemUrl: itemUrl, STALE_MIN: STALE_MIN, fa2en: fa2en, en2fa: en2fa, enTokens: enTokens, titleEn: titleEn, tree: tree, brandOf: brandOf, specInfo: specInfo, enrichTitle: enrichTitle, genderOf: genderOf, nameCmp: nameCmp, CFG: CFG, newDb: newDb, dbIndex: dbIndex, ingest: ingest, ingestAsync: ingestAsync, buildList: buildList, normFa: normFa, parseTitle: parseTitle, aggregate: aggregate, SOURCES: SOURCES, extractCards: extractCards,
+root.Core = { fetchNews: fetchNews, newsFromWp: newsFromWp, newsFromRss: newsFromRss, NEWS_SRC: NEWS_SRC, liveSearch: liveSearch, liveTerms: liveTerms, liveHit: liveHit, wooLivePrice: wooLivePrice, searchIndex: searchIndex, searchRank: searchRank, searchSimilar: searchSimilar, simWord: simWord, simFold: simFold, srn: srn, fzKey: fzKey, explainTitle: explainTitle, useSz: useSz, sizeFromPage: sizeFromPage, nextDataCards: nextDataCards, RAWC: RAWC, stripPriceTail: stripPriceTail, marketStats: marketStats, marketView: marketView, histNew: histNew, histFix: histFix, histSnap: histSnap, histReport: histReport, purgeStored: purgeStored, setBlock: setBlock, REJ: REJ, vetReason: vetReason, reconcile: reconcile, CLEANSE: CLEANSE, cleanseText: cleanseText, cleanBrandName: cleanBrandName, itemUrl: itemUrl, STALE_MIN: STALE_MIN, fa2en: fa2en, en2fa: en2fa, enTokens: enTokens, titleEn: titleEn, tree: tree, brandOf: brandOf, specInfo: specInfo, enrichTitle: enrichTitle, genderOf: genderOf, nameCmp: nameCmp, CFG: CFG, newDb: newDb, dbIndex: dbIndex, ingest: ingest, ingestAsync: ingestAsync, buildList: buildList, normFa: normFa, parseTitle: parseTitle, aggregate: aggregate, SOURCES: SOURCES, extractCards: extractCards,
   wooSource: wooSource, digikalaSource: digikalaSource, htmlSource: htmlSource, letterOf: letterOf, median: median, priceFromText: priceFromText, similar: similar };
 if (typeof module !== 'undefined') module.exports = root.Core;
 })(typeof window !== 'undefined' ? window : globalThis);

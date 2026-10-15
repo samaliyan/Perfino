@@ -1,7 +1,7 @@
 (function () {
 'use strict';
 var RM = !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
-var VERSION = '1.32';
+var VERSION = '1.33';
 var myCode = (function () { var m = /\/b(\d{1,10})\/index\.html$/.exec(String(location.pathname || '')); return m ? m[1] : '0'; })();      // نسخه‌ی این صفحه از روی آدرسش؛ در گزارش‌ها به جاوا فرستاده می‌شود تا صفحه‌ی کهنه نتواند نسخه‌ی تازه را «سالم» اعلام کند
 function otaCall(n) { try { if (window.Native && typeof window.Native[n] === 'function') window.Native[n](myCode); } catch (e) { } }
 otaCall('otaBoot');      // «جاوااسکریپتِ این صفحه شروع شد»: برنامه به صفحه‌ی بی‌نصب مهلتِ بیشتری برای ساختن فهرست می‌دهد
@@ -89,6 +89,7 @@ function tile(p) {
 }
 document.addEventListener('error', function (e) {
   var im = e.target;
+  if (im && im.tagName === 'IMG' && im.classList && im.classList.contains('nimg') && im.parentNode) { var nb = im.parentNode; if (nb.parentNode) nb.parentNode.removeChild(nb); return; }      // عکسِ خبر نیامد: خبر بدون عکس می‌ماند
   if (im && im.tagName === 'IMG' && im.parentNode && im.parentNode.classList.contains('tile')) {
     if (im.dataset.r) { var rs = im.dataset.r; im.removeAttribute('data-r'); im.src = rs; return; }   // فایل محلی خراب بود؛ از اینترنت
     var t = im.parentNode; t.classList.add('fb'); t.innerHTML = bottle(+im.dataset.k || 0, themeNow() === 'light');
@@ -345,7 +346,7 @@ function ModelFocus(kind, host, data, anchor) {
   var el = div('mod mg ' + (z ? 'mz' : 'mh'), (z ? '<div class="blob b1"></div><div class="blob b2"></div><div class="blob b3"></div>' : '<div class="ov"></div>') + '<div class="hdr"><div><div class="t1">قیمت امروز</div><div class="t2"></div></div><div class="cl"></div></div><div class="scl"></div><div class="fs2"></div><div class="bub2"></div>');
   el.style.setProperty('--rh', RH + 'px'); el.style.setProperty('--gap', GAP + 'px');
   host.appendChild(el);
-  var L = data.list, scl = el.querySelector('.scl'), cl = el.querySelector('.cl'), cur = -1, gl = '', rf = 0, CY = 300;
+  var L = data.list, scl = el.querySelector('.scl'), cl = el.querySelector('.cl'), cur = -1, gl = '', rf = 0, CY = 300, force = -1;      // force: عطرِ بالای فهرست که به خط وسط نمی‌رسد ولی عکسش باز است؛ تا اولین اسکرولِ دست، همان «برجسته» می‌ماند
   el.querySelector('.t1').textContent = data.title; el.querySelector('.t2').textContent = data.sub;
   scl.innerHTML = '<div class="vt" style="position:relative;height:' + (L.length * P) + 'px"></div>';
   var vt = scl.firstChild, live = {}, tmp = document.createElement('div');
@@ -391,13 +392,14 @@ function ModelFocus(kind, host, data, anchor) {
       if (ad < bd) { bd = ad; best = j; }
       fx(ensure(j), d, ad);
     }
+    if (force >= 0) { if (s > 3) force = -1; else { best = force; bd = 0; } }
     for (var k = lo; k <= hi; k++) live[k].classList.toggle('on', k === best && bd < .55);
     Object.keys(live).forEach(function (key) { if (+key < lo - 4 || +key > hi + 4) { live[key].remove(); delete live[key]; } });
     if (best !== cur) { cur = best; setCur(best); }
   }
   var down = false, settle = 0, jump = false;
   function settleNow() {
-    if (down || jump) return;
+    if (down || jump || force >= 0) return;      // عطرِ بالای فهرست برجسته است؛ جابه‌جایی‌اش نکن
     var s = scl.scrollTop, j = clamp(Math.round((s + CY - PAD - RH / 2) / P), 0, L.length - 1), t = PAD + j * P + RH / 2 - CY, d = t - s;
     if (Math.abs(d) > 1.5 && Math.abs(d) < P * .6 && t >= 0) { try { scl.scrollTo({ top: t, behavior: RM ? 'auto' : 'smooth' }); } catch (e) { scl.scrollTop = t; } }
   }
@@ -406,15 +408,19 @@ function ModelFocus(kind, host, data, anchor) {
   scl.addEventListener('touchstart', function () { down = true; }, { passive: true });
   function rel() { down = false; clearTimeout(settle); settle = setTimeout(settleNow, 160); }
   scl.addEventListener('pointerup', rel); scl.addEventListener('pointercancel', rel); scl.addEventListener('touchend', rel, { passive: true });
-  var strip = Strip(el.querySelector('.fs2'), { letters: data.LET, box: el, bub: el.querySelector('.bub2'), curve: z ? 0 : 14, pick: function (i) { jump = true; clearTimeout(settle); scl.scrollTop = PAD + data.FI[data.LET[i]] * P + RH / 2 - CY; setTimeout(function () { jump = false; }, 400); } });
+  var strip = Strip(el.querySelector('.fs2'), { letters: data.LET, box: el, bub: el.querySelector('.bub2'), curve: z ? 0 : 14, pick: function (i) { jump = true; clearTimeout(settle); var fi = data.FI[data.LET[i]], t = PAD + fi * P + RH / 2 - CY; force = t < 0 && fi >= 0 && fi < L.length ? fi : -1; scl.scrollTop = Math.max(0, t); run(); setTimeout(function () { jump = false; }, 400); } });
   function onR() { geom(); run(); }
   window.addEventListener('resize', onR);
   geom();
-  scl.scrollTop = anchor ? PAD + idxOf(L, anchor) * P + RH / 2 - CY : 0;
+  function focusAnchor() {      // عطرِ لنگر؛ اگر بالای فهرست است و به خط وسط نمی‌رسد، همان برجسته می‌ماند
+    var ai = anchor ? idxOf(L, anchor) : -1, t = ai >= 0 ? PAD + ai * P + RH / 2 - CY : 0;
+    force = t < 0 && ai >= 0 && L[ai] && L[ai].id === anchor ? ai : -1; scl.scrollTop = Math.max(0, t);
+  }
+  focusAnchor();
   run();
-  requestAnimationFrame(function () { geom(); if (anchor) scl.scrollTop = PAD + idxOf(L, anchor) * P + RH / 2 - CY; run(); });
+  requestAnimationFrame(function () { geom(); if (anchor) focusAnchor(); run(); });
   return {
-    el: el, goto: function (i) { scl.scrollTop = PAD + i * P + RH / 2 - CY; }, getAnchor: function () { return L[cur] ? L[cur].id : null; },
+    el: el, goto: function (i) { var t = PAD + i * P + RH / 2 - CY; force = t < 0 && i >= 0 && i < L.length ? i : -1; scl.scrollTop = Math.max(0, t); run(); }, getAnchor: function () { return L[cur] ? L[cur].id : null; },
     theme: function () { setCur(cur < 0 ? 0 : cur); },
     refresh: function () {
       Object.keys(live).forEach(function (k) {
@@ -645,7 +651,7 @@ function histTake() {
   try {
     var now = Date.now(), a = actv();
     if (!db.ready || !a.length || !a.every(function (s) { return db.t[s.id] && now - db.t[s.id] < 12 * 3600e3; })) return;   // همه‌ی سایت‌های روشن باید تازه باشند؛ وگرنه کالاهای یک سایتِ خراب «ناموجود» دیده می‌شوند
-    Core.histSnap(hist, FLAT, order().join(','), now, function (g) { return [GN[g.gn], g.conc].filter(Boolean).join(' · '); }, set.block.join(','));
+    Core.histSnap(hist, FLAT, order().join(','), now, function (g) { return [GN[g.gn], g.conc].filter(Boolean).join(' · '); }, set.block.join(','), function (g) { var a = VA[g.id]; return a ? { b: a.b, m: a.m } : null; });
     if (!ls.set('pp.hist', hist)) {
       Object.keys(hist.d).forEach(function (k) { var e = hist.d[k]; if (e.p && e.p.length > 2) e.p = [e.p[0], e.p[e.p.length - 1]]; });
       if (!ls.set('pp.hist', hist)) { hist = Core.histNew(); ls.set('pp.hist', hist); }
@@ -653,7 +659,7 @@ function histTake() {
     if (mkOn) { var sc = $('mkr').scrollTop; mkRender(); $('mkr').scrollTop = sc; }
   } catch (e) { console.error(e); }
 }
-var mkTab = 'sum', mkMore = {};
+var mkTab = 'news', mkMore = {};
 function dayT(d) { return d < 1 ? 'امروز' : fa(d) + ' روز پیش'; }
 function srcName(id) { var r = ''; Core.SOURCES.forEach(function (s) { if (s.id === id) r = s.name; }); return r || id; }
 function spark(pts) {                                    // نمودارِ کوچکِ تغییر قیمت
@@ -662,56 +668,125 @@ function spark(pts) {                                    // نمودارِ کو�
   var xy = pts.map(function (v, i) { return (i * (w - 4) / (pts.length - 1) + 2).toFixed(1) + ',' + (h - 2 - ((v - mn) / d) * (h - 4)).toFixed(1); }).join(' ');
   return '<svg class="spk" width="56" height="18" viewBox="0 0 56 18" aria-hidden="true"><polyline points="' + xy + '" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/></svg>';
 }
+/* عکسِ کوچکِ عطر در ردیف‌ها؛ اگر عطر صفحه‌ی خودش را ندارد (مثلاً ناموجود شده) یک بطریِ ساده */
+function mkPh(gid, name) {
+  var id = VM[gid], im = id ? entryImg(id) : null, k = 0;
+  if (!im) String(name || '').split('').forEach(function (c) { k = (k * 31 + c.charCodeAt(0)) % 64; });
+  return '<span class="mph">' + tile({ loc: im ? im.loc : '', img: im ? im.img : '', k: im ? im.k : k }) + '</span>';
+}
 function mkRow(r, val, sub, spk) {
-  var m = VM[r.gid], a = VA[r.gid], lab = [a && a.bn, r.l, fa(r.ml) + ' میل'].filter(Boolean).join(' · ');
-  var st = (r.stores && r.stores.length) ? 'فروشگاه‌ها: ' + r.stores.map(srcName).join('، ') : '';
-  return '<button type="button" class="mkr" ' + (m ? 'data-m="' + esc(m) + '"' : 'data-q="' + esc(r.name) + '"') + '><div class="mi"><b>' + esc(r.name) + '</b><small>' + esc(lab) + '</small>' + (sub ? '<small>' + sub + '</small>' : '') + (st ? '<small>' + esc(st) + '</small>' : '') + '</div><div class="mv ' + val[0] + '"><b>' + val[1] + '</b>' + (val[2] ? '<small>' + val[2] + '</small>' : '') + (spk ? spk : '') + '</div></button>';
+  var m = VM[r.gid], a = VA[r.gid], lab = [a && a.bn, r.l, fa(r.ml) + ' میل'].filter(Boolean).join('، ');      // «·» کنارِ رقم شبیهِ «۰» دیده می‌شود؛ ویرگول خواناتر است
+  return '<button type="button" class="mkr pr" ' + (m ? 'data-m="' + esc(m) + '"' : 'data-q="' + esc(r.name) + '"') + '>' + mkPh(r.gid, r.name)
+    + '<div class="mi"><b>' + esc(r.name) + '</b><small>' + esc(lab) + '</small><div class="mv ' + val[0] + '"><b>' + val[1] + '</b>' + (val[2] ? '<small>' + val[2] + '</small>' : '') + (spk || '') + '</div>'
+    + (sub ? '<small>' + sub + '</small>' : '') + '</div></button>';
 }
 function mkInfo(title, body) { return '<div class="mks">' + title + '</div><div class="mkh">' + body + '</div>'; }
 function mkSec(id, title, hint, rows, cap0) {
-  var base = cap0 || 10, cap = mkMore[id] ? base * 5 : base, shown = rows.slice(0, cap), more = rows.length - shown.length;
+  var base = cap0 || 10, cap = base + (mkMore[id] | 0) * base * 4, shown = rows.slice(0, cap), more = rows.length - shown.length;
   return '<div class="mks">' + title + (rows.length ? ' <span class="mkn">(' + fa(rows.length) + ' مورد)</span>' : '') + '</div><div class="mkh">' + hint + '</div>'
     + (rows.length ? shown.join('') + (more > 0 ? '<button type="button" class="mkmore" data-s="' + id + '">نمایش بیشتر (' + fa(Math.min(more, base * 4)) + ' مورد دیگر)</button>' : '') : '<div class="mkn">موردی نیست.</div>');
 }
-var mkCmp = { sort: 'd', gn: '' }, mkBr = { sort: 'n' };
+var mkCmp = { sort: 'd', gn: '' };
 function fa1(x) { return (Math.round(x * 10) / 10).toString().replace('.', '٫').replace(/\d/g, function (d) { return '۰۱۲۳۴۵۶۷۸۹'[d]; }); }
 function tmM(n) { return n >= 1e6 ? fa1(n / 1e6) + ' میلیون' : fa(n); }                 // ۱۰٫۹ میلیون
 function mkChips(key, st, opts) {
   return '<div class="srchips mkch">' + opts.map(function (o) { return '<button type="button" data-k="' + key + '" data-v="' + o[0] + '"' + (st[key] === o[0] ? ' class="on"' : '') + '>' + o[1] + '</button>'; }).join('') + '</div>';
 }
-var TIER_L = ['زیر ۲ میلیون', '۲ تا ۴ میلیون', '۴ تا ۶ میلیون', '۶ تا ۹ میلیون', '۹ تا ۱۴ میلیون', 'بالای ۱۴ میلیون'];
 function mkView() {
   var vis = function (g) { var a = VA[g.id]; return !(a && (set.hide[a.m] || (set.off || {})[a.b])); };
   var lab = function (g) { return [GN[g.gn], g.conc].filter(Boolean).join(' · '); };
-  var key = FLAT.length + ':' + treeStamp + ':' + Object.keys(set.hide).length + ':' + Object.keys(set.off || {}).length;
+  var key = FLAT.length + ':' + treeStamp + ':' + Object.keys(set.hide).sort().join(',') + ':' + Object.keys(set.off || {}).sort().join(',');      // نه فقط تعداد؛ عوض کردنِ یک برند با برندِ دیگر هم دیده شود
   if (mkView.k === key && mkView.v) return mkView.v;
   var V = Core.marketView(FLAT.filter(vis), { lab: lab, brand: function (gid) { var a = VA[gid]; return a ? { id: a.b, name: a.bn } : null; } });
   mkView.k = key; mkView.v = V; return V;
 }
+/* ---- خبرِ سایت‌ها (مجلهٔ همان فروشگاه‌ها): ذخیره می‌شود، هر چند ساعت یک بار خودش تازه می‌شود، نقطهٔ قرمزِ کنارِ دکمه یعنی خبرِ نادیده ---- */
+var news = (function () { var n = ls.get('pp.news', null); if (!n || typeof n !== 'object' || !Array.isArray(n.items)) return { t: 0, items: [], notes: {} }; n.items = n.items.filter(function (x) { return x && typeof x.t === 'string' && typeof x.u === 'string' && Core.itemUrl('x', x.u); }); n.t = +n.t || 0; n.notes = n.notes && typeof n.notes === 'object' ? n.notes : {}; return n; })();
+var newsBusy = false, newsTok = 0;
+function newsSeenMax() { return +ls.get('pp.newsSeen', 0) || 0; }
+function nwDot() { try { var seen = newsSeenMax(); $('nw').classList.toggle('nu', !mkOn && news.items.some(function (x) { return x.d > seen; })); } catch (e) { } }
+function newsMarkSeen() { var m = 0; news.items.forEach(function (x) { if (x.d > m) m = x.d; }); if (m > newsSeenMax()) ls.set('pp.newsSeen', m); nwDot(); }
+function mkKeep() { var sc = $('mkr').scrollTop; try { mkRender(); } catch (e) { console.error(e); } $('mkr').scrollTop = sc; }
+function newsLoad(mode) {                  // mode: 'force' (دکمه‌ی «دوباره»)، 'open' (باز شدنِ گزارش)، 'bg' (پس‌زمینه)
+  if (newsBusy) return;
+  var now = Date.now(), gap = mode === 'force' ? 0 : mode === 'open' ? 10 * 60e3 : 60 * 60e3;
+  if (mode !== 'force' && news.t && now - news.t < 3 * 3600e3) return;                // خبرِ تازه دارد
+  if (now - (+ls.get('pp.newsTry', 0) || 0) < gap) return;                            // تازه تلاش شده؛ اینترنتِ ضعیف را خسته نکند
+  ls.set('pp.newsTry', now); newsBusy = true; var tok = ++newsTok;
+  if (mkOn && mkTab === 'news') mkKeep();
+  var done = function (r) {
+    if (tok !== newsTok || !newsBusy) return; newsBusy = false;
+    if (r && r.items && r.items.length) {
+      var nt = r.notes || {}, keep = news.items.filter(function (x) { return nt[x.s] === 'fail'; }), all = r.items.concat(keep).sort(function (a, b) { return b.d - a.d; }).slice(0, 12);      // سایتی که این بار جواب نداد، خبرهای قبلی‌اش نپرد
+      news = { t: Date.now(), items: all, notes: nt }; ls.set('pp.news', news);
+    }
+    else if (r) news.notes = r.notes || {};
+    if (mkOn && mkTab === 'news') { newsMarkSeen(); mkKeep(); } else nwDot();
+  };
+  try { Core.fetchNews(net).then(done, function (e) { console.error(e); done(null); }); } catch (e) { console.error(e); done(null); }
+}
+function newsCard(x) {
+  var dd = x.d > 0 ? Math.max(0, Math.floor((Date.now() - x.d) / 864e5)) : -1;
+  return '<button type="button" class="nwc" data-u="' + esc(x.u) + '">' + (x.img ? '<span class="nim"><img class="nimg" src="' + esc(x.img) + '" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer"></span>' : '')
+    + '<span class="nin"><b>' + esc(x.t) + '</b>' + (x.x ? '<small>' + esc(x.x) + '</small>' : '') + '<em>' + esc(x.sn || '') + (dd >= 0 ? '، ' + dayT(dd) : '') + '</em></span></button>';
+}
+function mkNewsSec() {
+  var items = news.items, h = '<div class="mks">خبر از سایت‌های فروشگاهی</div>';
+  if (items.length) {
+    var cap = 5 + (mkMore.news | 0) * 7, shown = items.slice(0, cap), more = items.length - shown.length;
+    h += '<div class="mkh">تازه‌ترین نوشته‌های مجلهٔ فروشگاه‌ها' + (news.t ? ' (' + agoText(Date.now() - news.t) + ' بروز شد)' : '') + '. روی خبر بزنید تا در مرورگر باز شود.</div>' + shown.map(newsCard).join('')
+      + (more > 0 ? '<button type="button" class="mkmore" data-s="news">نمایش بیشتر (' + fa(Math.min(more, 7)) + ' خبر دیگر)</button>' : '')
+      + (newsBusy ? '<div class="mkn"><span class="spn"></span>در حال گرفتن خبرهای تازه…</div>' : '');
+  } else if (newsBusy) h += '<div class="mkn"><span class="spn"></span>در حال گرفتن خبر از سایت‌ها…</div>';
+  else h += '<div class="mkn">فعلاً خبری از سایت‌ها نرسید. شاید اینترنت ضعیف است یا سایت‌ها خبر تازه نگذاشته‌اند.</div><button type="button" class="mkmore" data-act="news">دوباره امتحان کن</button>';
+  return h;
+}
 function mkRender() {
   var tm = function (n) { return fa(n) + ' تومان'; }, pct = function (x) { return fa(Math.abs(x) * 100) + '٪'; };
-  var vis = function (r) { var a = VA[r.gid]; return !(a && (set.hide[a.m] || (set.off || {})[a.b])); };      // پنهان‌شده‌ها و برندهای خاموش در گزارش نیایند
+  var vis = function (r) { var a = VA[r.gid] || (r.b ? { m: r.hm, b: r.b } : null); return !(a && ((a.m && set.hide[a.m]) || (set.off || {})[a.b])); };      // پنهان‌شده‌ها و برندهای خاموش در گزارش نیایند (حتی وقتی عطر دیگر در فهرست نیست)
   Array.prototype.forEach.call($('mkt2').children, function (b) { b.classList.toggle('on', b.dataset.t === mkTab); });
-  var h = '', V = mkView(), sc = mkTab === 'sum' || mkTab === 'chg';
-  var R = sc ? Core.histReport(hist, FLAT, Date.now(), { thr: 0.08, lab: function (g) { return [GN[g.gn], g.conc].filter(Boolean).join(' · '); } }) : null;
+  var h = '', V = mkView(), hs = mkTab === 'news' || mkTab === 'chg';
+  var R = hs ? Core.histReport(hist, FLAT, Date.now(), { thr: 0.08, sig: order().join(','), lab: function (g) { return [GN[g.gn], g.conc].filter(Boolean).join(' · '); } }) : null;
   if (R) ['up', 'down', 'gone', 'back', 'low', 'fresh'].forEach(function (k) { R[k] = R[k].filter(vis); });
   var dealRow = function (r) {
     return mkRow(r, ['gn', pct(r.pct) + ' اختلاف', tm(r.d) + ' فرق'], 'ارزان‌تر: ' + esc(srcName(r.loS)) + '، ' + tm(r.lo) + '<br>گران‌تر: ' + esc(srcName(r.hiS)) + '، ' + tm(r.hi));
   };
-  if (mkTab === 'sum') {
-    var MS = Core.marketStats(FLAT.filter(function (g) { return vis({ gid: g.id }); })), lo = lastOk(), span = R.span;
-    h += '<div class="mkg"><div class="mkk"><b>' + fa(V.nPerf) + '</b><small>عطر</small></div><div class="mkk"><b>' + fa(TREE.length) + '</b><small>برند</small></div><div class="mkk"><b>' + fa(MS.multi) + '</b><small>اندازه در چند فروشگاه</small></div>'
-      + '<div class="mkk"><b>' + (V.med100 ? tmM(V.med100) : '—') + '</b><small>میانهٔ قیمت ۱۰۰ میل</small></div><div class="mkk"><b>' + fa(V.nDeals) + '</b><small>عطر با اختلاف قیمت</small></div><div class="mkk"><b>' + (lo ? esc(agoText(Date.now() - lo)) : '—') + '</b><small>آخرین بروزرسانی</small></div></div>';
+  var rowFresh = function (r) { return mkRow(r, ['dn', 'تازه آمده', dayT(r.ago)], 'قیمت: ' + tm(r.price)); };
+  var rowBack = function (r) { return mkRow(r, ['dn', 'دوباره موجود شد', dayT(r.ago)], 'قیمت: ' + tm(r.price)); };
+  if (mkTab === 'news') {
+    /* ۱) تیترهای امروز: هر کدام با یک لمس به فهرستِ کامل می‌رود */
+    var hl = [], hb = function (cls, n, txt, go) { hl.push('<button type="button" class="hl" data-go="' + go + '"><i class="' + cls + '">' + fa(n) + '</i><span>' + txt + '</span><em aria-hidden="true">‹</em></button>'); };
+    if (R.down.length) hb('dn', R.down.length, 'عطر ارزان‌تر شده', 'chg');
+    if (R.fresh.length) hb('dn', R.fresh.length, 'عطر تازه به بازار آمده', 'chg');
+    if (R.back.length) hb('dn', R.back.length, 'عطر دوباره موجود شده', 'chg');
+    if (R.up.length) hb('up', R.up.length, 'عطر گران‌تر شده', 'chg');
+    if (R.gone.length) hb('up', R.gone.length, 'عطر ناموجود شده', 'chg');
+    if (V.nDeals) hb('gn', V.nDeals, 'عطر در فروشگاه‌ها قیمتِ متفاوت دارد', 'cmp');
+    h += '<div class="mks first">امروز در بازار</div>';
+    h += hl.length ? '<div class="mkhl">' + hl.join('') + '</div>' : '';
+    if (!R.down.length && !R.up.length && !R.fresh.length && !R.back.length && !R.gone.length)
+      h += '<div class="mkh">' + (R.span < 1 ? 'ثبتِ تغییرِ قیمت‌ها از امروز شروع شده. بعد از چند روز این‌جا می‌نویسد کدام عطرها ارزان یا گران شده‌اند.' : 'در روزهای اخیر تغییرِ قابل‌توجهی در قیمت‌ها نبوده.') + '</div>';
+    /* ۲) خبرِ سایت‌ها */
+    h += mkNewsSec();
+    /* ۳) تازه‌ها و دوباره‌موجودها */
+    if (R.fresh.length) h += mkSec('nfresh', 'تازه‌های بازار', 'در هفته‌ی اخیر برای اولین بار در فروشگاه‌ها دیده شده‌اند.', R.fresh.map(rowFresh), 4);
+    if (R.back.length) h += mkSec('nback', 'دوباره موجود شدند', 'مدتی نبودند و دوباره پیدا شدند.', R.back.map(rowBack), 3);
+    /* ۴) بهترین فرصت‌های خرید */
+    var dl = V.deals.slice().sort(function (a, b) { return b.d - a.d; }).slice(0, 3);
+    if (dl.length) h += mkInfo('بهترین فرصت‌های خرید', 'بیشترین صرفه‌جویی با خرید از ارزان‌ترین فروشگاه. قبل از خرید، قیمت را خودتان هم چک کنید.') + dl.map(dealRow).join('') + '<button type="button" class="mkmore" data-go="cmp">دیدن همهٔ مقایسه‌ها</button>';
+  } else if (mkTab === 'cmp') {
+    var MS = Core.marketStats(FLAT.filter(function (g) { return vis({ gid: g.id }); })), lo = lastOk();
+    h += '<div class="mkh first">' + (lo ? 'قیمت‌ها ' + esc(agoText(Date.now() - lo)) + ' بروز شد. ' : '') + fa(V.nPerf) + ' عطر از ' + fa(TREE.length) + ' برند.</div>';
     /* نتیجه‌گیری‌های آماده: بدون نیاز به تاریخچه */
     var best = null, worst = null;
     Object.keys(MS.bySrc).forEach(function (id) { var s = MS.bySrc[id]; if (s.shared < 5) return; if (!best || s.avg < MS.bySrc[best].avg) best = id; if (!worst || s.avg > MS.bySrc[worst].avg) worst = id; });
     var ins = [];
-    if (best && worst && best !== worst) ins.push('<b>' + esc(srcName(best)) + '</b> در عطرهای مشترک معمولاً ارزان‌ترین است (' + pct(MS.bySrc[best].avg - 1) + ' زیر میانهٔ بازار)؛ <b>' + esc(srcName(worst)) + '</b> معمولاً گران‌تر است (' + pct(MS.bySrc[worst].avg - 1) + ' بالاتر).');
+    if (best && worst && best !== worst && MS.bySrc[worst].avg - MS.bySrc[best].avg >= 0.01) ins.push('<b>' + esc(srcName(best)) + '</b> در عطرهای مشترک معمولاً ارزان‌ترین است (' + pct(MS.bySrc[best].avg - 1) + ' زیر میانهٔ بازار)؛ <b>' + esc(srcName(worst)) + '</b> معمولاً گران‌تر است (' + pct(MS.bySrc[worst].avg - 1) + ' بالاتر).');
     if (V.nDeals) ins.push('در <b>' + fa(V.nDeals) + '</b> عطر، فروشگاه‌ها بیش از ۵٪ با هم اختلاف دارند. اگر همه را از ارزان‌ترین فروشگاه بخرید، در مجموع <b>' + tm(V.save) + '</b> صرفه‌جویی می‌شود.');
     var bs = V.brands.filter(function (b) { return b.n >= 3; }).sort(function (a, b) { return b.med - a.med; });
     if (bs.length >= 2) ins.push('گران‌ترین برند (میانهٔ ۱۰۰ میل): <b>' + esc(bs[0].name) + '</b> با ' + tmM(bs[0].med) + ' تومان؛ ارزان‌ترین: <b>' + esc(bs[bs.length - 1].name) + '</b> با ' + tmM(bs[bs.length - 1].med) + ' تومان.');
-    if (V.top[0]) ins.push('گران‌ترین عطر ۱۰۰ میلی: <b>' + esc(V.top[0].name) + '</b> (' + tmM(V.top[0].price) + ' تومان)؛ ارزان‌ترین: <b>' + esc(V.low[0].name) + '</b> (' + tmM(V.low[0].price) + ' تومان).');
-    if (ins.length) h += mkInfo('خلاصهٔ بازار', ins.map(function (t) { return '• ' + t; }).join('<br>'));
+    if (V.top[0] && V.low[0]) ins.push('گران‌ترین عطر ۱۰۰ میلی: <b>' + esc(V.top[0].name) + '</b> (' + tmM(V.top[0].price) + ' تومان)؛ ارزان‌ترین: <b>' + esc(V.low[0].name) + '</b> (' + tmM(V.low[0].price) + ' تومان).');
+    if (ins.length) h += '<div class="mks">نتیجه</div>' + ins.map(function (t) { return '<div class="mki">' + t + '</div>'; }).join('');
     var rowsS = Object.keys(MS.bySrc).sort(function (a, b) { return MS.bySrc[b].n - MS.bySrc[a].n; }).map(function (id) {
       var s = MS.bySrc[id], line1 = fa(s.n) + ' اندازه‌ی عطر دارد', line2 = '', cls = 'gn', val = '—';
       if (s.shared >= 5) {
@@ -721,64 +796,53 @@ function mkRender() {
       return '<div class="mkr nl"><div class="mi"><b>' + esc(srcName(id)) + '</b><small>' + line1 + '</small><small>' + line2 + '</small></div><div class="mv ' + cls + '"><b>' + val + '</b><small>نسبت به میانهٔ بازار</small></div></div>';
     });
     h += mkInfo('فروشگاه‌ها با هم', 'قیمتِ هر فروشگاه در عطرهایی که چند فروشگاه دارند با میانهٔ بازار مقایسه شده است. فروشگاهی که معمولاً «ارزان‌تر» است جای خوبی برای خرید است.') + (rowsS.join('') || '<div class="mkn">هنوز داده‌ی کافی نیست.</div>');
-    var mx = Math.max.apply(null, V.tiers.concat([1])), tot = V.tiers.reduce(function (a, b) { return a + b; }, 0);
-    if (tot) h += mkInfo('قیمت‌ها چقدر پراکنده‌اند؟', 'تعداد عطرهای ۱۰۰ میلی در هر بازهٔ قیمت (تومان).') + V.tiers.map(function (n, i) {
-      return '<div class="mkbar"><span>' + TIER_L[i] + '</span><i style="width:' + Math.max(n ? 3 : 0, Math.round(n / mx * 100)) + '%"></i><b>' + fa(n) + '</b></div>';
-    }).join('');
-    var dl = V.deals.slice().sort(function (a, b) { return b.d - a.d; }).slice(0, 5);
-    if (dl.length) h += mkInfo('بهترین فرصت‌های خرید', 'بیشترین صرفه‌جویی (به تومان) با خرید از ارزان‌ترین فروشگاه. قبل از خرید، قیمت را خودتان هم چک کنید.') + dl.map(dealRow).join('')
-      + '<button type="button" class="mkmore" data-go="cmp">دیدن همهٔ مقایسه‌ها</button>';
-    var T = R.trend;
-    h += mkInfo('روند قیمت‌ها', T.n >= 5
-      ? 'از ' + fa(T.n) + ' عطری که تاریخچه دارد: <b>' + fa(T.up) + '</b> گران‌تر شده، <b>' + fa(T.down) + '</b> ارزان‌تر شده و <b>' + fa(T.same) + '</b> تقریباً ثابت مانده است. میانهٔ تغییر: <b>' + (T.med > 0.0005 ? pct(T.med) + ' گران‌تر' : T.med < -0.0005 ? pct(T.med) + ' ارزان‌تر' : 'تقریباً بدون تغییر') + '</b>.'
-      : 'تاریخچه ' + (span < 1 ? 'از همین امروز' : 'از ' + fa(span) + ' روز پیش') + ' ثبت می‌شود. بعد از چند روز اینجا می‌نویسد بازار گران می‌شود یا ارزان؛ و تب «تغییرات» پر می‌شود.');
-  } else if (mkTab === 'cmp') {
     var rows = V.deals.filter(function (r) { return !mkCmp.gn || r.gn === mkCmp.gn; });
     rows.sort(mkCmp.sort === 'p' ? function (a, b) { return b.pct - a.pct; } : function (a, b) { return b.d - a.d; });
     h += mkChips('sort', mkCmp, [['d', 'بیشترین صرفه'], ['p', 'بیشترین درصد']]) + mkChips('gn', mkCmp, [['', 'همه'], ['m', 'مردانه'], ['w', 'زنانه'], ['u', 'یونیسکس']]);
-    h += mkSec('cmp', 'مقایسهٔ فروشگاه‌ها', 'همان عطر و همان اندازه که چند فروشگاه دارند و قیمت‌شان دست‌کم ۵٪ فرق دارد. ممکن است یکی از قیمت‌ها اشتباه باشد؛ قبل از خرید چک کنید.', rows.map(dealRow), 30);
-  } else if (mkTab === 'brand') {
-    var bl = V.brands.filter(function (b) { return b.n >= 2; });
-    bl.sort(mkBr.sort === 'hi' ? function (a, b) { return b.med - a.med; } : mkBr.sort === 'lo' ? function (a, b) { return a.med - b.med; } : function (a, b) { return b.n - a.n; });
-    h += mkChips('sort', mkBr, [['n', 'بیشترین عطر'], ['hi', 'گران‌ترین'], ['lo', 'ارزان‌ترین']]);
-    h += mkSec('brand', 'سطح قیمتِ برندها', 'قیمتِ «میانه» یعنی نیمی از عطرهای برند ارزان‌تر و نیمی گران‌تر از آن است؛ برای مقایسهٔ عادلانه همه به ۱۰۰ میل رسانده شده.',
-      bl.map(function (b) {
-        var br = BR_BY[b.id], sub = b.lo && b.hi && b.lo.gid !== b.hi.gid ? 'ارزان‌ترین: ' + esc(b.lo.name) + ' (' + tmM(b.lo.ppm) + ')<br>گران‌ترین: ' + esc(b.hi.name) + ' (' + tmM(b.hi.ppm) + ')' : '';
-        return '<button type="button" class="mkr' + (br ? '" data-b="' + esc(b.id) : ' nl') + '"><div class="mi"><b>' + esc(b.name) + '</b><small>' + fa(b.n) + ' عطر</small>' + (sub ? '<small>' + sub + '</small>' : '') + '</div><div class="mv gn"><b>' + tmM(b.med) + '</b><small>تومان، میانهٔ ۱۰۰ میل</small></div></button>';
-      }), 15);
+    h += mkSec('cmp', 'کدام عطر را از کجا بخرم؟', 'همان عطر و همان اندازه که چند فروشگاه دارند و قیمت‌شان دست‌کم ۵٪ فرق دارد. ممکن است یکی از قیمت‌ها اشتباه باشد؛ قبل از خرید چک کنید.', rows.map(dealRow), 12);
   } else {
-    h += '<div class="mkh">' + (R.span < 1 ? 'ثبت تاریخچه از همین امروز شروع شده است؛ بعد از چند روز این صفحه پر می‌شود.' : 'تاریخچه ' + fa(R.span) + ' روز است ثبت می‌شود.') + '</div>';
-    h += mkSec('up', 'گران شده‌اند', 'قیمت در ۳۰ روز اخیر دست‌کم ۸٪ بالا رفته. اگر از این‌ها دارید، احتمالاً می‌توانید گران‌تر بفروشید؛ اگر ندارید، زودتر بخرید.',
-      R.up.map(function (r) { return mkRow(r, ['up', pct(r.pct) + ' گران‌تر', tm(r.to - r.from) + ' بیشتر'], 'قبلاً ' + tm(r.from) + '، الان ' + tm(r.to) + '<br>' + dayT(r.ago) + ' شروع شد', spark(r.pts)); }));
+    var T = R.trend;
+    h += '<div class="mkh first">' + (R.span < 1 ? 'ثبت تاریخچه از همین امروز شروع شده است؛ بعد از چند روز این صفحه پر می‌شود.' : 'تاریخچه ' + fa(R.span) + ' روز است ثبت می‌شود.') + '</div>';
+    if (T.n >= 5) h += mkInfo('روند کلی', 'از ' + fa(T.n) + ' عطری که تاریخچه دارد: <b>' + fa(T.up) + '</b> گران‌تر شده، <b>' + fa(T.down) + '</b> ارزان‌تر شده و <b>' + fa(T.same) + '</b> تقریباً ثابت مانده است. میانهٔ تغییر: <b>' + (T.med > 0.0005 ? pct(T.med) + ' گران‌تر' : T.med < -0.0005 ? pct(T.med) + ' ارزان‌تر' : 'تقریباً بدون تغییر') + '</b>.');
     h += mkSec('down', 'ارزان شده‌اند', 'قیمت در ۳۰ روز اخیر دست‌کم ۸٪ پایین آمده. زمان خوبی برای خرید است.',
-      R.down.map(function (r) { return mkRow(r, ['dn', pct(r.pct) + ' ارزان‌تر', tm(r.from - r.to) + ' کمتر'], 'قبلاً ' + tm(r.from) + '، الان ' + tm(r.to) + '<br>' + dayT(r.ago) + ' شروع شد', spark(r.pts)); }));
+      R.down.map(function (r) { return mkRow(r, ['dn', pct(r.pct) + ' ارزان‌تر', dayT(r.ago)], 'قبلاً: ' + tm(r.from) + '<br>الان: <b class="nw">' + tm(r.to) + '</b>', spark(r.pts)); }), 8);
+    h += mkSec('up', 'گران شده‌اند', 'قیمت در ۳۰ روز اخیر دست‌کم ۸٪ بالا رفته. اگر از این‌ها دارید، احتمالاً می‌توانید گران‌تر بفروشید؛ اگر ندارید، زودتر بخرید.',
+      R.up.map(function (r) { return mkRow(r, ['up', pct(r.pct) + ' گران‌تر', dayT(r.ago)], 'قبلاً: ' + tm(r.from) + '<br>الان: <b class="nw">' + tm(r.to) + '</b>', spark(r.pts)); }), 8);
+    h += mkSec('back', 'دوباره موجود شده‌اند', 'مدتی نبودند و در دو هفته‌ی اخیر دوباره پیدا شدند.', R.back.map(rowBack), 8);
+    h += mkSec('fresh', 'تازه‌های بازار', 'در هفته‌ی اخیر برای اولین بار در فروشگاه‌ها دیده شده‌اند.', R.fresh.map(rowFresh), 8);
     h += mkSec('gone', 'ناموجود شده‌اند', 'این اندازه الان در هیچ‌کدام از فروشگاه‌ها دیده نمی‌شود. اگر مشتری خواست، زودتر تهیه کنید.',
-      R.gone.map(function (r) { return mkRow(r, ['up', 'ناموجود', dayT(r.ago)], (r.price ? 'آخرین قیمت: ' + tm(r.price) : '') + (r.was ? '<br>قبلاً در ' + fa(r.was) + ' فروشگاه بود' : '')); }));
-    h += mkSec('back', 'دوباره موجود شده‌اند', 'مدتی نبودند و در دو هفته‌ی اخیر دوباره پیدا شدند.',
-      R.back.map(function (r) { return mkRow(r, ['dn', 'دوباره موجود', dayT(r.ago)], 'قیمت: ' + tm(r.price)); }));
+      R.gone.map(function (r) { return mkRow(r, ['up', 'ناموجود', dayT(r.ago)], (r.price ? 'آخرین قیمت: ' + tm(r.price) : '') + (r.was ? '<br>قبلاً در ' + fa(r.was) + ' فروشگاه بود' : '')); }), 8);
     h += mkSec('low', 'موجودی کم شده', 'تعداد فروشگاه‌هایی که این را دارند کمتر شده؛ یعنی دارد کم‌یاب می‌شود.',
-      R.low.map(function (r) { return mkRow(r, ['gn', 'کم‌یاب', 'در ' + fa(r.now) + ' فروشگاه'], 'قبلاً در ' + fa(r.was) + ' فروشگاه بود، قیمت: ' + tm(r.price)); }));
-    h += mkSec('fresh', 'تازه‌های بازار', 'در هفته‌ی اخیر برای اولین بار در فروشگاه‌ها دیده شده‌اند.',
-      R.fresh.map(function (r) { return mkRow(r, ['dn', 'تازه', dayT(r.ago)], 'قیمت: ' + tm(r.price)); }));
+      R.low.map(function (r) { return mkRow(r, ['gn', 'کم‌یاب', 'در ' + fa(r.now) + ' فروشگاه'], 'قبلاً در ' + fa(r.was) + ' فروشگاه بود، قیمت: ' + tm(r.price)); }), 6);
   }
   $('mkr').innerHTML = h;
 }
 function openReport() {
+  mkTab = 'news';
   try { mkRender(); } catch (e) { console.error(e); toast('گزارش ساخته نشد', 3000); return; }      // تاریخچه‌ی سالم هرگز به‌خاطر یک خطا پاک نمی‌شود (داده‌ی خراب هنگام خواندن اصلاح می‌شود)
-  mkOn = true; closeSearch(); if (open) closeSheet(); $('mk').classList.add('on'); $('mkr').scrollTop = 0;
+  layerMark(); mkOn = true; closeSearch(); if (open) closeSheet(); $('mk').classList.add('on'); $('mkr').scrollTop = 0;
+  newsMarkSeen(); newsLoad('open');
 }
-function closeReport() { mkOn = false; $('mk').classList.remove('on'); }
-$('mkOpen').onclick = openReport; $('sMk').onclick = openReport; $('mkx').onclick = closeReport;
-$('mkt2').addEventListener('click', function (e) { var b = e.target.closest('button'); if (!b || !b.dataset.t) return; mkTab = b.dataset.t; try { mkRender(); } catch (e2) { console.error(e2); } $('mkr').scrollTop = 0; });
-$('mkr').addEventListener('click', function (e) {
-  var ch = e.target.closest('.mkch button'); if (ch) { (mkTab === 'brand' ? mkBr : mkCmp)[ch.dataset.k] = ch.dataset.v; mkRender(); return; }
-  var go = e.target.closest('button[data-go]'); if (go) { mkTab = go.dataset.go; mkRender(); $('mkr').scrollTop = 0; return; }
-  var bb = e.target.closest('button.mkr[data-b]'); if (bb) { var bid = bb.dataset.b; closeReport(); if (BR_BY[bid]) openEntry(bid); return; }
-  var mo = e.target.closest('button.mkmore[data-s]'); if (mo) { mkMore[mo.dataset.s] = 1; var sc = $('mkr').scrollTop; mkRender(); $('mkr').scrollTop = sc; return; }
-  var b = e.target.closest('button.mkr'); if (!b) return;
-  if (b.dataset.m && MD_BY[b.dataset.m]) { closeReport(); openDetail(b.dataset.m); return; }
-  if (b.dataset.q) { closeReport(); openSearch(); $('srq').value = b.dataset.q; srRender(); }      // عطری که صفحه‌ی مستقیم ندارد (مثلاً ناموجود شده): جستجو با نامش
+function closeReport() { layerMark(); mkOn = false; $('mk').classList.remove('on'); nwDot(); }
+$('nw').onclick = openReport; $('mkx').onclick = closeReport;
+$('mkt2').addEventListener('click', function (e) {
+  var b = e.target.closest('button'); if (!b || !b.dataset.t) return; mkTab = b.dataset.t;
+  try { mkRender(); } catch (e2) { console.error(e2); } $('mkr').scrollTop = 0;
+  if (mkTab === 'news') { newsMarkSeen(); newsLoad('open'); }
 });
+/* لمسِ هر ردیف، صفحه‌ی قیمتِ همان عطر را «روی» گزارش باز می‌کند؛ «برگشت» دوباره به همین گزارش (با همان جای اسکرول) برمی‌گرداند */
+$('mkr').addEventListener('click', function (e) {
+  if (ghosted()) return;
+  var ch = e.target.closest('.mkch button'); if (ch) { mkCmp[ch.dataset.k] = ch.dataset.v; mkKeep(); return; }
+  var go = e.target.closest('button[data-go]'); if (go) { mkTab = go.dataset.go; mkRender(); $('mkr').scrollTop = 0; return; }
+  var nc = e.target.closest('button.nwc'); if (nc) { openLink(nc.dataset.u); return; }
+  var ac = e.target.closest('button[data-act="news"]'); if (ac) { newsLoad('force'); return; }
+  var mo = e.target.closest('button.mkmore[data-s]'); if (mo) { mkMore[mo.dataset.s] = (mkMore[mo.dataset.s] | 0) + 1; mkKeep(); return; }
+  var b = e.target.closest('button.mkr'); if (!b) return;
+  if (b.dataset.m && MD_BY[b.dataset.m]) { openDetail(b.dataset.m); return; }
+  if (b.dataset.q) { closeReport(); openSearch(b.dataset.q); }      // عطری که صفحه‌ی مستقیم ندارد (مثلاً ناموجود شده): جستجو با نامش
+});
+nwDot();
 /* فهرستِ نمایشی را از حافظه می‌سازد؛ اگر فقط قیمت‌ها عوض شده باشد، همان صفحه سر جایش می‌ماند و فقط صفحه‌ی جزئیات (اگر باز است) بروز می‌شود */
 /* «مهرِ داده»: اگر هیچ قیمت/زمان/گروهی عوض نشده باشد، درخت دوباره ساخته نمی‌شود (ساختنش روی گوشی چند ثانیه است) و از فایلِ ذخیره‌شده خوانده می‌شود */
 function dataStamp(lang) {
@@ -871,8 +935,8 @@ function checkReady() {
 /* ---- رفتن بین سطح‌ها ---- */
 var swapping = false;
 function swap(anchor) {
-  var st = $('stage'); st.classList.add('out'); swapping = true;
-  setTimeout(function () { swapping = false; setEntries(); mountModel(anchor); navUi(); st.classList.remove('out'); }, RM ? 0 : 140);
+  var st = $('stage'); st.classList.add('out'); swapping = true; layerMark();
+  setTimeout(function () { swapping = false; setEntries(); mountModel(anchor); navUi(); st.classList.remove('out'); layerMark(); }, RM ? 0 : 140);      // نشانه‌ی دوم: ساختنِ لیست روی گوشیِ کند ممکن است از ۳۵۰ میلی‌ثانیه بیشتر طول بکشد
 }
 function openEntry(id) {
   if (swapping) return;
@@ -885,7 +949,7 @@ function goUp() {
   var b = nav.brand; nav.lvl = 0; nav.brand = null; swap(b); return true;
 }
 function navUi() { var dk = !!db.ready, was = document.body.classList.contains('dk'); document.body.classList.toggle('dk', dk); if (dk !== was) { try { window.dispatchEvent(new Event('resize')); } catch (e) { } }      // نوار پایین آمد/رفت: مدل لیست ارتفاعش را دوباره بسنجد
-  var b = $('bk'); if (b) b.classList.toggle('on', nav.lvl === 1 && !!db.ready); var q = $('sr'); if (q) q.style.display = db.ready && !(nav.lvl === 1) ? '' : 'none'; }
+  var b = $('bk'); if (b) b.classList.toggle('on', nav.lvl === 1 && !!db.ready); var q = $('sr'); if (q) q.style.display = db.ready && !(nav.lvl === 1) ? '' : 'none'; var nw = $('nw'); if (nw) nw.classList.toggle('on', !!db.ready && nav.lvl !== 1); }
 $('bk').onclick = function () { goUp(); };
 $('stage').addEventListener('click', function (e) {
   var h = e.target.closest && e.target.closest('.rw,.pn'); if (!h || !h.dataset.id) return;
@@ -907,10 +971,9 @@ function entryImg(id) {
   var o = BR_BY[id] || MD_BY[id]; if (!o) return null;
   return { img: o.img, big: o.big || o.img, loc: imgLoc[o.imgId] || '', k: parseInt(String(o.imgId).replace(/^b/, ''), 36) % 64 || 0, name: o.name };
 }
-var hideArm = 0;
 function dact(id) {
-  var fv = !!set.fav[id], armed = hideArm && Date.now() - hideArm < 5000;
-  return '<div class="dact"><button type="button" class="' + (fv ? 'on' : '') + '" data-a="fav">' + (fv ? '★ در لیست مغازه' : '☆ افزودن به لیست مغازه') + '</button><button type="button" class="warn" data-a="hide">' + (armed ? 'مطمئنید؟ دوباره بزنید' : 'درست نیست؛ پنهانش کن') + '</button></div>';
+  var fv = !!set.fav[id];
+  return '<div class="dact"><button type="button" class="' + (fv ? 'on' : '') + '" data-a="fav">' + (fv ? '★ در لیست مغازه' : '☆ افزودن به لیست مغازه') + '</button></div>';
 }
 function renderDetail() {
   var m = MD_BY[dtId]; if (!m) return;
@@ -938,27 +1001,33 @@ function recAdd(id) {
   set.rec.unshift([id, BR_BY[m.brandId].name + ' | ' + m.name]); if (set.rec.length > 10) set.rec.length = 10;
   ls.set('pp.set', set);
 }
+/* لمسِ دوباره (دو بار زدنِ پدر وقتی صفحه دیر باز می‌شود) نباید روی صفحه‌ی تازه یا زیرِ آن اثر بگذارد: چند لحظه بعد از باز و بسته شدنِ هر صفحه، لمس نادیده گرفته می‌شود */
+var layerT = 0;
+function layerMark() { layerT = Date.now(); }
+function ghosted() { if (window.__NOGHOST) return false; var d = Date.now() - layerT; return d >= 0 && d < 350; }      // (ساعتِ گوشی عقب برود: قفل نمی‌ماند)
+document.addEventListener('click', function (e) {      // یک نگهبانِ همگانی: لمسِ دوبارهٔ بی‌قصد روی هر چیزی (دکمه، ستاره، ردیف، اندازه…) در لحظه‌ی عوض شدنِ صفحه اثری ندارد
+  if (!ghosted()) return;
+  var t = e.target; if (t && t.closest && t.closest('input,textarea')) return;
+  e.stopPropagation(); e.preventDefault();
+}, true);
 function openDetail(id) {
-  hideArm = 0; recAdd(id);
+  layerMark(); recAdd(id);
   dtId = id; renderDetail(); $('dtc').scrollTop = 0;
-  dtEl.classList.add('on');
+  dtEl.classList.add('on'); layerMark();
 }
-function closeDetail() { hideArm = 0; dtId = null; dtEl.classList.remove('on'); }
+function closeDetail() { layerMark(); dtId = null; dtEl.classList.remove('on'); if (typeof fvOn !== 'undefined' && fvOn) { var sc = $('fvr').scrollTop; favRender(); $('fvr').scrollTop = sc; } }      // از صفحه‌ی قیمت لیست مغازه عوض شده باشد، لیستِ زیرش هم تازه شود
 $('dtx').onclick = closeDetail;
 $('dtc').addEventListener('click', function (e) {
+  if (ghosted()) return;
   var ab = e.target.closest && e.target.closest('.dact button');
   if (ab && dtId) {
     var m0 = MD_BY[dtId];
-    if (ab.dataset.a === 'fav') { if (set.fav[dtId]) delete set.fav[dtId]; else set.fav[dtId] = BR_BY[m0.brandId].name + ' | ' + m0.name; ls.set('pp.set', set); hideArm = 0; renderDetail(); }
-    else if (ab.dataset.a === 'hide') {
-      if (hideArm && Date.now() - hideArm > 500 && Date.now() - hideArm < 5000) { set.hide[dtId] = BR_BY[m0.brandId].name + ' | ' + m0.name; hideArm = 0; ls.set('pp.set', set); closeDetail(); rebuild(); renderSheet(); toast('پنهان شد. برگرداندن: تنظیمات، «عطرهای پنهان‌شده»', 4000); }
-      else { hideArm = Date.now(); renderDetail(); setTimeout(function () { if (dtId) renderDetail(); }, 5100); }
-    }
+    if (ab.dataset.a === 'fav' && m0) { layerMark(); if (set.fav[dtId]) delete set.fav[dtId]; else set.fav[dtId] = BR_BY[m0.brandId].name + ' | ' + m0.name; ls.set('pp.set', set); renderDetail(); }
     return;
   }
   if (e.target.closest('.dpic') && dtId) { var bm = MD_BY[dtId] && BR_BY[MD_BY[dtId].brandId]; viewImg(dtId, bm ? bm.models.map(function (m) { return m.id; }) : [dtId], 'detail'); return; }
   var g = e.target.closest('.go'); if (g) { openLink(g.dataset.u); return; }
-  var z = e.target.closest('.sz'); if (z && z.dataset.k) { var on = !z.classList.contains('on'); szOpen[z.dataset.k] = on; z.classList.toggle('on', on); if (z.nextElementSibling) z.nextElementSibling.classList.toggle('on', on); }
+  var z = e.target.closest('.sz'); if (z && z.dataset.k) { layerMark(); var on = !z.classList.contains('on'); szOpen[z.dataset.k] = on; z.classList.toggle('on', on); if (z.nextElementSibling) z.nextElementSibling.classList.toggle('on', on); }
 });
 
 /* ---- عکس بزرگ: بزرگ‌نمایی (دو انگشت / دو بار لمس)، جابه‌جایی، و کشیدن به چپ و راست برای عطر بعدی و قبلی ---- */
@@ -982,6 +1051,7 @@ function vwCaption() {
   $('vwn').style.display = n > 1 && vwIx < n - 1 ? '' : 'none'; $('vwp').style.display = n > 1 && vwIx > 0 ? '' : 'none';
 }
 function viewImg(id, seq, from) {
+  layerMark();
   if (seq) { vwSeq = seq; vwFrom = from || ''; vwIx = Math.max(0, seq.indexOf(id)); }
   showImg(id, 0);
   $('vw').classList.add('on');
@@ -1006,15 +1076,23 @@ function showImg(id, dir) {
   }
   if (dir) { var e0 = box.firstElementChild; if (e0) { e0.style.transform = 'translate3d(' + (dir * 60) + 'px,0,0)'; e0.style.opacity = '0'; e0.getBoundingClientRect(); e0.style.transition = 'transform .22s ease, opacity .22s ease'; e0.style.transform = ''; e0.style.opacity = '1'; } }
   vwCaption();
+  if (dir) vwSync(id);
   [vwSeq[vwIx + 1], vwSeq[vwIx - 1]].forEach(function (n) { var o = n && entryImg(n); if (o && (o.loc || o.img)) { var q = new Image(); q.referrerPolicy = 'no-referrer'; q.src = o.loc || o.img; } });      // عکسِ بعدی و قبلی از قبل آماده شود
+}
+/* با هر بار کشیدنِ عکس، پشتِ آن هم عطر عوض شود: لیست روی همان عطر می‌رود، یا صفحه‌ی قیمت‌ها همان عطر را نشان می‌دهد */
+function vwSync(id) {
+  try {
+    if (vwFrom === 'stage' && curModel && curModel.goto) { for (var i = 0; i < list.length; i++) if (list[i].id === id) { curModel.goto(i); break; } }
+    else if (vwFrom === 'detail' && dtId && dtId !== id && MD_BY[id]) { dtId = id; recAdd(id); renderDetail(); $('dtc').scrollTop = 0; }
+  } catch (e) { console.error(e); }
 }
 function vwGo(d) {      // d=+1 بعدی، d=-1 قبلی
   var n = vwIx + d; if (n < 0 || n >= vwSeq.length) { vwApply(true); return false; }
   showImg(vwSeq[n], d); return true;
 }
 function closeViewer() {
-  var was = vwId, from = vwFrom; vwId = null; vwTok++; $('vw').classList.remove('on'); vwPtr = {}; vwG = null;
-  if (from === 'detail' && was && dtId && was !== dtId && MD_BY[was]) { hideArm = 0; dtId = was; renderDetail(); $('dtc').scrollTop = 0; }      // با کشیدن به عطر دیگری رفته بودید: صفحه‌ی جزئیاتِ همان عطر باز بماند
+  layerMark(); var was = vwId, from = vwFrom; vwId = null; vwTok++; $('vw').classList.remove('on'); vwPtr = {}; vwG = null;
+  if (from === 'detail' && was && dtId && was !== dtId && MD_BY[was]) { dtId = was; renderDetail(); $('dtc').scrollTop = 0; }      // با کشیدن به عطر دیگری رفته بودید: صفحه‌ی جزئیاتِ همان عطر باز بماند
 }
 function vwZoomAt(px, py, s2) {
   var box = $('vwb').getBoundingClientRect(), cx = box.left + box.width / 2, cy = box.top + box.height / 2, s0 = vwT.s;
@@ -1063,6 +1141,7 @@ function vwUp(e) {
     vwT = { s: 1, x: 0, y: 0 }; vwApply(true);
   }
   if (moved < 12 && dt < 350) {                                                        // لمس
+    if (ghosted()) return;      // لمسِ دومِ همان ضربه‌ی بازکردنِ عکس
     var now = Date.now();
     if (now - vwLastTap < 320) { clearTimeout(vwTapT); vwLastTap = 0; if (vwT.s > 1.2) { vwT = { s: 1, x: 0, y: 0 }; vwApply(true); } else { vwZoomAt(p.x, p.y, 2.8); vwApply(true); } return; }
     vwLastTap = now;
@@ -1177,7 +1256,7 @@ function renderSheet() {
   renderMine();
   renderReport();
   $('sCopy').style.display = bad || adv ? '' : 'none'; $('sFull').style.display = bad || adv ? '' : 'none';
-  $('sVer').textContent = 'نسخه ' + VERSION;
+  $('sVer').textContent = 'نسخه ' + VERSION; updStatus();
   renderBrands();
   [].forEach.call(document.querySelectorAll('#sLang button'), function (b) { b.classList.toggle('on', b.dataset.l === (set.lang === 'en' ? 'en' : 'fa')); });
 }
@@ -1318,8 +1397,8 @@ var sheet = $('sheet'), scm = $('scm'), sSp = new Spring(1, function (y) { sheet
 sSp.eps = .002;
 function pageFix() { [$('app'), document.body, document.documentElement].forEach(function (e) { if (e && (e.scrollTop || e.scrollLeft)) { e.scrollTop = 0; e.scrollLeft = 0; } }); }
 $('app').addEventListener('scroll', pageFix);
-function openSheet() { open = true; if (!window.__forceAdv) $('sAdv').style.display = 'none'; $('sAdvBtn').setAttribute('aria-expanded', 'false'); $('sAdvBtn').firstChild.textContent = 'تنظیمات پیشرفته'; renderSheet(); sheet.scrollTop = 0; sSp.x = sheetY; sSp.to(0, { response: .42, damping: .85 }); }
-function closeSheet() { open = false; sSp.x = sheetY; sSp.to(1, { response: .36, damping: 1 }); }
+function openSheet() { layerMark(); open = true; if (!window.__forceAdv) $('sAdv').style.display = 'none'; $('sAdvBtn').setAttribute('aria-expanded', 'false'); $('sAdvBtn').firstChild.textContent = 'تنظیمات پیشرفته'; renderSheet(); sheet.scrollTop = 0; sSp.x = sheetY; sSp.to(0, { response: .42, damping: .85 }); layerMark(); }
+function closeSheet() { layerMark(); open = false; sSp.x = sheetY; sSp.to(1, { response: .36, damping: 1 }); }
 sSp.cb(1);
 $('sVer').onclick = function () { if (++advN >= 5 && !adv) { adv = true; renderSheet(); toast('گزینه‌های سازنده نشان داده شد', 2200); } };
 $('gear').onclick = openSheet; scm.onclick = closeSheet;
@@ -1342,18 +1421,12 @@ $('sSrc').onclick = function (e) {
   if (!on && !busy && !(db.it[id] && Object.keys(db.it[id]).length)) refresh(false);      // تازه روشن شد و هنوز چیزی ندارد
   else if (!on && !busy) toast('سایت روشن شد؛ با «بروزرسانی» قیمت‌هایش تازه می‌شود', 3500);
 };
-$('sPPBtn').onclick = function () { var b = $('sPP'), on = b.style.display === 'none'; b.style.display = on ? '' : 'none'; $('sPPBtn').setAttribute('aria-expanded', on ? 'true' : 'false'); if (on) setTimeout(function () { try { var top = b.getBoundingClientRect().top - sheet.getBoundingClientRect().top + sheet.scrollTop - 90; sheet.scrollTo({ top: Math.max(0, top), behavior: 'smooth' }); } catch (e) { } pageFix(); }, 50); };
-$('sPlay').onclick = function () { var ok = false; try { ok = hasN('openPlayStore') && window.Native.openPlayStore(); } catch (e) { } if (!ok) toast('فروشگاه گوگل باز نشد؛ خودتان از صفحه‌ی گوشی بازش کنید', 3500); };
-$('sUpd').onclick = function () { if ($('sUpd').disabled) return; updSt.dismissed = false; updCheck(true); };
-$('updLater').onclick = function () { updSt.dismissed = true; updSt.manual = false; $('updBox').classList.remove('on'); };
-$('updGo').onclick = function () {
-  if ($('updGo').disabled) return;
-  updSt.phase = 'inst'; updSt.installing = true; updRender();
-  if (updSt.mode === 'ota') {      // بدون نصب: فقط صفحه با فایل‌های تازه از نو بالا می‌آید
-    var ok2 = false; try { ok2 = window.Native.otaApply(); } catch (e) { }
-    if (!ok2) window.__otaErr();
-    return;
-  }
+$('sUpd').onclick = function () { if ($('sUpd').disabled) return; updSt.dismissed = false; ls.set('pp.updDis', null); updCheck(true); };
+function updDismiss() { layerMark(); updSt.dismissed = true; updSt.dismissAt = Date.now(); updSt.dismissCode = updSt.ready || updSt.code || 0; ls.set('pp.updDis', [updSt.dismissCode, updSt.dismissAt]); updSt.manual = false; updSt.cardOk = false; $('updBox').classList.remove('on'); updAuto(); }      // «بعداً»: سه ساعت دوباره نیاید
+$('updLater').onclick = updDismiss;
+$('updGo').onclick = function () {      // فقط برای نصبِ APK
+  var dc = Date.now() - (updSt.cardT || 0); if ($('updGo').disabled || (dc >= 0 && dc < 800)) return;      // کارت همین حالا آمده: لمسِ اتفاقیِ دستِ پدر نصب را شروع نکند
+  clearTimeout(updSt.instTm); ls.set('pp.updDis', null); updSt.phase = 'inst'; updSt.installing = true; ls.set('pp.updTo', updSt.ready); updRender();
   var ok = false; try { ok = window.Native.updInstall(); } catch (e) { }
   if (!ok) { updSt.ready = 0; window.__updErr('start'); setTimeout(function () { updSt.dismissed = false; updCheck(true); }, 600); }      // فایلِ دانلودشده از بین رفته (کمبود حافظه): دوباره دانلود شود، نه گیر کردن تا باز شدنِ بعدی
 };
@@ -1458,20 +1531,23 @@ $('sSend').onclick = function () {
   if (!ok) toast('اول پشتیبان را ذخیره کنید', 2500);
 };
 window.__back = function () {
-  if ($('updBox').classList.contains('on')) { $('updBox').classList.remove('on'); updSt.dismissed = true; return true; }
-  if (mkOn) { closeReport(); return true; }
-  if (srOn) { closeSearch(); return true; }
+  if ($('updBox').classList.contains('on')) { updDismiss(); return true; }
   if (vwId) { closeViewer(); return true; }
-  if (open) { closeSheet(); return true; }
   if (dtId) { closeDetail(); return true; }
+  if (mkOn) { closeReport(); return true; }
+  if (fvOn) { closeFav(); return true; }
+  if (srOn) { closeSearch(); return true; }
+  if (open) { closeSheet(); return true; }
   return goUp();
 };
 
 /* ---------- اندازه‌ی نوشته ---------- */
 var FS = [1, 1.15, 1.3, 1.5];
-function applyFs() { document.documentElement.style.setProperty('--zs', FS[set.fs | 0] || 1); }
-/* ---------- جستجو و لیست مغازه ---------- */
-var srOn = false, srFavOnly = false, srIdx = [], srSig = '', srT = 0, srVoice = null, voiceOn = false, voiceTo = 0;
+function applyFs() { document.documentElement.style.setProperty('--zs', FS[set.fs | 0] || 1); document.documentElement.classList.toggle('big', (set.fs | 0) >= 2); }
+/* ---------- جستجو ----------
+   نتیجه‌ها «کارتِ عکس‌دار» هستند: عکسِ بزرگ + نام + برند. لمسِ کارت = رفتن به قیمت‌ها، و جستجو زیرِ آن باز می‌ماند؛
+   با «برگشت» دوباره همان لیست (با همان جای اسکرول) می‌آید. لیست مغازه جداست (دکمه‌ی ستاره‌ی پایین). */
+var srLastRaw = '', srOn = false, fvOn = false, srIdx = [], srSig = '', srT = 0, srVoice = null, voiceOn = false, voiceTo = 0, srLv = null, srLvTok = 0, srLvT = 0;
 function srNorm(x) { return Core.srn(x); }
 var srTools = {
   toEn: function (w) { var r = Core.fa2en([w], db.wd); return Array.isArray(r) ? r.join(' ') : String(r); },
@@ -1501,57 +1577,135 @@ function srDup(list) {
     return t && t !== x.m.name ? ' · ' + (t.length > 26 ? t.slice(0, 26) + '…' : t) : '';
   };
 }
+function genOf(m) { var g = {}, o = []; (m.variants || []).forEach(function (v) { if (v.gn && GN[v.gn] && !g[v.gn]) { g[v.gn] = 1; o.push(GN[v.gn]); } }); return o.join(' و '); }
+/* کارتِ عطر: عکسِ بزرگ، نام، برند. o: {best, gone, lab} */
+function pcard(m, b, o) {
+  o = o || {}; var im = entryImg(m.id), gl = genOf(m);
+  return '<button type="button" class="pc' + (o.best ? ' best' : '') + '" data-id="' + esc(m.id) + '"><span class="pph">' + tile({ loc: im ? im.loc : '', img: im ? im.img : '', k: im ? im.k : 0 }) + '</span><span class="pin">' + (o.best ? '<span class="pbest">بهترین حدس</span>' : '') + '<b>' + esc(m.name) + '</b><small>' + esc(b.name) + (gl ? ' · ' + esc(gl) : '') + esc(o.lab || '') + '</small></span><span class="pgo" aria-hidden="true">‹</span></button>';
+}
+/* list: [{x: ردیفِ نمایه, sim: شبیه است؟}] */
+function srCards(list, bestFirst) {
+  var dp = srDup(list.map(function (r) { return r.x; })), h = '<div class="pcs">', simOn = false;
+  list.forEach(function (r, i) {
+    if (r.sim && !simOn) { simOn = true; h += '</div><div class="srsim">نام‌های شبیه</div><div class="pcs">'; }
+    h += pcard(r.x.m, r.x.b, { best: bestFirst && i === 0 && !r.sim, lab: dp(r.x) });
+  });
+  return h + '</div>';
+}
+function srQuery() { return srVoice && $('srq').value === srVoice.text ? srVoice.text : $('srq').value; }
 function srRender() {
-  var raw = $('srq').value, q = srNorm(raw), out = [], box = $('srr'), nf = Object.keys(set.fav).length;
-  $('srFc').textContent = nf ? '(' + fa(nf) + ')' : ''; $('srFav').classList.toggle('on', srFavOnly);
+  var raw = $('srq').value, q = srNorm(raw), box = $('srr'), html = '', strong = 99, typed = false;
   srBuild();
-  function row(m, b, gone, id, lab) {
-    var fv = !!set.fav[id];
-    return '<div class="srr' + (gone ? ' gone' : '') + '"><button type="button" class="sn1" data-id="' + esc(id) + '"' + (gone ? ' disabled' : '') + '><b>' + esc(m) + '</b><small>' + esc(b) + (gone ? ' · الان در سایت‌ها نیست' : '') + esc(lab || '') + '</small></button><button type="button" class="sf" data-f="' + esc(id) + '" aria-label="لیست مغازه">' + (fv ? '★' : '☆') + '</button></div>';
-  }
-  if (srFavOnly) {
-    if (q) {      // لیست مغازه + نوشته: همان ترتیبِ نزدیکی، فقط از عطرهای لیست
-      Core.searchRank(srIdx, [raw], srTools, { prefixLast: true }).forEach(function (r) { var x = srIdx[r.i]; if (set.fav[x.m.id]) out.push([0, 0, row(x.m.name, x.b.name, false, x.m.id)]); });
-    } else Object.keys(set.fav).forEach(function (id) {
-      var m = MD_BY[id], lab = String(set.fav[id]).split(' | ');
-      if (m) out.push([BR_BY[m.brandId].name, m.name, row(m.name, BR_BY[m.brandId].name, false, id)]);
-      else out.push([lab[0] || '', lab[1] || '', row(lab[1] || lab[0], lab[0] || '', true, id)]);
-    });
-    if (!q) out.sort(function (a, c) { return (a[0] + a[1]).localeCompare(c[0] + c[1], 'fa'); });
-    box.innerHTML = out.length ? out.map(function (x) { return x[2]; }).join('') : (q ? '<div class="sremp">در لیست مغازه چیزی با این نام نیست.</div>' : '<div class="sremp">لیست مغازه خالی است.<br>در صفحه‌ی هر عطر یا همین‌جا روی ستاره بزنید تا عطرهای مغازه را جدا نگه دارید.</div>');
-    return;
-  }
-  if (srVoice && raw === srVoice.text) {      // نتیجه‌ی گفتار: چند پیشنهادِ نزدیک؛ نه حدسِ بی‌صدا
-    box.innerHTML = '<div class="srvh">شنیدم: «' + esc(srVoice.text) + '»<small>کدام را می‌گویید؟ روی آن بزنید.</small></div>' + (function (dp) { return srVoice.ranks.map(function (x) { return row(x.m.name, x.b.name, false, x.m.id, dp(x)); }).join(''); })(srDup(srVoice.ranks));
-    return;
-  }
-  if (!q) {
+  if (raw !== srLastRaw) { srLastRaw = raw; box.scrollTop = 0; }      // نوشته (یا متنِ گفتار) عوض شد: نتیجه‌ها از بالا
+  if (srVoice && raw === srVoice.text) {      // نتیجه‌ی گفتار: چند کارتِ نزدیک؛ نه حدسِ بی‌صدا
+    html = '<div class="srvh">شنیدم: «' + esc(srVoice.text) + '»<small>' + (srVoice.ranks.length ? 'روی عکسِ عطرِ مورد نظر بزنید تا قیمت‌ها را ببینید.' : 'چیزی شبیه آن در فهرست پیدا نشد.') + '</small></div>' + srCards(srVoice.ranks, srVoice.best) + '<button type="button" class="srbtn pri" id="srAgain">دوباره بگویید</button>';
+    strong = srVoice.strong;
+  } else if (!q) {
     var rc = set.rec.filter(function (x) { return x && MD_BY[x[0]]; }).slice(0, 8);
-    box.innerHTML = (rc.length ? '<div class="srvh">آخرین‌هایی که دیدید</div>' + rc.map(function (x) { var m = MD_BY[x[0]]; return row(m.name, BR_BY[m.brandId].name, false, x[0]); }).join('') : '')
+    html = (rc.length ? '<div class="srvh">آخرین‌هایی که دیدید</div><div class="pcs">' + rc.map(function (x) { var m = MD_BY[x[0]]; return pcard(m, BR_BY[m.brandId]); }).join('') + '</div>' : '')
       + '<div class="sremp">نام عطر یا برند را بنویسید، یا با دکمه‌ی میکروفون بگویید.<br>مثلاً «ساواج» یا «sauvage» یا «ورساچه».</div>';
-    return;
+    box.innerHTML = html; return;
+  } else {
+    typed = true;
+    var out = Core.searchRank(srIdx, [raw], srTools, { prefixLast: true, similar: 8 });
+    strong = out.filter(function (r) { return !r.sim && !r.miss && r.k >= 1; }).length;
+    var more = out.length > 40; out = out.slice(0, 40);
+    html = out.length ? srCards(out.map(function (r) { return { x: srIdx[r.i], sim: !!r.sim }; }), false) + (more ? '<div class="sremp">فقط ۴۰ مورد اول نشان داده شد؛ دقیق‌تر بنویسید.</div>' : '')
+      : '<div class="sremp">در فهرستِ گوشی چیزی پیدا نشد.</div>';
   }
-  out = Core.searchRank(srIdx, [raw], srTools, { prefixLast: true });
-  var more = out.length > 60; out = out.slice(0, 60);
-  var dp = srDup(out.map(function (r) { return srIdx[r.i]; }));
-  box.innerHTML = out.length ? out.map(function (r) { var x = srIdx[r.i]; return row(x.m.name, x.b.name, false, x.m.id, dp(x)); }).join('') + (more ? '<div class="sremp">فقط ۶۰ مورد اول نشان داده شد؛ دقیق‌تر بنویسید.</div>' : '')
-    : '<div class="sremp">چیزی پیدا نشد.<br>املای دیگری را امتحان کنید یا فقط بخشی از نام را بنویسید.</div>';
+  box.innerHTML = html + '<div id="srlv" class="srlive"></div>';
+  if (!srLv && typed && q.length >= 3 && strong === 0) { clearTimeout(srLvT); srLvT = setTimeout(function () { if (srOn && !srLv && $('srq').value === raw) srLvStart(raw); }, 900); }      // چیزی پیدا نشد: بعد از مکثِ تایپ، از خودِ سایت‌ها هم می‌پرسد
+  srLvUi(strong);
+}
+/* ---- پرسیدن از خودِ سایت‌ها ---- */
+function srLvStart(text) {
+  text = String(text || '').trim(); if (!text) return;
+  clearTimeout(srLvT); var tok = ++srLvTok; srLv = { q: text, busy: true }; srLvUi();
+  var ids = actv().map(function (s) { return s.id; });
+  Core.liveSearch(text, net, ids, srTools).then(function (res) {
+    if (tok !== srLvTok) return;
+    srLv = { q: text, busy: true, res: res }; srLvUi();
+    return srLvMap(res.items, tok).then(function (m) { if (tok !== srLvTok) return; srLv = { q: text, busy: false, res: res, mapped: m.mapped, other: m.other }; srLvUi(); });
+  }).then(null, function () { if (tok !== srLvTok) return; srLv = { q: text, busy: false, err: 1 }; srLvUi(); });
+}
+function srLvReset() { srLvTok++; clearTimeout(srLvT); srLv = null; }
+/* عنوانِ هر کالای سایت با فهرستِ خودمان سنجیده می‌شود: اگر همان عطر در فهرست هست، کارتِ خودمان (با قیمتِ همه‌ی سایت‌ها) نشان داده می‌شود؛ وگرنه کارتِ خودِ سایت */
+function srLvMap(items, tok) {
+  return new Promise(function (resolve) {
+    var seen = {}, mapped = [], other = [], per = {}, todo = [];
+    items.forEach(function (it) { per[it.s] = (per[it.s] || 0) + 1; if (per[it.s] <= 5) todo.push(it); });
+    (function next(i) {
+      if (tok !== srLvTok || i >= todo.length) { resolve({ mapped: mapped, other: other }); return; }
+      var it = todo[i], t = null;
+      try { var rk = Core.searchRank(srIdx, [it.t], srTools, { prefixLast: false }); t = rk[0]; } catch (e) { }
+      if (t && !t.sim && (t.ex || (t.s >= 1.1 && t.cnt >= 2))) { var x = srIdx[t.i]; if (!seen[x.m.id]) { seen[x.m.id] = 1; mapped.push({ x: x, sim: false }); } }
+      else other.push(it);
+      setTimeout(function () { next(i + 1); }, 0);      // کارِ سنگین تکه‌تکه؛ صفحه نایستد
+    })(0);
+  });
+}
+function lvCard(it) {
+  return '<button type="button" class="pc live" data-u="' + esc(it.u || '') + '"' + (it.u ? '' : ' disabled') + '><span class="pph">' + tile({ loc: '', img: it.img, k: (String(it.t).length * 7) % 64 }) + '</span><span class="pin"><b>' + esc(String(it.t).length > 70 ? String(it.t).slice(0, 70) + '…' : it.t) + '</b><small>' + esc(srcName(it.s)) + ' · ' + (it.price > 0 ? fa(it.price) + ' تومان' : it.price < 0 ? 'قیمت در سایت' : 'ناموجود') + '</small><small>فقط در سایت است؛ برای دیدن بزنید</small></span><span class="pgo" aria-hidden="true">‹</span></button>';
+}
+function srLvUi(strong) {
+  var el = $('srlv'); if (!el || !srOn) return;
+  var h = '';
+  if (srLv && srLv.busy && !srLv.res) h = '<div class="srvh"><span class="spn"></span>در سایت‌ها هم می‌گردم…</div>';
+  else if (srLv && srLv.busy) h = '<div class="srvh"><span class="spn"></span>در حال بررسیِ نتیجه‌ی سایت‌ها…</div>';
+  else if (srLv && srLv.err) h = '<div class="sremp">جستجو در سایت‌ها نشد؛ اینترنت را ببینید.</div><button type="button" class="srbtn" id="srLvBtn">دوباره امتحان کن</button>';
+  else if (srLv && srLv.res) {
+    var n = (srLv.mapped || []).length + (srLv.other || []).length, ns = srLv.res.notes || {}, allFail = Object.keys(ns).length && Object.keys(ns).every(function (k) { return ns[k] === 'fail'; });
+    if (n) h = '<div class="srvh">در سایت‌ها پیدا شد<small>روی عکس بزنید.</small></div>' + (srLv.mapped.length ? srCards(srLv.mapped, false) : '') + (srLv.other.length ? '<div class="pcs">' + srLv.other.map(lvCard).join('') + '</div>' : '');
+    else h = '<div class="sremp">' + (allFail ? 'سایت‌ها جواب ندادند؛ اینترنت را ببینید.' : 'در سایت‌ها هم چیزی شبیه آن پیدا نشد.<br>املای دیگری را امتحان کنید.') + '</div>' + (allFail ? '<button type="button" class="srbtn" id="srLvBtn">دوباره امتحان کن</button>' : '');
+  } else if (strong !== 99 && ($('srq').value || '').trim().length >= 2 && !(srVoice && $('srq').value === srVoice.text && !srVoice.ranks.length)) h = '<button type="button" class="srbtn" id="srLvBtn">اینها نبود؟ در سایت‌ها هم بگرد</button>';
+  el.className = 'srlive' + (srLv && !srLv.err ? ' has' : '');
+  el.innerHTML = h;
 }
 function openSearch(q) {
-  var was = srOn; srOn = true; $('srch').classList.add('on');
-  if (typeof q === 'string') { $('srq').value = q; srFavOnly = false; }      // نتیجه‌ی گفتار همیشه از کل فهرست است، نه فقط «لیست مغازه»
-  else if (!was) { srVoice = null; $('srq').value = ''; }      // هر بار از نو؛ زیرِ آن «آخرین‌هایی که دیدید» می‌آید
+  var was = srOn; if (!was) layerMark(); srOn = true; $('srch').classList.add('on');
+  if (typeof q === 'string') { $('srq').value = q; srLvReset(); }
+  else if (!was) { srVoice = null; srLvReset(); $('srq').value = ''; }      // هر بار از نو؛ زیرِ آن «آخرین‌هایی که دیدید» می‌آید
   srRender();
+  if (!was) layerMark();
   if (typeof q !== 'string' && !was) setTimeout(function () { try { $('srq').focus(); } catch (e) { } }, 60);      // با گفتار: صفحه‌کلید باز نشود
 }
-function closeSearch() { srOn = false; $('srch').classList.remove('on'); try { $('srq').blur(); } catch (e) { } }
+function closeSearch() { layerMark(); srOn = false; clearTimeout(srT); srLvReset(); $('srch').classList.remove('on'); try { $('srq').blur(); } catch (e) { } }
 $('sr').onclick = function () { openSearch(); }; $('srx').onclick = closeSearch; $('dkS').onclick = function () { openSearch(); };
-$('srq').addEventListener('input', function () { srVoice = null; clearTimeout(srT); srT = setTimeout(srRender, 120); });
-$('srFav').onclick = function () { srFavOnly = !srFavOnly; srRender(); };
+$('srq').addEventListener('input', function () { srVoice = null; srLvReset(); clearTimeout(srT); srT = setTimeout(srRender, 120); });
+$('srq').addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.keyCode === 13) { e.preventDefault(); clearTimeout(srT); if (!srLv || srLv.q !== srQuery().trim()) srLvReset(); srRender(); try { $('srq').blur(); } catch (x) { } } });      // دکمه‌ی «جستجو»ی صفحه‌کلید: صفحه‌کلید بسته شود و نتیجه‌ها دیده شوند
 $('srr').addEventListener('click', function (e) {
-  var f = e.target.closest('button.sf');
-  if (f) { var id = f.dataset.f; if (set.fav[id]) delete set.fav[id]; else { var m = MD_BY[id]; if (m) set.fav[id] = BR_BY[m.brandId].name + ' | ' + m.name; } ls.set('pp.set', set); var sc = $('srr').scrollTop; srRender(); $('srr').scrollTop = sc; return; }
-  var b = e.target.closest('button.sn1'); if (b && b.dataset.id && MD_BY[b.dataset.id]) { closeSearch(); openDetail(b.dataset.id); }
+  if (ghosted()) return;
+  var b = e.target.closest('button.pc');
+  if (b) {
+    if (b.dataset.id) { if (MD_BY[b.dataset.id]) openDetail(b.dataset.id); else toast('این عطر دیگر در فهرست نیست', 2500); }
+    else if (b.dataset.u) openLink(b.dataset.u);
+    return;
+  }
+  if (e.target.closest('#srAgain')) { startVoice(); return; }
+  if (e.target.closest('#srLvBtn')) srLvStart(srQuery());
+});
+/* ---------- لیست مغازه (جدا از جستجو) ---------- */
+function favRender() {
+  var rows = Object.keys(set.fav).map(function (id) {
+    var m = MD_BY[id], lab = String(set.fav[id]).split(' | ');
+    return m ? { id: id, m: m, b: BR_BY[m.brandId], k: BR_BY[m.brandId].name + ' ' + m.name } : { id: id, gone: 1, bn: lab[0] || '', mn: lab[1] || lab[0] || '', k: (lab[0] || '') + ' ' + (lab[1] || '') };
+  });
+  rows.sort(function (a, c) { return a.k.localeCompare(c.k, 'fa'); });
+  var h = rows.map(function (r) {
+    var card = r.gone ? '<button type="button" class="pc gone" disabled><span class="pph">' + tile({ k: 0 }) + '</span><span class="pin"><b>' + esc(r.mn) + '</b><small>' + esc(r.bn) + ' · الان در سایت‌ها نیست</small></span></button>' : pcard(r.m, r.b);
+    return '<div class="pcw">' + card + '<button type="button" class="pfv" data-f="' + esc(r.id) + '" aria-label="برداشتن از لیست مغازه">★</button></div>';
+  }).join('');
+  $('fvr').innerHTML = rows.length ? '<div class="srvh">عطرهایی که در مغازه دارید<small>روی عکس بزنید تا قیمت‌ها را ببینید. ستاره‌ی کنارِ هر عطر برای برداشتن از لیست است.</small></div><div class="pcs">' + h + '</div>'
+    : '<div class="sremp">لیست مغازه خالی است.<br>در صفحه‌ی قیمتِ هر عطر روی «افزودن به لیست مغازه» بزنید.</div>';
+}
+function openFav() { layerMark(); fvOn = true; $('fv').classList.add('on'); favRender(); $('fvr').scrollTop = 0; }
+function closeFav() { layerMark(); fvOn = false; $('fv').classList.remove('on'); }
+$('dkF').onclick = openFav; $('fvx').onclick = closeFav;
+$('fvr').addEventListener('click', function (e) {
+  if (ghosted()) return;
+  var f = e.target.closest('.pfv');
+  if (f) { layerMark(); delete set.fav[f.dataset.f]; ls.set('pp.set', set); var sc = $('fvr').scrollTop; favRender(); $('fvr').scrollTop = sc; toast('از لیست مغازه برداشته شد', 2200); return; }
+  var b = e.target.closest('button.pc'); if (b && b.dataset.id) { if (MD_BY[b.dataset.id]) openDetail(b.dataset.id); else toast('این عطر دیگر در فهرست نیست', 2500); }
 });
 /* ---------- گفتنِ نام عطر ---------- */
 function startVoice() {
@@ -1560,28 +1714,30 @@ function startVoice() {
   voiceOn = true; clearTimeout(voiceTo); voiceTo = setTimeout(function () { voiceOn = false; }, 60000);
   try { window.Native.startVoice(); } catch (e) { window.__voiceErr('fail'); }
 }
-/* alts: چند حدسِ تشخیص‌دهنده. فقط وقتی مطمئن است عطر را باز می‌کند؛ وگرنه چند پیشنهاد نشان می‌دهد */
+/* alts: چند حدسِ تشخیص‌دهنده. همیشه «کارت‌های عکس‌دار» نشان می‌دهد (هیچ‌وقت بی‌خبر یک عطر را باز نمی‌کند):
+   پدر عکس را می‌بیند، روی درستش می‌زند و به قیمت‌ها می‌رود. اگر حدسِ خوبی نبود، همان‌جا از خودِ سایت‌ها هم می‌پرسد. */
 function voiceGo(alts) {
   alts = alts.map(srNorm).filter(function (a, i, ar) { return a && ar.indexOf(a) === i; });
   if (!alts.length) { toast('چیزی نشنیدم؛ دوباره بگویید', 3000); return null; }
   srBuild();
-  var rk = Core.searchRank(srIdx, alts, srTools, { prefixLast: false }), said = alts[0];
-  if (!rk.length) { srVoice = null; openSearch(said); toast('«' + said + '» را پیدا نکردم؛ بنویسید یا دوباره بگویید', 4000); return { kind: 'none', said: said }; }
-  var top = rk[0], sec = null;
-  for (var q = 1; q < rk.length && q < 12; q++) { if (!top.ex || rk[q].ex) { sec = rk[q]; break; } }      // وقتی نام دقیق گفته شده، فقط یک نامِ «دقیقِ» دیگر رقیب است، نه املای نزدیک
+  var rk = Core.searchRank(srIdx, alts, srTools, { prefixLast: false, similar: 12 }), said = alts[0];
+  var top = rk[0], sec = null, strong = 0;
+  rk.forEach(function (r) { if (!r.sim && !r.miss && r.k >= 1) strong++; });
+  for (var q = 1; top && q < rk.length && q < 12; q++) { if (!top.ex || rk[q].ex) { sec = rk[q]; break; } }      // وقتی نام دقیق گفته شده، فقط یک نامِ «دقیقِ» دیگر رقیب است، نه املای نزدیک
   var gap = sec ? top.s - sec.s : 9;
-  /* فقط برند گفته شده (مثلاً «دیور») = لیست؛ هرگز یک عطرِ دلخواه باز نشود. واژه‌ی بی‌جواب (miss) یا دو واژه روی یک واژه‌ی عطر (dupc) = لیست. املای نزدیک: دست‌کم دو واژه، و هر واژه حداکثر یک غلطِ املایی تا جور شدن */
-  var near = rk.length > 1 && top.s - rk[1].s < .03 - 1e-9;      // دو املای تقریباً هم‌امتیاز (مثلاً «تامین» و «تمین» که هر دو در فهرست‌اند): خودکار باز نمی‌شود
-  var sure = !top.bo && !top.miss && !top.dupc && !near && (top.ex ? gap >= .12 - 1e-9 : (top.cnt >= 2 && top.s >= 1.15 && top.mn >= .7 && gap >= .15 - 1e-9));
-  if (sure) {      // نامِ عطر کامل گفته شده (یا املای نزدیک و همه‌ی واژه‌ها جور) و رقیبِ نزدیک ندارد
-    var e = srIdx[top.i]; srVoice = null; closeSearch(); openDetail(e.m.id); toast('«' + e.m.name + '» · ' + e.b.name, 2600);
-    return { kind: 'open', id: e.m.id, said: said };
-  }
-  srVoice = { text: said, ranks: rk.slice(0, 8).map(function (r) { return srIdx[r.i]; }) };
+  /* «بهترین حدس» فقط وقتی نوشته می‌شود که نام کامل و بی‌رقیب باشد: نه فقط برند، نه واژه‌ی بی‌جواب، نه دو املای هم‌امتیاز */
+  var near = rk.length > 1 && top.s - rk[1].s < .03 - 1e-9;      // دو املای تقریباً هم‌امتیاز (مثلاً «تامین» و «تمین» که هر دو در فهرست‌اند)
+  var sure = !!top && !top.sim && !top.bo && !top.miss && !top.dupc && !near && (top.ex ? gap >= .12 - 1e-9 : (top.cnt >= 2 && top.s >= 1.15 && top.mn >= .7 && gap >= .15 - 1e-9));
+  srVoice = { text: said, strong: strong, best: sure, ranks: rk.slice(0, 12).map(function (r) { return { x: srIdx[r.i], sim: !!r.sim }; }) };
+  if (vwId) closeViewer(); if (dtId) closeDetail(); if (fvOn) closeFav(); if (mkOn) closeReport();      // هرچه باز بود بسته شود تا لیست دیده شود
   openSearch(said);
-  return { kind: 'list', said: said, n: srVoice.ranks.length };
+  var live = strong < 2; if (live) srLvStart(said);
+  return { kind: rk.length ? 'list' : 'none', said: said, n: srVoice.ranks.length, best: sure ? srIdx[top.i].m.id : null, live: live };
 }
-window.__voiceRes = function (arr) { voiceOn = false; clearTimeout(voiceTo); voiceGo(Array.isArray(arr) ? arr.map(String) : []); };
+window.__voiceRes = function (arr) {
+  voiceOn = false; clearTimeout(voiceTo);
+  try { voiceGo(Array.isArray(arr) ? arr.map(String) : []); } catch (e) { console.error(e); toast('جستجو نشد؛ نام را بنویسید', 3500); openSearch(); }      // خطای ناگهانی نباید پدر را بی‌جواب بگذارد
+};
 window.__voiceErr = function (c) {
   voiceOn = false; clearTimeout(voiceTo);
   if (c === 'cancel') return;
@@ -1599,7 +1755,8 @@ function renderMine() {
   if ($('bkList')._h !== bl) { $('bkList')._h = bl; $('bkList').innerHTML = bl; }
   var hk = Object.keys(set.hide), hl = hk.map(function (id) { return '<button type="button" class="ch" data-id="' + esc(id) + '"><bdi>' + esc(String(set.hide[id]).replace(' | ', ' ، ')) + '</bdi></button>'; }).join('');
   if ($('hdList')._h !== hl) { $('hdList')._h = hl; $('hdList').innerHTML = hl; }
-  $('hdHint').textContent = hk.length ? 'برای برگرداندنِ هر عطر روی نامش بزنید.' : 'عطری پنهان نکرده‌اید. در صفحه‌ی هر عطر دکمه‌ی «درست نیست؛ پنهانش کن» هست.';
+  $('hdHint').textContent = 'برای برگرداندنِ هر عطر روی نامش بزنید.';
+  $('hdBox').style.display = hk.length ? '' : 'none';      // دکمه‌ی پنهان‌کردن برداشته شد؛ این بخش فقط وقتی هست که از قبل عطری پنهان شده باشد
 }
 $('sFs').onclick = function (e) { var b = e.target.closest('button'); if (!b || b.dataset.v == null) return; set.fs = +b.dataset.v; ls.set('pp.set', set); applyFs(); renderMine(); if (curModel) mountModel(curModel.getAnchor()); };
 function addBlock() {
@@ -1627,113 +1784,150 @@ $('hdList').onclick = function (e) {
   try { rebuild(); } catch (e2) { console.error(e2); }
   renderSheet(); toast('عطر برگشت', 2200);
 };
-/* ---------- بروزرسانی خودِ برنامه از گیت‌هاب ---------- */
-var updSt = { code: 0, ready: 0, phase: '', pct: null, dismissed: false, checking: false, manual: false, mode: '' }, UPD_EVERY = 3 * 3600000;
+/* ---------- بروزرسانی خودکارِ خودِ برنامه ----------
+   بدون دکمه و بدون پرسیدن: برنامه خودش نسخه‌ی تازه را می‌پرسد، بی‌صدا می‌گیرد و در لحظه‌ی بی‌کاری (یا وقتی دوباره باز می‌شود)
+   خودش از نو باز می‌شود. فقط اگر بخشِ اصلیِ برنامه (جاوا) عوض شده باشد نصبِ فایل لازم است؛ آن‌وقت یک کارتِ ساده با یک دکمه می‌آید. */
+var updSt = { code: 0, ready: 0, phase: '', pct: null, dismissed: false, checking: false, manual: false, mode: '', last: +ls.get('pp.updt', 0) || 0, autoTm: 0 }, UPD_EVERY = 20 * 60000;
+(function () { var d = ls.get('pp.updDis', null); if (Array.isArray(d) && d[1] > 0 && Date.now() - d[1] >= 0 && Date.now() - d[1] < 3 * 3600000) { updSt.dismissed = true; updSt.dismissAt = d[1]; updSt.dismissCode = +d[0] || 0; } })();      // «بعداً» با بسته شدنِ برنامه فراموش نشود
+var lastTouch = Date.now() - 20000;      // هنوز کسی دست نزده = بی‌کار
+['pointerdown', 'touchstart', 'keydown', 'wheel'].forEach(function (ev) { window.addEventListener(ev, function () { lastTouch = Date.now(); }, { capture: true, passive: true }); });
 function hasN(k) { return !!(window.Native && typeof window.Native[k] === 'function'); }
-function updText(t) { var e = $('sUpdT'); if (e) e.textContent = t; }
+function updText(t) { updSt.msg = t; var e = $('sUpdT'); if (e) e.textContent = t; }
 function updAutoOn() { return set.updAuto !== 0; }
+function updAgo() { var d = Date.now() - (updSt.last || 0); return !updSt.last ? '' : d < 120000 ? 'همین الان' : d < 3600000 ? fa(Math.round(d / 60000)) + ' دقیقه پیش' : d < 86400000 ? fa(Math.round(d / 3600000)) + ' ساعت پیش' : fa(Math.round(d / 86400000)) + ' روز پیش'; }
+function updStatus() { var e = $('sUpdT'); if (!e) return; e.textContent = (updSt.msg ? updSt.msg + '. ' : '') + 'برنامه خودش بروز می‌شود؛ لازم نیست کاری بکنید.' + (updSt.last ? ' آخرین بررسی: ' + updAgo() + '.' : ''); }
+/* کی می‌شود بی‌خبر از نو بازش کرد؟ وقتی پدر چیزی را باز نکرده، چند ثانیه دست نزده و قیمت‌ها هم در حال گرفتن نیست */
+function updSafe() {
+  if (document.hidden || busy || voiceOn || swapping || vwId || dtId || srOn || fvOn || mkOn || open) return false;
+  var idle = Date.now() - lastTouch;
+  if (!db.ready) return idle > 30000;      // روی «در حال بارگذاری» گیر کرده و کسی کاری نمی‌کند: بروزرسانی همین را درست می‌کند
+  return nav.lvl === 0 ? idle > 15000 : idle > 180000;      // وسطِ خواندنِ لیستِ یک برند: دست‌کم سه دقیقه بی‌حرکت
+}
+function manualArm() { clearTimeout(updSt.manualTm); if (updSt.manual) updSt.manualTm = setTimeout(function () { updSt.manual = false; }, 90000); }      // «همین حالا» فقط چند لحظه اعتبار دارد؛ تا وقتی دانلود پیش می‌رود تمدید می‌شود
 function updCheck(manual) {
-  updSt.manual = !!manual;
+  updSt.manual = !!manual; manualArm();
   if (!hasN('updCheck') && !hasN('otaCheck')) { if (manual) toast('این امکان فقط در برنامه‌ی نصب‌شده کار می‌کند', 3000); return; }
   if (updSt.phase === 'dl' || updSt.phase === 'inst') { updRender(); return; }      // همین الان دارد گرفته/باز می‌شود؛ از نو شروع نکن
-  if (updSt.phase === 'ready') { updRender(); return; }      // آماده است و منتظر «بله»؛ دوباره نپرس (اگر کاربر دستی زد، پنجره دوباره نشان داده می‌شود)
+  if (updSt.phase === 'ready') { updRender(); updAuto(); return; }      // آماده است و منتظرِ لحظه‌ی مناسب
   if (updSt.checking && Date.now() - updSt.checkT < 45000) return;      // پرسیدن در جریان است
-  ls.set('pp.updt', Date.now());
+  updSt.last = Date.now(); ls.set('pp.updt', updSt.last);
   updSt.checking = true; updSt.checkT = Date.now(); updSt.mode = ''; updRender();
   clearTimeout(updSt.checkTm); updSt.checkTm = setTimeout(function () { if (updSt.checking && !updSt.phase) window.__otaInfo({ ok: false, reason: 'net' }); }, 45000);      // جوابی نیامد: گیر نکن
   if (manual) updText('در حال بررسی…');
-  if (hasN('otaCheck')) {      // اول بروزرسانیِ بدون نصب. فایل APK (و پنجره‌ی Install anyway) فقط وقتی لازم است که خودِ جاوا عوض شده باشد
+  if (hasN('otaCheck')) {      // اول بروزرسانیِ بدون نصب. فایل APK فقط وقتی لازم است که خودِ جاوا عوض شده باشد
     try { window.Native.otaCheck(); } catch (e) { window.__otaInfo({ ok: false, reason: 'net' }); }
     return;
   }
   updApk();      // برنامه‌ی قدیمی که اصلاً بروزرسانیِ بی‌نصب ندارد
 }
 function updApk() { try { window.Native.updCheck(); } catch (e) { window.__updErr('check'); } }
-function updDue() { return updAutoOn() && (hasN('updCheck') || hasN('otaCheck')) && Date.now() - (+ls.get('pp.updt', 0) || 0) > UPD_EVERY; }
-/* پنجره‌ی بروزرسانی: سه حالت دارد؛ dl = در حال دانلود (دکمه غیرفعال با درصد)، ready = آماده‌ی نصب، inst = در حال نصب */
+function updDue() { var f = Math.min(Math.max((+ls.get('pp.updFail', 0) || 0) - 1, 0), 4); return updAutoOn() && (hasN('updCheck') || hasN('otaCheck')) && Date.now() - (+ls.get('pp.updt', 0) || 0) > UPD_EVERY * (1 << f); }      // چند بار پشت‌سرهم نشد: فاصله دو برابر می‌شود (تا حدود پنج ساعت)
+/* آماده است: اگر لحظه‌ی مناسب باشد همین الان، وگرنه هر چند ثانیه دوباره نگاه می‌کند */
+function updAuto() {
+  clearTimeout(updSt.autoTm);
+  if (updSt.phase !== 'ready' || !updSt.ready) return;
+  if (updSt.mode === 'apk' && updSt.dismissed && !updSt.manual && (!updSt.dismissCode || updSt.dismissCode === updSt.ready) && Date.now() - (updSt.dismissAt || 0) >= 0 && Date.now() - (updSt.dismissAt || 0) < 3 * 3600000) { updSt.autoTm = setTimeout(updAuto, 300000); return; }      // «بعداً» را زده؛ سه ساعت مزاحم نشو
+  var go = updSt.manual || (updAutoOn() && updSafe());      // کسی دستی «بپرس» را زده: همان لحظه
+  if (!go) { updSt.autoTm = setTimeout(updAuto, 4000); return; }
+  if (updSt.mode === 'ota') updApply();
+  else if (updSt.mode === 'apk') { updSt.dismissed = false; updSt.cardOk = true; updRender(); }      // کارت فقط در لحظه‌ی بی‌کاری (یا وقتی خودش بخواهد) می‌آید
+}
+function updApply() {
+  updSt.phase = 'inst'; ls.set('pp.updTo', updSt.ready); updRender();
+  toast('برنامه بروز می‌شود…', 1600);
+  setTimeout(function () {
+    if (updSt.phase !== 'inst' || updSt.mode !== 'ota') return;      // در این نیم‌ثانیه خطا یا چیز دیگری پیش آمد
+    if (!updSt.manual && !updSafe()) { ls.set('pp.updTo', 0); updSt.phase = 'ready'; updRender(); updAuto(); return; }      // در همین نیم‌ثانیه دست زد: بگذار کارش را بکند، بعداً باز می‌شود
+    var ok = false; try { ok = window.Native.otaApply(); } catch (e) { } if (!ok) window.__otaErr();
+  }, 500);      // فقط صفحه با فایل‌های تازه از نو بالا می‌آید
+}
+/* کارتِ نصب فقط برای بروزرسانیِ APK دیده می‌شود (وقتی بخشِ اصلیِ برنامه عوض شده) */
 function updRender() {
-  var ota = updSt.mode === 'ota', ph = updSt.phase, g = $('updGo'), sp = g.querySelector('span'), pb = $('updPb'), bi = $('updPbi'), me = $('sUpd'), ms = me.querySelector('span');
-  if (ph === 'dl') {
-    var pc = updSt.pct == null ? null : Math.max(0, Math.min(100, Math.round(updSt.pct)));
-    $('updTx').textContent = ota ? 'نسخه‌ی جدید برنامه پیدا شد و دارد گرفته می‌شود. چند لحظه صبر کنید.' : 'نسخه‌ی جدید برنامه پیدا شد و دارد دانلود می‌شود. چند لحظه صبر کنید.';
-    g.disabled = true; g.classList.add('busy'); sp.textContent = pc == null ? 'در حال دانلود…' : 'دانلود ' + fa(pc) + '٪';
-    pb.style.display = 'block'; bi.style.width = (pc == null ? 8 : pc) + '%';
-  } else if (ph === 'inst') {
-    $('updTx').textContent = ota ? 'نسخه‌ی تازه دارد باز می‌شود…' : 'در حال نصب… اگر اندروید پرسید، گزینه‌ی بروزرسانی را بزنید.';
-    g.disabled = true; g.classList.add('busy'); sp.textContent = ota ? 'در حال باز کردن…' : 'در حال نصب…'; pb.style.display = 'none';
+  var ph = updSt.phase, apk = updSt.mode === 'apk', g = $('updGo'), sp = g.querySelector('span'), pb = $('updPb'), me = $('sUpd'), ms = me.querySelector('span');
+  if (apk && ph === 'inst') {
+    $('updTx').textContent = 'در حال نصب… اگر گوشی پرسید، «نصب» یا «بروزرسانی» را بزنید. بعد از نصب برنامه را دوباره باز کنید.';
+    g.disabled = true; g.classList.add('busy'); sp.textContent = 'در حال نصب…'; pb.style.display = 'none';
   } else {
-    $('updTx').textContent = ota ? 'نسخه‌ی تازه‌ی برنامه آماده است. نصب لازم نیست؛ با زدن دکمه، برنامه چند ثانیه دوباره باز می‌شود.' : 'نسخه‌ی جدید برنامه دانلود شد. الان نصب شود؟ بعد از نصب باید برنامه را دوباره باز کنید.';
-    g.disabled = false; g.classList.remove('busy'); sp.textContent = ota ? 'بله، تازه شود' : 'بله، نصب شود'; pb.style.display = 'none';
+    $('updTx').textContent = 'یک بروزرسانیِ مهم برای برنامه آماده است. فقط دکمه‌ی «نصب» را بزنید. بعد از نصب، برنامه را دوباره باز کنید.';
+    g.disabled = false; g.classList.remove('busy'); sp.textContent = 'نصب'; pb.style.display = 'none';
   }
-  $('updH').style.display = ph === 'dl' || ota ? 'none' : '';      // «Install anyway» فقط وقتی لازم است که واقعاً فایل نصب می‌شود
   var wk = ph === 'dl' || ph === 'inst' || updSt.checking;
   me.disabled = wk; me.classList.toggle('busy', wk);
-  ms.textContent = ph === 'dl' ? 'در حال دانلود…' : ph === 'inst' ? (ota ? 'در حال باز کردن…' : 'در حال نصب…') : updSt.checking ? 'در حال بررسی…' : 'بررسی نسخه‌ی جدید';
-  if (ph && (!updSt.dismissed || updSt.manual)) $('updBox').classList.add('on'); else $('updBox').classList.remove('on');
+  ms.textContent = ph === 'dl' ? 'در حال گرفتن…' : ph === 'inst' ? 'در حال باز کردن…' : updSt.checking ? 'در حال بررسی…' : 'همین حالا بپرس';
+  if (apk && (ph === 'ready' || ph === 'inst') && updSt.cardOk && (!updSt.dismissed || updSt.manual)) { if (!$('updBox').classList.contains('on')) { updSt.cardT = Date.now(); layerMark(); } $('updBox').classList.add('on'); } else $('updBox').classList.remove('on');
+  updStatus();
 }
-function showUpd() { updSt.phase = 'ready'; updRender(); }
+function showUpd() { updSt.phase = 'ready'; updRender(); updAuto(); }
 window.__otaInfo = function (o) {
   if (!o || !o.ok) {      // پرسیدن نشد (اینترنت قطع است یا گیت‌هاب جواب نداد). هرگز سراغ فایل APK نمی‌رویم؛ فقط بعداً دوباره می‌پرسیم
-    updSt.checking = false; updRender();
-    if (o && o.reason === 'none') { updText('برنامه‌ی شما آخرین نسخه است'); if (updSt.manual) toast('آخرین نسخه را دارید', 2500); }
-    else { updText('الان نشد نسخه‌ی تازه را بپرسم؛ اینترنت را ببینید و بعداً دوباره امتحان کنید'); if (updSt.manual) toast('بررسی انجام نشد؛ اینترنت را ببینید', 3500); }
-    return;
+    updSt.checking = false;
+    if (o && o.reason === 'none') { updText('آخرین نسخه را دارید'); if (updSt.manual) toast('آخرین نسخه را دارید', 2500); }
+    else { updText('الان نشد نسخه‌ی تازه را بپرسم'); if (updSt.manual) toast('بررسی انجام نشد؛ اینترنت را ببینید', 3500); }
+    updRender(); return;
   }
   if (o.state === 'apk') { updApk(); return; }      // این نسخه بخشِ اصلیِ برنامه را هم عوض کرده؛ نصب لازم است
   updSt.checking = false; clearTimeout(updSt.checkTm);
   if (updSt.phase === 'dl' || updSt.phase === 'ready' || updSt.phase === 'inst') return;      // جوابِ دیررسیده؛ بروزرسانی همین الان در جریان است
-  if (o.state === 'new') {
-    updSt.code = o.code; updSt.mode = 'ota';
-    updText('نسخه‌ی تازه پیدا شد؛ در حال گرفتن…');
-    updSt.phase = 'dl'; updSt.pct = null; updRender(); updDlGuard();
+  if (o.state === 'new') {      // بی‌صدا می‌گیرد؛ پنجره‌ای نمی‌آید
+    updSt.code = o.code; updSt.mode = 'ota'; updText('نسخه‌ی تازه پیدا شد'); updSt.phase = 'dl'; updSt.pct = null; updRender(); updDlGuard();
     try { window.Native.otaDownload(); } catch (e) { window.__otaErr(); }
   } else if (o.cur > o.run) {      // قبلاً گرفته شده ولی هنوز باز نشده
     updSt.code = o.cur; updSt.mode = 'ota'; updSt.ready = o.cur; updText('نسخه‌ی تازه آماده است'); showUpd();
   } else {
-    updText('برنامه‌ی شما آخرین نسخه است'); updRender();
+    updText('آخرین نسخه را دارید'); updRender(); ls.set('pp.updFail', 0);
     if (updSt.manual) toast('آخرین نسخه را دارید', 2500);
   }
 };
-function updDlGuard() { clearTimeout(updSt.dlTm); updSt.dlTm = setTimeout(function () { if (updSt.phase === 'dl' && updSt.mode === 'ota') window.__otaErr(); }, 150000); }      // دو دقیقه و نیم بی‌خبری: گیر نکن
-window.__otaProg = function (p) { if (updSt.phase === 'dl') { updSt.pct = +p; updRender(); updDlGuard(); } };
-window.__otaReady = function (code) { clearTimeout(updSt.dlTm); updSt.mode = 'ota'; updSt.ready = code; updText('نسخه‌ی تازه آماده است'); showUpd(); };
+function updDlGuard() { clearTimeout(updSt.dlTm); updSt.dlTm = setTimeout(function () { if (updSt.phase === 'dl') { if (updSt.mode === 'apk') window.__updErr('slow'); else window.__otaErr(); } }, updSt.mode === 'apk' ? 600000 : 150000); }      // دو دقیقه و نیم بی‌خبری: گیر نکن
+window.__otaProg = function (p) { if (updSt.phase === 'dl') { updSt.pct = +p; updDlGuard(); manualArm(); } };
+window.__otaReady = function (code) { if (updSt.phase === 'inst') return; updSt.fail = 0; ls.set('pp.updFail', 0); clearTimeout(updSt.dlTm); updSt.mode = 'ota'; updSt.ready = code; updText('نسخه‌ی تازه آماده است'); showUpd(); };
 window.__otaErr = function () {
-  clearTimeout(updSt.dlTm);
+  if (updSt.mode === 'apk' && updSt.phase) return;      // خطای دیررسیده‌ی بروزرسانیِ بی‌نصب، وسطِ کارِ نصبِ APK
+  clearTimeout(updSt.dlTm); clearTimeout(updSt.autoTm);
   var was = updSt.phase, wasOta = updSt.mode === 'ota';
-  updSt.phase = ''; updSt.checking = false; updSt.installing = false; updSt.mode = ''; updRender();
-  updText('بروزرسانیِ برنامه انجام نشد؛ بعداً دوباره امتحان کنید');
-  if (updSt.manual || was || wasOta) toast('بروزرسانیِ برنامه انجام نشد', 3500);
+  if (was === 'dl' || was === 'inst') ls.set('pp.updFail', (+ls.get('pp.updFail', 0) || 0) + 1);
+  updSt.phase = ''; updSt.checking = false; updSt.installing = false; updSt.mode = ''; updSt.ready = 0; updSt.cardOk = false; updRender();
+  updText('بروزرسانی الان نشد؛ بعداً خودش دوباره امتحان می‌کند');
+  if (updSt.manual || was || wasOta) { if (updSt.manual) toast('بروزرسانیِ برنامه انجام نشد', 3500); }
 };
 window.__updInfo = function (code) {
-  updSt.checking = false; updSt.mode = 'apk';
+  updSt.checking = false; clearTimeout(updSt.checkTm);
+  if (updSt.phase === 'dl' || updSt.phase === 'inst' || (updSt.phase === 'ready' && updSt.mode === 'ota')) return;      // جوابِ دیررسیده؛ کار دیگری در جریان است
+  updSt.mode = 'apk';
   var cur = hasN('appCode') ? +window.Native.appCode() : 0;
   if (code > cur) {
     updSt.code = code;
     if (updSt.ready === code) { showUpd(); return; }
-    updText('نسخه‌ی تازه پیدا شد؛ در حال دانلود…');
-    updSt.phase = 'dl'; updSt.pct = null; updRender();
-    try { window.Native.updDownload(); } catch (e) { }
+    updText('یک بروزرسانیِ مهم پیدا شد');
+    updSt.phase = 'dl'; updSt.pct = null; updRender(); updDlGuard();      // بی‌صدا می‌گیرد
+    try { window.Native.updDownload(); } catch (e) { window.__updErr('start'); }
   } else {
-    updText('برنامه‌ی شما آخرین نسخه است'); updRender();
+    updText('آخرین نسخه را دارید'); updRender();
     if (updSt.manual) toast('آخرین نسخه را دارید', 2500);
   }
 };
-window.__updProg = function (p) { if (updSt.phase === 'dl') { updSt.pct = +p; updRender(); } };
-window.__updReady = function (code) { updSt.ready = code; updText('نسخه‌ی تازه آماده‌ی نصب است'); showUpd(); };
+window.__updProg = function (p) { if (updSt.phase === 'dl') { updSt.pct = +p; updDlGuard(); manualArm(); } };
+window.__updReady = function (code) { if (updSt.phase === 'inst') return; updSt.fail = 0; ls.set('pp.updFail', 0); clearTimeout(updSt.dlTm); updSt.mode = 'apk'; updSt.ready = code; updText('بروزرسانیِ مهم آماده است'); showUpd(); };
 window.__updErr = function (m) {
+  if (updSt.mode === 'ota' && updSt.phase) return;      // خطای دیررسیده‌ی APK، وسطِ بروزرسانیِ بی‌نصب
+  clearTimeout(updSt.autoTm); clearTimeout(updSt.dlTm); clearTimeout(updSt.instTm);
   var was = updSt.phase;
-  updSt.phase = ''; updSt.checking = false; updSt.installing = false; updSt.mode = ''; updRender();
-  updText('بروزرسانیِ برنامه انجام نشد؛ بعداً دوباره امتحان کنید');
-  if (updSt.manual || was) toast('بروزرسانیِ برنامه انجام نشد', 3500);
+  if (was === 'dl' || was === 'inst') ls.set('pp.updFail', (+ls.get('pp.updFail', 0) || 0) + 1);
+  updSt.phase = ''; updSt.checking = false; updSt.installing = false; updSt.mode = ''; updSt.cardOk = false; updRender();
+  updText('بروزرسانی الان نشد؛ بعداً خودش دوباره امتحان می‌کند');
+  if (updSt.manual) toast('بروزرسانیِ برنامه انجام نشد', 3500);
 };
 function autoMs() { var m = +set.auto; return m > 0 ? m * 60000 : 0; }      // ۰ = دستی (پیش‌فرض)
 function autoDue() { var lo = lastOk(); if (!lo) return true; var a = autoMs(); return a > 0 && Date.now() - lo > a; }
 var lastTry = +ls.get('pp.try', 0) || 0;       // آخرین تلاشِ بروزرسانی (ماندگار)؛ سایتِ همیشه‌خراب هر بار باز شدن را به بمباران تبدیل نکند
 function launchDue() { return !busy && needFresh() && Date.now() - lastTry > 1800000; }      // قیمت‌ها قدیمی‌اند یا سایتی هنوز نیامده: حتی در حالت دستی یک بار تازه شود
-window.__resume = function () { updPill(); if (updDue()) updCheck(false); if (!busy && (autoDue() || launchDue())) refresh(false); };
+window.__resume = function () {
+  updPill();
+  if (updSt.phase === 'inst' && updSt.mode === 'apk') { clearTimeout(updSt.instTm); updSt.instTm = setTimeout(function () { if (updSt.phase === 'inst' && updSt.mode === 'apk') { updSt.phase = 'ready'; updSt.installing = false; updRender(); } }, 20000); }      // نصب‌کننده بسته شد (لغو یا تمام): بیست ثانیه بعد دکمه دوباره کار کند، نه «در حال نصب…» برای همیشه
+  if (updDue()) updCheck(false); else updAuto(); if (!busy && (autoDue() || launchDue())) refresh(false); };
 document.addEventListener('visibilitychange', function () { if (!document.hidden) window.__resume(); });
 window.addEventListener('beforeunload', function () { if (curModel && nav.lvl === 0) { var a = curModel.getAnchor(); if (a) ls.set('pp.last', a); } });
-window.__pp = { voice: function (a) { return voiceGo(a); }, get allBrands() { return ALLB; }, open: openEntry, up: goUp, view: viewImg, closeView: closeViewer, get nav() { return nav; }, get tree() { return TREE; }, get gate() { var ps = photoStat(); return { need: ps.need, have: ps.have, ready: !!db.ready, tot: imgTot, left: imgLeft(), ok: imgOk, bad: imgBad }; }, mount: function (m) { var t = performance.now(); set.model = m; mountModel(curModel ? curModel.getAnchor() : null); return performance.now() - t; }, get model() { return curModel; }, get list() { return list; }, get flat() { return FLAT; }, get state() { return { db: db, st: stt, busy: busy, imgLoc: imgLoc }; }, refresh: refresh, net: net };
+window.__pp = { voice: function (a) { return voiceGo(a); }, setHide: function (id, on) { var m = MD_BY[id]; if (on && m) set.hide[id] = BR_BY[m.brandId].name + ' | ' + m.name; else delete set.hide[id]; ls.set('pp.set', set); rebuild(); renderSheet(); }, get fav() { return set.fav; }, openFav: openFav, openSearch: openSearch, get allBrands() { return ALLB; }, open: openEntry, up: goUp, view: viewImg, closeView: closeViewer, get nav() { return nav; }, get tree() { return TREE; }, get gate() { var ps = photoStat(); return { need: ps.need, have: ps.have, ready: !!db.ready, tot: imgTot, left: imgLeft(), ok: imgOk, bad: imgBad }; }, mount: function (m) { var t = performance.now(); set.model = m; mountModel(curModel ? curModel.getAnchor() : null); return performance.now() - t; }, get model() { return curModel; }, get list() { return list; }, get flat() { return FLAT; }, get state() { return { db: db, st: stt, busy: busy, imgLoc: imgLoc }; }, refresh: refresh, net: net };
 
 /* شروع */
 applyTheme(); applyFs();
@@ -1753,8 +1947,9 @@ var okTries = 0, okT = setInterval(function () {
   } catch (e) { clearInterval(okT); }
 }, 500);
 if (autoDue() || launchDue()) refresh(false);
-setTimeout(function () { if (updAutoOn() && (hasN('updCheck') || hasN('otaCheck'))) updCheck(false); }, 1500);      // هر بار که برنامه باز می‌شود نسخه‌ی تازه را می‌پرسد
-setInterval(function () { updPill(); if (!busy && autoDue()) refresh(false); }, 30000);
+setTimeout(function () { if (updAutoOn() && (hasN('updCheck') || hasN('otaCheck'))) updCheck(false); }, 1500);
+(function () { var to = +ls.get('pp.updTo', 0) || 0; if (!to) return; ls.set('pp.updTo', 0); var now = Math.max(+myCode || 0, hasN('appCode') ? +window.Native.appCode() : 0); if (now >= to) setTimeout(function () { toast('برنامه بروز شد ✓', 4000); }, 2500); })();      // بعد از بروزرسانیِ خودکار یک پیامِ کوتاه      // هر بار که برنامه باز می‌شود نسخه‌ی تازه را می‌پرسد
+setInterval(function () { updPill(); if (!busy && autoDue()) refresh(false); if (!document.hidden && updDue()) updCheck(false); if (!document.hidden && !busy && db.ready) newsLoad('bg'); }, 30000);      // برنامه باز مانده هم باشد، هر ۲۰ دقیقه یک بار نسخه‌ی تازه را می‌پرسد
 /* قفل ورود: اگر دانلود گیر کرد خودش دوباره تلاش کند؛ عکسی که جواب نداد جلوی ورود را نگیرد */
 setInterval(function () {
   if (db.ready) return;

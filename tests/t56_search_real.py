@@ -18,7 +18,7 @@ window.__files={'pp.db':%s};
  window.__MODE=function(u){return {s:503,b:''}};
 })();
 """%DB
-JS_ROWS="Array.prototype.map.call(document.querySelectorAll('#srr .srr .sn1'),function(b){return {m:b.querySelector('b').textContent,b:b.querySelector('small').textContent.replace(/ · .*/,''),id:b.dataset.id}})"
+JS_ROWS="Array.prototype.map.call(document.querySelectorAll('#srr .pc[data-id]'),function(b){return {m:b.querySelector('.pin b').textContent,b:b.querySelector('.pin small').textContent.replace(/ · .*/,''),id:b.dataset.id}})"
 async def typeq(pg,q,wait=260):
     await pg.fill('#srq',q); await pg.wait_for_timeout(wait)
     return await pg.evaluate("({rows:%s,emp:(document.querySelector('#srr .sremp')||{}).textContent||''})"%JS_ROWS)
@@ -32,9 +32,9 @@ async def main():
         chk('داده‌ی واقعی بالا آمد (۱۰۰+ برند، ۵۰۰۰+ عطر)',nb>100 and nm>5000,(nb,nm))
         # ---- کار با جستجو در حالت سرد (نمایه هنوز ساخته نشده)
         t0=time.time()
-        await pg.evaluate("document.getElementById('sr').click()")
+        await pg.evaluate("document.getElementById('dkS').click()")
         r=await typeq(pg,'ساواج',wait=60)
-        await pg.wait_for_function("document.querySelectorAll('#srr .srr').length>0",timeout=20000)
+        await pg.wait_for_function("document.querySelectorAll('#srr .pc[data-id]').length>0",timeout=20000)
         cold=time.time()-t0
         print('cold first search seconds',round(cold,2))
         chk('جستجوی سرد (بدون نمایه‌ی از پیش ساخته) کمتر از ۸ ثانیه جواب می‌دهد',cold<8,round(cold,2))
@@ -66,6 +66,10 @@ async def main():
         # ---- بی‌معنی
         for q in ('zzzz','xqzv','ؤؤؤؤؤ'):
             r=await typeq(pg,q); chk('«%s»: چیزی پیدا نشد (نه فهرستِ بی‌ربط)'%q,len(r['rows'])==0 and 'چیزی پیدا نشد' in r['emp'],(len(r['rows']),r['rows'][:2]))
+        # ---- شماره‌ی نام: «شنل ۵» باید «نامبر ۵» را اول بیاورد، نه عطرهای بی‌شماره‌ی شنل
+        for q in ('شنل 5','شنل ۵','شنل پنج','نامبر 5 شنل'):
+            r=await typeq(pg,q); f=r['rows'][0] if r['rows'] else {}
+            chk('«%s»: اولین نتیجه «شنل … ۵» است'%q,f.get('b')=='شنل' and any(k in f.get('m','') for k in ('5','۵','پنج')),[(x['b'],x['m']) for x in r['rows'][:3]])
         # ---- نمونه‌ی تصادفی از خودِ داده: «برند + مدل» باید همان مدل را اول بیاورد
         sample=await pg.evaluate("""(function(){var o=[],i=0;__pp.tree.forEach(function(b){b.models.forEach(function(m){if(i++%110===0&&m.name.length>2)o.push([b.name,m.name,m.id])})});return o})()""")
         ok1=ok3=0; badl=[]
@@ -92,7 +96,7 @@ async def main():
         seq=[]
         for ch in 'ساواج':
             await pg.keyboard.type(ch,delay=30); await pg.wait_for_timeout(200)
-            seq.append(await pg.evaluate("({n:document.querySelectorAll('#srr .srr').length,emp:(document.querySelector('#srr .sremp')||{}).textContent||''})"))
+            seq.append(await pg.evaluate("({n:document.querySelectorAll('#srr .pc[data-id]').length,emp:(document.querySelector('#srr .sremp')||{}).textContent||''})"))
         chk('تایپ حرف به حرف «ساواج»: در هر مرحله چیزی نشان داده می‌شود، نه «پیدا نشد»',all(x['n']>0 for x in seq),seq)
         r=await pg.evaluate("%s"%JS_ROWS)
         chk('... و در پایان عطر درست اول است',(r[0]['b'],r[0]['m'])==('دیور','ساواج') if r else False,r[:2])
@@ -107,26 +111,15 @@ async def main():
         print('keystroke ms',[round(x) for x in times])
         med=statistics.median(times); mx=max(times)
         chk('هر بار نوشتن (روی این کامپیوتر) میانه ≤ ۱۵۰ و بیشینه ≤ ۴۰۰ میلی‌ثانیه (میانه %d، بیشینه %d)'%(med,mx),med<=150 and mx<=400 and min(times)>-100,[round(x) for x in times])
-        # ---- لیست مغازه + نوشته
-        ids=await pg.evaluate("""(function(){var r=[];__pp.tree.forEach(function(b){if(b.name==='دیور'){b.models.forEach(function(m){if(m.name==='ساواج'||m.name==='فارنهایت'||m.name==='جادور')r.push(m.id)})}});return r})()""")
-        await pg.evaluate("(function(ids){var s=JSON.parse(localStorage.getItem('pp.set')||'{}');s.fav=s.fav||{};ids.forEach(function(i){s.fav[i]='x | y'});localStorage.setItem('pp.set',JSON.stringify(s));})(%s)"%json.dumps(ids))
-        print('fav ids',ids)
         await pg.reload(); await wait_ready(pg,180000); await pg.wait_for_timeout(300)
-        await pg.evaluate("document.getElementById('sr').click()"); await pg.wait_for_timeout(200)
-        nfv=await pg.evaluate("Object.keys(JSON.parse(localStorage.getItem('pp.set')).fav).length")
-        if nfv>0:
-            await pg.evaluate("document.getElementById('srFav').click()"); await pg.wait_for_timeout(200)
-            r=await typeq(pg,'ساواج')
-            chk('«لیست مغازه» روشن + نوشتن «ساواج»: فقط از عطرهای لیست و عطرِ درست',len(r['rows'])>=1 and all(x['id'] in ids for x in r['rows']) and r['rows'][0]['m']=='ساواج',r['rows'][:3])
-            r=await typeq(pg,'zzzz'); chk('«لیست مغازه» + چیز بی‌ربط: پیام مناسب',len(r['rows'])==0 and 'لیست مغازه' in r['emp'],r['emp'])
-            await pg.evaluate("document.getElementById('srFav').click()")
-        else: chk('لیست مغازه ساخته شد',False,nfv)
+        await pg.evaluate("document.getElementById('dkS').click()"); await pg.wait_for_timeout(200)
         # ---- گفتار روی داده‌ی واقعی
         async def say(alts): return await pg.evaluate("(function(a){var d=document.getElementById('dt');if(d.classList.contains('on'))document.getElementById('dtx').click();return __pp.voice(a)})(%s)"%json.dumps(alts,ensure_ascii=False))
         for alts,kind,name in ((['ساواج'],'open','«ساواج»'),(['دیور ساواج'],'open','«دیور ساواج»'),(['عطر ادکلن اروس ورساچه بده'],'open','جمله‌ی اضافه'),(['تام فورد عود وود'],'open','«تام فورد عود وود»'),(['دیور'],'list','فقط برند'),(['ساواگ','ساواج'],None,'حدس اول غلط'),(['ضضض غغغ'],None,'بی‌معنی')):
             r=await say(alts)
-            if kind: chk('گفتار %s → %s'%(name,kind),r and r['kind']==kind,r)
-        r=await say(['ضضض غغغ']); chk('گفتارِ بی‌معنی عطری را باز نمی‌کند',r and r['kind']!='open',r)
+            if kind=='open': chk('گفتار %s → فهرستِ عکس‌دار با «بهترین حدس» (چیزی خودش باز نمی‌شود)'%name,r and r['kind']=='list' and r['best'] and not await pg.evaluate("document.getElementById('dt').classList.contains('on')"),r)
+            elif kind: chk('گفتار %s → %s'%(name,kind),r and r['kind']==kind,r)
+        r=await say(['ضضض غغغ']); chk('گفتارِ بی‌معنی عطری را باز نمی‌کند و «بهترین حدس» نمی‌دهد',r and not r.get('best') and not await pg.evaluate("document.getElementById('dt').classList.contains('on')"),r)
         chk('بدون خطای صفحه',not errs,errs[:3])
         await b.close()
     print(len(OK),'pass',len(BAD),'fail',BAD)

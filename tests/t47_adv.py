@@ -4,8 +4,8 @@ from harness import *
 OK=[];BAD=[]
 def chk(n,c,i=''):
     (OK if c else BAD).append(n); print(('PASS ' if c else 'FAIL ')+n+(' '+str(i)[:200] if i!='' else ''))
-SIMPLE=['sMk','sRef','sTheme','sModel','sLang','sFs','sUpd']
-ADV=['sSamp','sSend','sRep','bkIn','bkList','hdList','sBrBtn','sAuto','sSrc','sUpdA']
+SIMPLE=['sRef','sTheme','sModel','sLang','sFs','sUpdT']
+ADV=['sSamp','sSend','sRep','bkIn','bkList','sBrBtn','sAuto','sSrc','sUpdA','sUpd']
 async def main():
     async with async_playwright() as p:
         for fs in (0,3):

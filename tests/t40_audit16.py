@@ -12,40 +12,21 @@ async def main():
         await pg.set_viewport_size({'width':320,'height':640})
         await pg.goto('file://'+ROOT+'/index.html'); await wait_ready(pg,180000); await pg.wait_for_timeout(1200)
         ms=await models(pg,3); A,B,C=ms[0],ms[1],ms[2]
-        # ۱) تأییدِ «پنهانش کن» بین دو عطر نماند
-        await pg.evaluate("window.__pp.open && 0")
-        await pg.evaluate("(function(){var a=document.getElementById('sr');a.click()})()"); await pg.wait_for_timeout(200)
-        await pg.evaluate("document.getElementById('srq').value=%s;document.getElementById('srq').dispatchEvent(new Event('input'))"%json.dumps(A['tok'])); await pg.wait_for_timeout(400)
-        await pg.evaluate("document.querySelector('#srr .sn1[data-id=\"%s\"]').click()"%A['id']); await pg.wait_for_timeout(400)
-        await pg.evaluate("document.querySelector('#dtc [data-a=hide]').click()"); await pg.wait_for_timeout(200)
-        armed=await pg.evaluate("document.querySelector('#dtc [data-a=hide]').innerText")
-        chk('first tap arms hide',('مطمئنید' in armed),armed)
-        await pg.evaluate("window.__back()"); await pg.wait_for_timeout(300)
-        await pg.evaluate("document.getElementById('sr').click()"); await pg.wait_for_timeout(200)
-        await pg.evaluate("document.getElementById('srq').value=%s;document.getElementById('srq').dispatchEvent(new Event('input'))"%json.dumps(B['tok'])); await pg.wait_for_timeout(400)
-        await pg.evaluate("document.querySelector('#srr .sn1[data-id=\"%s\"]').click()"%B['id']); await pg.wait_for_timeout(400)
-        t2=await pg.evaluate("document.querySelector('#dtc [data-a=hide]').innerText")
-        chk('other perfume is NOT pre-armed',('مطمئنید' not in t2),t2)
-        await pg.evaluate("window.__back()"); await pg.wait_for_timeout(300)
-        # ۲) فهرست جستجو بعد از پنهان/آشکار کردن کهنه نماند
-        async def hide(m):
-            await pg.evaluate("document.getElementById('sr').click()"); await pg.wait_for_timeout(200)
-            await pg.evaluate("document.getElementById('srq').value=%s;document.getElementById('srq').dispatchEvent(new Event('input'))"%json.dumps(m['tok'])); await pg.wait_for_timeout(400)
-            await pg.evaluate("document.querySelector('#srr .sn1[data-id=\"%s\"]').click()"%m['id']); await pg.wait_for_timeout(400)
-            await pg.evaluate("document.querySelector('#dtc [data-a=hide]').click()"); await pg.wait_for_timeout(700); await pg.evaluate("document.querySelector('#dtc [data-a=hide]').click()"); await pg.wait_for_timeout(500)
+        # ۱) فهرست جستجو بعد از پنهان/آشکار شدنِ عطر کهنه نماند (دکمه‌ی «پنهانش کن» برداشته شده؛ همان سازوکار با __pp.setHide)
+        async def hide(m,on=True):
+            await pg.evaluate("window.__pp.setHide(%s,%s)"%(json.dumps(m['id']),'true' if on else 'false')); await pg.wait_for_timeout(700)
         async def found(m):
-            await pg.evaluate("document.getElementById('sr').click()"); await pg.wait_for_timeout(200)
-            await pg.evaluate("document.getElementById('srq').value=%s;document.getElementById('srq').dispatchEvent(new Event('input'))"%json.dumps(m['tok'])); await pg.wait_for_timeout(400)
-            r=await pg.evaluate("[].map.call(document.querySelectorAll('#srr .sn1'),function(x){return x.dataset.id})")
-            await pg.evaluate("window.__back()"); await pg.wait_for_timeout(200); return m['id'] in r
-        await pg.evaluate("window.__back && 0")
+            await pg.evaluate("document.getElementById('dkS').click()"); await pg.wait_for_timeout(200)
+            await pg.evaluate("document.getElementById('srq').value=%s;document.getElementById('srq').dispatchEvent(new Event('input'))"%json.dumps(m['tok'])); await pg.wait_for_timeout(500)
+            r=await pg.evaluate("[].map.call(document.querySelectorAll('#srr .pc[data-id]'),function(x){return x.dataset.id})")
+            await pg.evaluate("document.getElementById('srx').click()"); await pg.wait_for_timeout(200); return m['id'] in r
+        chk('A is found before hiding',await found(A))
         await hide(A); chk('hidden A is not found',not await found(A))
-        await pg.evaluate("document.getElementById('gear').click()"); await pg.wait_for_timeout(500)
-        await pg.evaluate("document.querySelector('#hdList .ch').click()"); await pg.wait_for_timeout(500)
-        await pg.evaluate("window.__back()"); await pg.wait_for_timeout(400)
+        await hide(A,False)
         await hide(B)
         chk('after unhide A + hide B: A found again',await found(A))
         chk('after unhide A + hide B: B is NOT found (index not stale)',not await found(B))
+        await hide(B,False)
         await b.close()
         # ۳) رفتار صفحه با تنظیم‌های خراب
         for name,items in (('run null element',{'pp.run':json.dumps({'src':[None]})}),('model __proto__',{'pp.set':json.dumps({'model':'__proto__','theme':'auto'})}),('model constructor',{'pp.set':json.dumps({'model':'constructor'})})):
@@ -65,10 +46,10 @@ async def main():
             ms=await models(pg,1)
             mid=await pg.evaluate("(function(){var t=window.__pp.tree;for(var i=0;i<t.length;i++)for(var j=0;j<t[i].models.length;j++){var m=t[i].models[j];for(var k=0;k<m.variants.length;k++)for(var z=0;z<m.variants[k].sizes.length;z++)if(m.variants[k].sizes[z].srcs.length>1)return {m:m.id,k:k,z:z}}return null})()")
             await pg.evaluate("window.__pp.open && 0")
-            await pg.evaluate("document.getElementById('sr').click()")
+            await pg.evaluate("document.getElementById('dkS').click()")
             nm=await pg.evaluate("(function(){var t=window.__pp.tree;for(var i=0;i<t.length;i++)for(var j=0;j<t[i].models.length;j++)if(t[i].models[j].id==%s)return t[i].models[j].name})()"%json.dumps(mid['m']))
             await pg.evaluate("document.getElementById('srq').value=%s;document.getElementById('srq').dispatchEvent(new Event('input'))"%json.dumps(nm.split(' ')[0])); await pg.wait_for_timeout(400)
-            await pg.evaluate("(function(){var b=document.querySelector('#srr .sn1[data-id=\"%s\"]');if(b)b.click()})()"%mid['m']); await pg.wait_for_timeout(500)
+            await pg.evaluate("(function(){var b=document.querySelector('#srr .pc[data-id=\"%s\"]');if(b)b.click()})()"%mid['m']); await pg.wait_for_timeout(500)
             await pg.evaluate("(function(){var r=document.querySelectorAll('#dtc .sz');var t=r[%d]||r[0];if(t)t.click()})()"%0); await pg.wait_for_timeout(300)
             await pg.evaluate("[].forEach.call(document.querySelectorAll('#dtc .sz'),function(x){x.click()})"); await pg.wait_for_timeout(400)
             info=await pg.evaluate("""(function(){var rows=[].slice.call(document.querySelectorAll('#dtc .sr')),bad=[];rows.forEach(function(r){var ks=[].slice.call(r.children).map(function(c){return c.getBoundingClientRect()});
@@ -84,12 +65,13 @@ async def main():
                 await pg.evaluate("(function(){var i=document.getElementById('vwi');if(i){i.dispatchEvent(new Event('error'));i.dispatchEvent(new Event('error'))}})()"); await pg.wait_for_timeout(300)
                 chk('viewer falls back to bottle on image error',await pg.evaluate("!!document.querySelector('#vwb .vfb')"))
                 await pg.evaluate("window.__back()"); await pg.wait_for_timeout(200)
-                # بازگشت کنار «بروزرسانی»
-                await pg.evaluate("window.__updReady(999999)"); await pg.wait_for_timeout(100)
+                await pg.evaluate("window.__back()"); await pg.wait_for_timeout(300)      # عکس، سپس صفحه‌ی قیمت و جستجو بسته شود تا لحظه‌ی مناسبِ نصب برسد
+                await pg.evaluate("window.__back()"); await pg.wait_for_timeout(300)
+                # بازگشت کنار «بروزرسانی» (فقط کارتِ نصبِ APK)
+                await pg.evaluate("window.__updReady(999999)"); await pg.wait_for_timeout(400)
                 on1=await pg.evaluate("document.getElementById('updBox').classList.contains('on')")
-                await pg.evaluate("window.__back()")
-                await pg.evaluate("window.__updReady(999999)"); await pg.wait_for_timeout(100)
-                chk('update box shows, Back dismisses it and it does not pop back',on1 and not await pg.evaluate("document.getElementById('updBox').classList.contains('on')"),on1)
+                await pg.evaluate("window.__back()"); await pg.wait_for_timeout(5200)
+                chk('update box shows, Back dismisses it and it does not pop back on its own',on1 and not await pg.evaluate("document.getElementById('updBox').classList.contains('on')"),on1)
                 # واژه‌ی ممنوع دوحرفی رد شود
                 await pg.evaluate("document.getElementById('gear').click()"); await pg.wait_for_timeout(500)
                 await pg.evaluate("document.getElementById('bkIn').value='عط';document.getElementById('bkAdd').click()"); await pg.wait_for_timeout(300)

@@ -34,6 +34,7 @@ async def new_page(p, w=360,h=780, scheme='dark', stub=STUB, extra=None, mobile=
     pg.on('pageerror',lambda e:errs.append('PAGEERR '+str(e)))
     pg.on('console',lambda m:errs.append('CONSOLE '+m.text) if m.type=='error' else None)
     if adv: await pg.add_init_script("window.__forceAdv=1;document.addEventListener('DOMContentLoaded',function(){var e=document.getElementById('sAdv');if(e)e.style.display='';});")
+    await pg.add_init_script("window.__NOGHOST=1;")      # نگهبانِ لمسِ اتفاقی در آزمایش‌ها خاموش است (لمس‌های پشت‌سرهمِ آزمایش لمسِ دوبارهٔ پدر نیستند)؛ آزمایشِ خودِ نگهبان آن را روشن می‌کند
     if stub: await pg.add_init_script(stub)
     if extra: await pg.add_init_script(extra)
     return b,ctx,pg,errs

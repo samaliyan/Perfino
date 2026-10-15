@@ -54,9 +54,9 @@ Online-shop titles are messy. A multi-stage pipeline keeps the list clean:
 - **Your own control**: *blocked words* (anything containing them never enters the list and is removed immediately) and *hide this perfume* for single bad entries.
 
 ### Everyday use
-- **Speak the name**: a big bottom bar has a “Speak” button (the phone's own speech recognition, Persian). When the app is sure it opens the perfume directly; otherwise it lists the closest guesses. Search shows the last perfumes you looked at.
-- **Search** in Persian or English, with partial words.
-- **Shop list** (★): star perfumes to keep a personal shortlist.
+- **Speak the name**: a big bottom bar has a “Speak” button (the phone's own speech recognition, Persian). It never opens a perfume by itself: it shows big photo cards of the closest names (the best guess marked) so the person looks at the picture, taps it, and lands on the prices; Back returns to the same list. If the name is not in the phone's list, the app asks the four shops' own search and shows what they sell.
+- **Search** in Persian or English, with partial words and similar spellings (the same photo cards; “not these? search the shops” for names the phone's list does not have). Search shows the last perfumes you looked at.
+- **Shop list** (★) is a separate page with its own button in the bottom bar (not part of search): star a perfume on its price page to keep a personal shortlist.
 - **Four list styles**, light / dark / automatic theme, Persian or English names, and **four text sizes** (they scale the whole app: lists, prices and the letter strip) for easier reading.
 - **Per-brand switches** to hide brands you do not sell (their images are not downloaded either).
 - **Product photos** cached on the device, with a drawn bottle as fallback.
@@ -64,8 +64,8 @@ Online-shop titles are messy. A multi-stage pipeline keeps the list clean:
 ### Updates
 - **Updates without installing.** All screens and logic live in `assets/www`, so a normal update downloads only those files (about 115 KB, `www.zip` + `ota.json` in the `latest` release), checks size and SHA-256, and stores them in the app's own folder. Nothing is installed, so Android and Google Play Protect show no “Install anyway” question. If the new files do not start (no “I am alive” signal after a clean start, or three failed starts in a row), the app returns by itself to the previous working files, or to the version inside the APK. If there is no internet, the update is simply postponed; the APK flow is never started just because the check failed.
 - A full APK is needed only when the Java part changes (`api` in `www/version.json` is higher than `NATIVE_API` in `Ota.java`); then the old flow is used (download, confirm, install, and Play Protect may ask).
-- Automatic or manual update mode in Settings; the button is disabled during download and a progress bar is shown.
-- The “Install anyway” question comes from Google Play Protect (the app comes from outside the Play Store); the app cannot switch it off. Settings contains simple steps to turn that scan off once, for the rare APK updates.
+- **No button, no question.** The app checks by itself when it opens and about every 20 minutes while it stays open, downloads silently, and restarts its own page when the person is idle (nothing open, no touch for 15 seconds, prices not loading). Settings only shows a short status line; a “check now” button and an on/off switch exist only under Advanced settings (for the developer).
+- If an APK is ever needed, a single card with one button (“Install”) appears when the person is idle; the Android system may still ask once. The app itself never mentions “Install anyway”.
 
 ## Install
 
@@ -116,7 +116,13 @@ node tests/gen.js              # generate fixtures
 node tests/t35_vet.js          # name vetting, brand and line recognition
 node tests/t37_hist.js         # price and availability history logic
 python3 tests/t36_features.py  # search, shop list, hide, blocked words, text size
-python3 tests/t38_market.py    # market report screen
+python3 tests/t60_report3.py   # خبر و گزارش بازار (خبر ساختگی، سه برگه، عکس، برگشت)
+python3 tests/t61_news.py      # خواندن خبر از وردپرس/RSS (در مرورگر؛ t61_news.js در Node)
+python3 tests/t62_viewer_sync.py  # کشیدن عکس به چپ/راست، منو هم همراهش
+python3 tests/t63_search_ui.py    # کارت‌های عکس‌دار، برگشت به لیست، لیست مغازه، گفتن، جستجو در سایت‌ها
+node tests/t64_core_fixes.js        # تاریخچه (برند/مدل)، قیمت جستجوی زنده، دیجی‌کالا
+python3 tests/t64_review_fixes.py   # نمایش بیشتر، کش مقایسه، لمس دوباره، خبرِ سایتِ ناموفق
+python3 tests/t65_update_rules.py   # بروزرسانی: گیر کردن روی بارگذاری، خواندنِ لیست، «بعداً» ماندگار، خطای دیررسیده
 python3 tests/t3_flow.py       # full refresh flow
 ```
 
@@ -151,8 +157,14 @@ Python tests need Playwright with Chromium. The Java code is compiled only by CI
 - **بروزرسانی خودکار** (خاموش، ۱۵ دقیقه، ۳۰ دقیقه، ۱ ساعت و …)، حالت سبک «فقط قیمت» برای بروزرسانی سریع و حالت کامل برای خواندن دوبارهٔ نام‌ها و عکس‌ها.
 - **قیمت قدیمی هرگز تازه نشان داده نمی‌شود**: نشانگر بالا قرمز می‌شود و سن قیمت‌ها نوشته می‌شود.
 
-### گزارش بازار
-با هر بروزرسانی کامل، یک تصویر کوچک از قیمت و موجودی ذخیره می‌شود. صفحهٔ **گزارش بازار** این تاریخچه را به اطلاعات کاربردی برای مغازه تبدیل می‌کند:
+### خبر و گزارش بازار
+صفحهٔ **خبر و گزارش بازار** (دکمهٔ روزنامه، بالای صفحه) سه برگه دارد و در هر ردیف **عکس عطر** هست:
+
+- **خبر**: تیترهای امروز (چند عطر ارزان یا گران شد، تازه آمد، دوباره موجود شد، ناموجود شد؛ هر کدام با یک لمس به فهرستش می‌رود)، **خبرهای تازهٔ مجلهٔ فروشگاه‌ها** (لیلیوم، سفیر، هایلند و مقالات عطرِ مجلهٔ دیجی‌کالا؛ با لمس در مرورگر باز می‌شود، خودش هر چند ساعت تازه می‌شود و نقطهٔ قرمز کنار دکمه یعنی خبرِ نادیده)، تازه‌های بازار و بهترین فرصت‌های خرید.
+- **قیمت‌ها**: ارزان شده‌اند، گران شده‌اند، دوباره موجود، تازه، ناموجود و موجودی کم، با قیمتِ «قبلاً» و «الان» و نمودار کوچک.
+- **مقایسه**: نتیجه‌ی آماده (ارزان‌ترین فروشگاه، صرفه‌جویی کل، گران‌ترین و ارزان‌ترین برند)، مقایسهٔ فروشگاه‌ها با هم و «کدام عطر را از کجا بخرم؟» با فیلتر جنسیت و ترتیب.
+
+لمس هر ردیف صفحهٔ قیمتِ همان عطر را روی گزارش باز می‌کند و «برگشت» به همان جای گزارش برمی‌گردد.
 
 | بخش | چه می‌گوید |
 |---|---|
@@ -172,12 +184,12 @@ Python tests need Playwright with Chromium. The Java code is compiled only by CI
 - **یکی شدن فارسی و لاتین**: «ورساچه اروس» و «Versace Eros» یک عطر می‌شوند.
 - **شناخت برند** برای بیش از ۱۸۰ برند، به‌علاوهٔ جدول «نام خط محصول به برند»؛ مثلاً «Pour Un Homme» زیر برند کارون می‌رود، نه «سایر برندها».
 - **غلظت و جنسیت** (ادو پرفیوم، ادو تویلت، پارفوم؛ مردانه، زنانه، یونیسکس) تشخیص داده می‌شود و به‌عنوان نسخه‌های جدا می‌ماند.
-- **کنترل با خودتان**: «واژه‌های ممنوع» (هر عنوانی که آن را داشته باشد وارد فهرست نمی‌شود و همان لحظه برداشته می‌شود) و «پنهانش کن» برای یک مورد خراب.
+- **کنترل با خودتان**: «واژه‌های ممنوع» (هر عنوانی که آن را داشته باشد وارد فهرست نمی‌شود و همان لحظه برداشته می‌شود). عطرهایی که قبلاً پنهان شده‌اند در تنظیمات می‌مانند و با لمس برمی‌گردند؛ دکمهٔ «پنهانش کن» از صفحهٔ قیمت برداشته شد.
 
 ### استفادهٔ روزمره
-- **گفتنِ نام عطر**: در نوار بزرگ پایین دکمهٔ «بگویید» هست (تشخیص گفتار خودِ گوشی، فارسی). اگر برنامه مطمئن باشد خودش عطر را باز می‌کند؛ وگرنه نزدیک‌ترین حدس‌ها را فهرست می‌کند. جستجوی خالی «آخرین‌هایی که دیدید» را نشان می‌دهد.
-- **جستجو** به فارسی یا انگلیسی، حتی با بخشی از نام.
-- **لیست مغازه** (ستاره): عطرهای مهم را ستاره بزنید تا فهرست شخصی بسازید.
+- **گفتنِ نام عطر**: در نوار بزرگ پایین دکمهٔ «بگویید» هست (تشخیص گفتار خودِ گوشی، فارسی). هیچ‌وقت بی‌خبر عطری باز نمی‌شود: **کارت‌های بزرگِ عکس‌دار** از نزدیک‌ترین نام‌ها نشان داده می‌شود (بهترین حدس علامت دارد)، کاربر عکس را می‌بیند، روی درستش می‌زند و به قیمت‌ها می‌رود؛ «برگشت» دوباره همان فهرست است. املای غلط یا نزدیک هم پیدا می‌شود، و اگر نام در فهرست گوشی نبود، برنامه از جستجوی خودِ چهار فروشگاه می‌پرسد و آنچه می‌فروشند را نشان می‌دهد.
+- **جستجو** به فارسی یا انگلیسی، حتی با بخشی از نام یا املای نزدیک؛ نتیجه‌ها کارت‌های عکس‌دارِ بزرگ‌اند. اگر نام را در فهرست گوشی پیدا نکرد، دکمهٔ «در سایت‌ها هم بگرد» (و برای نتیجهٔ خالی، خودکار) از فروشگاه‌ها می‌پرسد.
+- **لیست مغازه** (ستاره): صفحهٔ جدا با دکمهٔ خودش در نوار پایین، نه بخشی از جستجو. در صفحهٔ قیمتِ هر عطر «افزودن به لیست مغازه» را بزنید.
 - **چهار شکل فهرست**، پوستهٔ روشن، تاریک یا خودکار، نام‌ها به فارسی یا انگلیسی و **چهار اندازهٔ نوشته** (روی کل برنامه اثر می‌کند: فهرست، قیمت و ستون حروف) برای خواندن راحت‌تر.
 - **خاموش کردن برند**: برندهایی که نمی‌فروشید دیده نمی‌شوند و عکسشان هم دانلود نمی‌شود.
 - **عکس محصول** روی گوشی نگه‌داری می‌شود و اگر نبود، یک بطری ترسیمی جایگزین می‌شود.
@@ -185,8 +197,8 @@ Python tests need Playwright with Chromium. The Java code is compiled only by CI
 ### به‌روزرسانی خود برنامه
 - **بروزرسانی بدون نصب:** همه‌ی رابط و منطق برنامه در `assets/www` است؛ پس بروزرسانیِ معمولی فقط همان فایل‌ها (حدود ۱۱۵ کیلوبایت: `www.zip` و `ota.json` در Release با برچسب `latest`) را می‌گیرد، اندازه و SHA-256 را بررسی می‌کند و در پوشه‌ی خودِ برنامه می‌گذارد. چیزی نصب نمی‌شود، پس اندروید و Play Protect پنجره‌ی «Install anyway» نشان نمی‌دهند. اگر فایل‌های تازه سالم بالا نیایند (بدون خطا و با فهرستِ کشیده‌شده)، برنامه خودش به فایل‌های سالمِ قبلی و در نبودِ آن به نسخه‌ی داخل APK برمی‌گردد. اگر اینترنت نباشد، بروزرسانی فقط عقب می‌افتد و هرگز به‌خاطر ناموفق بودن بررسی، فایل APK دانلود نمی‌شود.
 - فقط وقتی بخش جاوا عوض شود (عدد `api` در `www/version.json` بالاتر از `NATIVE_API` در `Ota.java`) هنوز فایل APK لازم است؛ آن‌وقت همان روش قبلی (دانلود، تأیید، نصب) اجرا می‌شود و Play Protect ممکن است بپرسد.
-- هنگام باز شدن، برنامه نسخهٔ جدید را بررسی و دانلود می‌کند (در حالت دستی فقط وقتی بخواهید). هنگام دانلود، دکمه غیرفعال می‌شود و نوار پیشرفت دیده می‌شود. حالت خودکار یا دستی در تنظیمات.
-- سؤال «Install anyway» کارِ Play Protect گوگل است (برنامه از فروشگاه گوگل نیامده) و برنامه نمی‌تواند خاموشش کند. در تنظیمات، مراحل ساده‌ی خاموش کردنِ آن اسکن (یک بار) برای بروزرسانی‌های نادرِ APK نوشته شده است.
+- **بدون دکمه و بدون پرسیدن:** برنامه هنگام باز شدن و هر حدود ۲۰ دقیقه (تا وقتی باز است) خودش نسخهٔ جدید را می‌پرسد، بی‌صدا می‌گیرد و وقتی کاربر کاری نمی‌کند (چیزی باز نیست، ۱۵ ثانیه دست نزده، قیمت‌ها در حال گرفتن نیست) صفحه را با فایل‌های تازه از نو باز می‌کند و بعدش یک پیام کوتاه «برنامه بروز شد» می‌دهد. در تنظیمات فقط یک خط وضعیت هست؛ دکمهٔ «همین حالا بپرس» و کلید خاموش/روشن فقط در تنظیمات پیشرفته (برای سازنده) است.
+- اگر روزی نصب APK لازم شود، فقط یک کارت با یک دکمهٔ «نصب» وقتی کاربر بیکار است نشان داده می‌شود (اندروید ممکن است یک بار تأیید بخواهد). خودِ برنامه هیچ‌جا «Install anyway» نمی‌نویسد و راهنمایی برایش لازم نیست.
 - قاعده‌ی کار برای سازنده: اگر صفحه‌ها به تابع تازه‌ای در جاوا نیاز دارند، هم `NATIVE_API` و هم `api` در `version.json` را با هم بالا ببرید؛ وگرنه فقط فایل‌های وب را عوض کنید و بسته‌ی بی‌نصب خودکار ساخته می‌شود.
 
 ## نصب

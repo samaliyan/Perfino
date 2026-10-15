@@ -29,6 +29,7 @@ async def main():
         r=await pg.evaluate("""(async function(){
           var n=0;window.Native.updInstall=function(){return false};window.Native.updCheck=function(){n++};window.Native.updDownload=function(){n+=100};
           window.__updReady(999999);
+          await new Promise(function(r){setTimeout(r,900)});      // لمسِ اتفاقیِ لحظه‌ی آمدنِ کارت نادیده گرفته می‌شود
           document.getElementById('updGo').click();
           await new Promise(function(r){setTimeout(r,1200)});
           return {n:n,on:document.getElementById('updBox').classList.contains('on')}})()""")
