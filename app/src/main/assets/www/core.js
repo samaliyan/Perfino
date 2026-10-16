@@ -2137,14 +2137,46 @@ function newsText(h, n) {      // برای نمایش است نه جستجو: ن
 }
 function newsImg(u) { u = String(u || '').trim(); if (/^http:\/\//i.test(u)) u = 'https://' + u.slice(7); return /^https:\/\//i.test(u) && u.length < 600 ? u : ''; }      // عکسِ ناامن (http) بارگذاری نمی‌شود؛ همه‌ی سایت‌ها https دارند
 function newsDate(d) { var now = Date.now(); return d > 0 && d <= now + 864e5 ? Math.min(d, now) : 0; }      // اختلافِ ساعتِ کم: همین حالا؛ تاریخِ آینده‌ی دور (ساعتِ اشتباهِ سایت): نامعلوم تا برای همیشه «تازه‌ترین» نماند
+/* خلاصه‌ی خبر: «[…]»، «ادامه مطلب» و «The post … appeared first on …» که وردپرس ته خلاصه می‌گذارد برداشته می‌شود؛ اگر خلاصه همان عنوان بود، خالی می‌ماند */
+function newsExcerpt(h, title) {
+  var x = newsText(h, 700).replace(/\s*The post .{0,200} appeared first on .{0,100}$/i, '').replace(/\s*(\[\s*(…|\.\.\.|&hellip;)\s*\]|ادامه (مطلب|خبر)(\s*[»›>]+)?)\s*$/, '').replace(/\s*(…|\.\.\.)$/, '').trim();
+  if (x.length > 130) x = x.slice(0, 130).replace(/\s+\S*$/, '') + '…';
+  var a = x.replace(/[\s…\.:؛،]/g, ''), b = String(title || '').replace(/[\s…\.:؛،]/g, '');
+  return a && b && (a === b || b.indexOf(a) === 0 || a.indexOf(b) === 0 && a.length < b.length + 12) ? '' : x;
+}
+/* وقتی نوشته «عکسِ شاخص» ندارد: اولین عکسِ درخورِ خودِ نوشته (نه آیکون/لوگو/ایموجی)؛ اگر srcset دارد، اندازه‌ی میانی (حدود ۷۰۰ پیکسل) برای اینکه روی گوشی سنگین نباشد */
+function newsPickImg(html) {
+  html = String(html == null ? '' : html).slice(0, 40000);
+  function at(tag, a) { var r = new RegExp('\\s' + a + '\\s*=\\s*(?:"([^"]*)"|\'([^\']*)\')', 'i').exec(tag); return r ? (r[1] != null ? r[1] : r[2]) : ''; }
+  var re = /<img\b(?:[^>"']|"[^"]*"|'[^']*'){0,600}>/gi, m, n = 0;      // «>» داخلِ مقدارِ صفت (alt="a > b") تگ را نمی‌شکند
+  while ((m = re.exec(html)) && n++ < 8) {
+    var tag = m[0], w = +at(tag, 'width') || 0, h = +at(tag, 'height') || 0;
+    if ((w && w < 160) || (h && h < 100)) continue;
+    var src = at(tag, 'data-src') || at(tag, 'data-lazy-src') || at(tag, 'src');
+    if (/^data:/i.test(src)) src = at(tag, 'data-src') || at(tag, 'data-lazy-src');
+    var cands = [], ss = at(tag, 'srcset') || at(tag, 'data-srcset'), sm, sre = /(\S+)\s+(\d+)w\s*(?:,|$)/g;      // آدرس می‌تواند ویرگول داشته باشد (w_300,h_200)
+    while ((sm = sre.exec(ss))) cands.push({ u: sm[1], w: parseInt(sm[2], 10) });
+    if (cands.length) { cands.sort(function (a, b) { return a.w - b.w; }); var pick = cands.filter(function (c) { return c.w >= 640; })[0] || cands[cands.length - 1]; if (pick.w >= 300) src = pick.u; }
+    src = decodeEnt(String(src || '').trim());      // &amp; و &#038; (وردپرس) → &
+    if (src.slice(0, 2) === '//') src = 'https:' + src;
+    if (!src || /(^|[\/_\-.])(emoji|emojis|avatar|gravatar|logo|icon|icons|spinner|placeholder|pixel)([\/_\-.\d]|$)|\.svg(\?|$)|\.gif(\?|$)/i.test(src)) continue;      // لوگو/آیکون/ایموجی/آواتار (واژه‌ی کامل؛ «silicone» نه)
+    var ok = newsImg(src); if (ok) return ok;
+  }
+  return '';
+}
 function newsFromWp(a, src) {
   var out = [];
   a.forEach(function (p) {
     if (!p || typeof p !== 'object') return;
     var t = newsText(p.title && p.title.rendered, 140), u = itemUrl(src.id, p.link); if (!t || !u) return;
     var d = newsDate(Date.parse(p.date_gmt ? p.date_gmt + 'Z' : p.date)), img = '';
-    try { var fm = p._embedded && p._embedded['wp:featuredmedia'] && p._embedded['wp:featuredmedia'][0]; if (fm) { var sz = fm.media_details && fm.media_details.sizes; img = (sz && ((sz.medium_large && sz.medium_large.source_url) || (sz.medium && sz.medium.source_url))) || fm.source_url || ''; } } catch (e) { }
-    out.push({ s: src.id, sn: src.name, t: t, d: d, u: u, x: newsText(p.excerpt && p.excerpt.rendered, 130), img: newsImg(img) });
+    try { var fm = p._embedded && p._embedded['wp:featuredmedia'] && p._embedded['wp:featuredmedia'][0]; if (fm) { var sz = fm.media_details && fm.media_details.sizes; img = (sz && ((sz.medium_large && sz.medium_large.source_url) || (sz.large && sz.large.source_url))) || fm.source_url || (sz && sz.medium && sz.medium.source_url) || ''; } } catch (e) { }
+    img = newsImg(img);
+    var body = p.content && typeof p.content.rendered === 'string' ? p.content.rendered : '';
+    if (!img && body) { try { img = newsPickImg(body); } catch (e) { } }      // عکسِ شاخص نداشت: عکسِ داخلِ متن
+    var ex = newsExcerpt(p.excerpt && p.excerpt.rendered, t);
+    if (!ex && body) { try { ex = newsExcerpt(body.replace(/<(figure|script|style|noscript)[\s\S]*?<\/\1>/gi, ' ').slice(0, 6000), t); } catch (e) { } }      // خلاصه نداشت: چند کلمه‌ی اولِ متن
+    out.push({ s: src.id, sn: src.name, t: t, d: d, u: u, x: ex, img: img });
   });
   return out;
 }
@@ -2159,7 +2191,7 @@ function newsFromRss(xml, src) {
     var raw = tx('content:encoded') || tx('description'), im = '', m = /<img[^>]+src=["']([^"']+)["']/i.exec(raw);
     var enc = it.getElementsByTagName('enclosure')[0], mc = it.getElementsByTagName('media:content')[0];
     im = (enc && /image/i.test(enc.getAttribute('type') || 'image') && enc.getAttribute('url')) || (mc && mc.getAttribute('url')) || (m && m[1]) || '';
-    out.push({ s: src.id, sn: src.name, t: t, d: newsDate(Date.parse(tx('pubDate'))), u: u, x: newsText(tx('description'), 130), img: newsImg(im) });
+    out.push({ s: src.id, sn: src.name, t: t, d: newsDate(Date.parse(tx('pubDate'))), u: u, x: newsExcerpt(tx('description'), t), img: newsImg(im) });
   });
   return out;
 }
@@ -2179,12 +2211,12 @@ async function fetchNews(net, srcIds) {
   var notes = {}, all = [];
   var jobs = NEWS_SRC.filter(function (s) { return !srcIds || srcIds.indexOf(s.id) >= 0; }).map(function (src) {
     var tm, pr = Promise.race([newsOne(src, net).catch(function () { return { items: [], note: 'fail' }; }), new Promise(function (res) { tm = setTimeout(function () { res({ items: [], note: 'fail' }); }, 25000); })]).then(function (r) { clearTimeout(tm); return r; });
-    return pr.then(function (r) { notes[src.id] = r.note; return r.items.sort(function (a, b) { return b.d - a.d; }).slice(0, 4); });      // از هر سایت حداکثر چهار خبرِ تازه؛ یک سایت همه‌جا را نگیرد
+    return pr.then(function (r) { notes[src.id] = r.note; return r.items.sort(function (a, b) { return b.d - a.d; }).slice(0, 6); });      // از هر سایت حداکثر شش خبرِ تازه؛ یک سایت همه‌جا را نگیرد
   });
   (await Promise.all(jobs)).forEach(function (a) { all = all.concat(a); });
   all.sort(function (a, b) { return b.d - a.d; });
   var seen = {}; all = all.filter(function (x) { var k = x.u; if (seen[k]) return false; seen[k] = 1; return true; });
-  return { items: all.slice(0, 12), notes: notes };
+  return { items: all.slice(0, 24), notes: notes };
 }
 
 /* ---------- تاریخچه‌ی قیمت و موجودی (برای «گزارش بازار») ----------
@@ -2698,7 +2730,7 @@ function searchRank(idx, alts, tools, opts) {
   return out;
 }
 
-root.Core = { fetchNews: fetchNews, newsFromWp: newsFromWp, newsFromRss: newsFromRss, NEWS_SRC: NEWS_SRC, liveSearch: liveSearch, liveTerms: liveTerms, liveHit: liveHit, wooLivePrice: wooLivePrice, searchIndex: searchIndex, searchRank: searchRank, searchSimilar: searchSimilar, simWord: simWord, simFold: simFold, srn: srn, fzKey: fzKey, explainTitle: explainTitle, useSz: useSz, sizeFromPage: sizeFromPage, nextDataCards: nextDataCards, RAWC: RAWC, stripPriceTail: stripPriceTail, marketStats: marketStats, marketView: marketView, histNew: histNew, histFix: histFix, histSnap: histSnap, histReport: histReport, purgeStored: purgeStored, setBlock: setBlock, REJ: REJ, vetReason: vetReason, reconcile: reconcile, CLEANSE: CLEANSE, cleanseText: cleanseText, cleanBrandName: cleanBrandName, itemUrl: itemUrl, STALE_MIN: STALE_MIN, fa2en: fa2en, en2fa: en2fa, enTokens: enTokens, titleEn: titleEn, tree: tree, brandOf: brandOf, specInfo: specInfo, enrichTitle: enrichTitle, genderOf: genderOf, nameCmp: nameCmp, CFG: CFG, newDb: newDb, dbIndex: dbIndex, ingest: ingest, ingestAsync: ingestAsync, buildList: buildList, normFa: normFa, parseTitle: parseTitle, aggregate: aggregate, SOURCES: SOURCES, extractCards: extractCards,
+root.Core = { fetchNews: fetchNews, newsFromWp: newsFromWp, newsFromRss: newsFromRss, newsPickImg: newsPickImg, newsExcerpt: newsExcerpt, NEWS_SRC: NEWS_SRC, liveSearch: liveSearch, liveTerms: liveTerms, liveHit: liveHit, wooLivePrice: wooLivePrice, searchIndex: searchIndex, searchRank: searchRank, searchSimilar: searchSimilar, simWord: simWord, simFold: simFold, srn: srn, fzKey: fzKey, explainTitle: explainTitle, useSz: useSz, sizeFromPage: sizeFromPage, nextDataCards: nextDataCards, RAWC: RAWC, stripPriceTail: stripPriceTail, marketStats: marketStats, marketView: marketView, histNew: histNew, histFix: histFix, histSnap: histSnap, histReport: histReport, purgeStored: purgeStored, setBlock: setBlock, REJ: REJ, vetReason: vetReason, reconcile: reconcile, CLEANSE: CLEANSE, cleanseText: cleanseText, cleanBrandName: cleanBrandName, itemUrl: itemUrl, STALE_MIN: STALE_MIN, fa2en: fa2en, en2fa: en2fa, enTokens: enTokens, titleEn: titleEn, tree: tree, brandOf: brandOf, specInfo: specInfo, enrichTitle: enrichTitle, genderOf: genderOf, nameCmp: nameCmp, CFG: CFG, newDb: newDb, dbIndex: dbIndex, ingest: ingest, ingestAsync: ingestAsync, buildList: buildList, normFa: normFa, parseTitle: parseTitle, aggregate: aggregate, SOURCES: SOURCES, extractCards: extractCards,
   wooSource: wooSource, digikalaSource: digikalaSource, htmlSource: htmlSource, letterOf: letterOf, median: median, priceFromText: priceFromText, similar: similar };
 if (typeof module !== 'undefined') module.exports = root.Core;
 })(typeof window !== 'undefined' ? window : globalThis);

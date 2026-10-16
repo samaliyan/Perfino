@@ -12,7 +12,7 @@ android {
         targetSdk 34
         // هر ساخت جدید در گیت‌هاب شماره‌ی بالاتری می‌گیرد تا نصب روی نسخه‌ی قبلی (آپدیت) پذیرفته شود
         versionCode (System.getenv('GITHUB_RUN_NUMBER') ? (System.getenv('GITHUB_RUN_NUMBER') as int) + 100 : 100)
-        versionName '1.35'
+        versionName '1.36'
     }
 
     // امضای ثابت: همیشه با همین کلید امضا می‌شود، پس آپدیت «conflict» نمی‌دهد.

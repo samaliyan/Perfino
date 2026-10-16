@@ -54,3 +54,41 @@ def make_seed(flat):
     return {'v':1,'t0':now-10*D,'t':now-3600000,'as':'','d':d}
 def pre_js(seed,fs=0,extra=''):
     return "if(!sessionStorage.getItem('mk')){sessionStorage.setItem('mk','1');localStorage.setItem('pp.hist',%s);%s}"%(json.dumps(json.dumps(seed)),"var s=JSON.parse(localStorage.getItem('pp.set')||'{}');s.fs=%d;localStorage.setItem('pp.set',JSON.stringify(s));"%fs)+extra
+
+def rich_news_mock_js(mode='ok', extra_wp=None):
+    """خبرِ ساختگیِ پربارتر (برای آزمایشِ فیدِ خبر): عکسِ شاخص، عکسِ داخلِ متن (srcset)، بدون عکس، تیترِ خیلی بلند، تیترِ لاتین، خبرِ خیلی قدیمی"""
+    now=int(time.time()*1000)
+    def wp(t,link,ago_ms,ex='',content='',feat=None):
+        emb={}
+        if feat: emb={'wp:featuredmedia':[{'source_url':feat['full'],'media_details':{'sizes':{'medium':{'source_url':feat['full']+'?m'},'medium_large':{'source_url':feat['ml']}}}}]}
+        return {'title':{'rendered':t},'link':link,'date_gmt':iso(now-ago_ms),'excerpt':{'rendered':('<p>%s</p>'%ex) if ex else ''},'content':{'rendered':content},'_embedded':emb}
+    H=3600000
+    lil=[wp('معرفی ساواژ اکستریت؛ جدیدترین عطر دیور چه بویی دارد؟','https://liliome.com/dior-sauvage-extrait/',3*H,'دیور نسخهٔ جدیدی از ساواژ را عرضه کرده است؛ ترکیبی گرم و ادویه‌ای با ماندگاری بالا و پخش بوی عالی در فصل سرد سال [&hellip;]',feat={'full':'https://liliome.com/up/dior-full.jpg','ml':'https://liliome.com/up/dior-768.jpg'}),
+         wp('بهترین ادکلن‌های مردانه برای زمستان','https://liliome.com/best-winter-men/',26*H,'','<p>اگر دنبال عطری گرم و ماندگار برای روزهای سرد هستید، این فهرست برای شماست. عطرهای چوبی و ادویه‌ای بهترین انتخاب‌اند.</p><figure><img src="https://liliome.com/up/win.jpg" srcset="https://liliome.com/up/win-300x169.jpg 300w, https://liliome.com/up/win-768x432.jpg 768w, https://liliome.com/up/win.jpg 1680w" width="1680" height="945"></figure>'),
+         wp('راهنمای کاملِ تشخیص عطر اصل از تقلبی؛ از بسته‌بندی و بارکد و کدِ بچ تا بوی عطر روی پوست و ماندگاری در ساعت‌های اول و آخر روز','https://liliome.com/real-vs-fake/',3*D+H,'چند نشانهٔ ساده که کمک می‌کند در خرید اشتباه نکنید.'),
+         wp('Tom Ford Oud Wood؛ نقد و بررسی','https://liliome.com/tom-ford-oud-wood/',5*D,'عودِ نرم و چوبِ گرم: بررسی کامل نت‌ها و ماندگاری.'),
+         wp('نگهداری درست ادکلن','https://liliome.com/keep/',10*D,'دور از نور و گرما.'),
+         wp('خبر خیلی قدیمی','https://liliome.com/ancient/',100*D,'قدیمی.')]
+    if extra_wp: lil=lil+extra_wp
+    hil=[wp('تخفیف زمستانی هایلند','https://hilandbeauty.com/winter-sale/',2*D,'تا ۳۰٪ تخفیف روی چند برند.',feat={'full':'https://hilandbeauty.com/up/s.jpg','ml':'https://hilandbeauty.com/up/s-768.jpg'}),
+         wp('معرفی برند جدید','https://hilandbeauty.com/new-brand/',6*D,'یک برند تازه به فروشگاه آمد.')]
+    rss1='<?xml version="1.0"?><rss version="2.0" xmlns:content="http://purl.org/rss/1.0/modules/content/"><channel><title>x</title>'+\
+        '<item><title>عطرهای تازه رسیده به سفیر</title><link>https://www.safirstores.com/blog/new-arrivals/</link><pubDate>%s</pubDate><description>معرفی چند عطر جدید</description><content:encoded><![CDATA[<img src="https://www.safirstores.com/wp-content/uploads/b.jpg"><p>متن</p>]]></content:encoded></item>'%rfc(now-9*H)+\
+        '<item><title>چطور عطر مناسب هدیه انتخاب کنیم؟</title><link>https://www.safirstores.com/blog/gift/</link><pubDate>%s</pubDate><description>چند پیشنهاد برای هدیه دادن.</description></item></channel></rss>'%rfc(now-4*D)
+    rss4='<?xml version="1.0"?><rss version="2.0"><channel><title>mag</title>'+\
+        '<item><title>بهترین ادکلن‌های مردانه ۱۴۰۵</title><link>https://www.digikala.com/mag/best-men-perfume/</link><pubDate>%s</pubDate><description>فهرست پرفروش‌ها</description></item>'%rfc(now-7*H)+\
+        '<item><title>بهترین گوشی‌های میان‌رده</title><link>https://www.digikala.com/mag/phones/</link><pubDate>%s</pubDate><description>موبایل</description></item></channel></rss>'%rfc(now-1*D)
+    return """
+window.__NEWSCALLS=[];
+window.__MODE=function(u){
+  var mode=window.__NEWSMODE||%s;
+  if(u.indexOf('/wp-json/wp/v2/posts')<0 && u.indexOf('/feed')<0) return null;
+  window.__NEWSCALLS.push(u);
+  if(mode==='fail') return {s:500,b:'err'};
+  if(u.indexOf('liliome.com/wp-json/wp/v2/posts')>=0) return {s:200,b:%s};
+  if(u.indexOf('safirstores.com/feed')>=0) return {s:200,b:%s};
+  if(u.indexOf('hilandbeauty.com/wp-json/wp/v2/posts')>=0) return {s:200,b:%s};
+  if(u.indexOf('digikala.com/mag/feed')>=0) return {s:200,b:%s};
+  return {s:404,b:'nf'};
+};
+"""%(json.dumps(mode),json.dumps(json.dumps(lil)),json.dumps(rss1),json.dumps(json.dumps(hil)),json.dumps(rss4))

@@ -1,7 +1,7 @@
 (function () {
 'use strict';
 var RM = !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
-var VERSION = '1.35';
+var VERSION = '1.36';
 var myCode = (function () { var m = /\/b(\d{1,10})\/index\.html$/.exec(String(location.pathname || '')); return m ? m[1] : '0'; })();      // نسخه‌ی این صفحه از روی آدرسش؛ در گزارش‌ها به جاوا فرستاده می‌شود تا صفحه‌ی کهنه نتواند نسخه‌ی تازه را «سالم» اعلام کند
 function otaCall(n) { try { if (window.Native && typeof window.Native[n] === 'function') window.Native[n](myCode); } catch (e) { } }
 otaCall('otaBoot');      // «جاوااسکریپتِ این صفحه شروع شد»: برنامه به صفحه‌ی بی‌نصب مهلتِ بیشتری برای ساختن فهرست می‌دهد
@@ -89,7 +89,7 @@ function tile(p) {
 }
 document.addEventListener('error', function (e) {
   var im = e.target;
-  if (im && im.tagName === 'IMG' && im.classList && im.classList.contains('nimg') && im.parentNode) { var nb = im.parentNode; if (nb.parentNode) nb.parentNode.removeChild(nb); return; }      // عکسِ خبر نیامد: خبر بدون عکس می‌ماند
+  if (im && im.tagName === 'IMG' && im.classList && im.classList.contains('nimg') && im.parentNode) { var nb = im.parentNode; nb.classList.add('ph'); nb.innerHTML = bottle(+im.dataset.k || 0, themeNow() === 'light'); return; }      // عکسِ خبر نیامد: همان قابِ بزرگ با یک بطریِ ساده، نه جای خالی
   if (im && im.tagName === 'IMG' && im.parentNode && im.parentNode.classList.contains('tile')) {
     if (im.dataset.r) { var rs = im.dataset.r; im.removeAttribute('data-r'); im.src = rs; return; }   // فایل محلی خراب بود؛ از اینترنت
     var t = im.parentNode; t.classList.add('fb'); t.innerHTML = bottle(+im.dataset.k || 0, themeNow() === 'light');
@@ -661,7 +661,7 @@ function histTake() {
     if (mkOn) { var sc = $('mkr').scrollTop; mkRender(); $('mkr').scrollTop = sc; }
   } catch (e) { console.error(e); }
 }
-var mkTab = 'news', mkMore = {};
+var mkTab = 'news', mkMore = {}, mkChgN = 0;
 function dayT(d) { return d < 1 ? 'امروز' : fa(d) + ' روز پیش'; }
 function srcName(id) { var r = ''; Core.SOURCES.forEach(function (s) { if (s.id === id) r = s.name; }); return r || id; }
 function spark(pts) {                                    // نمودارِ کوچکِ تغییر قیمت
@@ -704,7 +704,7 @@ function mkView() {
 }
 /* ---- خبرِ سایت‌ها (مجلهٔ همان فروشگاه‌ها): ذخیره می‌شود، هر چند ساعت یک بار خودش تازه می‌شود، نقطهٔ قرمزِ کنارِ دکمه یعنی خبرِ نادیده ---- */
 var news = (function () { var n = ls.get('pp.news', null); if (!n || typeof n !== 'object' || !Array.isArray(n.items)) return { t: 0, items: [], notes: {} }; n.items = n.items.filter(function (x) { return x && typeof x.t === 'string' && typeof x.u === 'string' && Core.itemUrl('x', x.u); }); n.t = +n.t || 0; n.notes = n.notes && typeof n.notes === 'object' ? n.notes : {}; return n; })();
-var newsBusy = false, newsTok = 0;
+var newsBusy = false, newsTok = 0, newsSeenAt = 0;      // newsSeenAt: «دیده‌شده»ی پیش از باز شدنِ این گزارش؛ خبرِ تازه‌تر از آن «جدید» نشان داده می‌شود
 function newsSeenMax() { return +ls.get('pp.newsSeen', 0) || 0; }
 function nwDot() { try { var seen = newsSeenMax(); $('nw').classList.toggle('nu', !mkOn && news.items.some(function (x) { return x.d > seen; })); } catch (e) { } }
 function newsMarkSeen() { var m = 0; news.items.forEach(function (x) { if (x.d > m) m = x.d; }); if (m > newsSeenMax()) ls.set('pp.newsSeen', m); nwDot(); }
@@ -719,7 +719,12 @@ function newsLoad(mode) {                  // mode: 'force' (دکمه‌ی «د�
   var done = function (r) {
     if (tok !== newsTok || !newsBusy) return; newsBusy = false;
     if (r && r.items && r.items.length) {
-      var nt = r.notes || {}, keep = news.items.filter(function (x) { return nt[x.s] === 'fail'; }), all = r.items.concat(keep).sort(function (a, b) { return b.d - a.d; }).slice(0, 12);      // سایتی که این بار جواب نداد، خبرهای قبلی‌اش نپرد
+      var nt = r.notes || {}, seenU = {}, all = [], lim = Date.now() - 60 * 864e5, per = {};
+      r.items.map(function (x) { return [x, 1]; }).concat(news.items.filter(function (x) { return x.d > 0 || nt[x.s] === 'fail'; }).map(function (x) { return [x, 0]; })).forEach(function (e) {      // تازه‌ها اول (اگر تکراری بود، نسخه‌ی تازه می‌ماند)؛ خبرهای قبلی هم می‌مانند تا صفحه خالی و کوتاه نشود
+        var x = e[0]; if (seenU[x.u] || (!e[1] && x.d > 0 && x.d < lim)) return; seenU[x.u] = 1; all.push(x);      // آنچه همین دریافت آورده همیشه می‌ماند؛ فقط خبرِ قدیمیِ ذخیره‌شده بعد از ۶۰ روز می‌پرد
+      });
+      all.sort(function (a, b) { return b.d - a.d; });
+      all = all.filter(function (x) { per[x.s] = (per[x.s] | 0) + 1; return per[x.s] <= 10; }).slice(0, 30);      // یک سایتِ پرنوشته همه‌جا را نگیرد
       news = { t: Date.now(), items: all, notes: nt }; ls.set('pp.news', news);
     }
     else if (r) news.notes = r.notes || {};
@@ -727,20 +732,26 @@ function newsLoad(mode) {                  // mode: 'force' (دکمه‌ی «د�
   };
   try { Core.fetchNews(net).then(done, function (e) { console.error(e); done(null); }); } catch (e) { console.error(e); done(null); }
 }
+var NW_ABB = { liliome: 'لی', safir: 'سف', hiland: 'های', digikala: 'دی' };
+var NW_COL = { liliome: '#6d4ad6', safir: '#c8402f', hiland: '#1f8f56', digikala: '#d6303f' };
+function newsKey(t) { var k = 0; String(t || '').split('').forEach(function (c) { k = (k * 31 + c.charCodeAt(0)) % 64; }); return k; }
+/* هر خبر یک «پست» است مثل اینستاگرام: بالا نامِ سایت و زمان، عکسِ بزرگ، تیتر، دو خطِ خلاصه؛ لمسِ هرجای کارت خبر را در مرورگر باز می‌کند */
 function newsCard(x) {
-  var dd = x.d > 0 ? Math.max(0, Math.floor((Date.now() - x.d) / 864e5)) : -1;
-  return '<button type="button" class="nwc" data-u="' + esc(x.u) + '">' + (x.img ? '<span class="nim"><img class="nimg" src="' + esc(x.img) + '" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer"></span>' : '')
-    + '<span class="nin"><b>' + esc(x.t) + '</b>' + (x.x ? '<small>' + esc(x.x) + '</small>' : '') + '<em>' + esc(x.sn || '') + (dd >= 0 ? '، ' + dayT(dd) : '') + '</em></span></button>';
+  var k = newsKey(x.t), isNew = newsSeenAt > 0 && x.d > newsSeenAt, nm = String(x.sn || x.s || '').replace(/^مجله‌ی\s*/, ''), ago = x.d > 0 ? agoText(Date.now() - x.d) : '';
+  var pic = x.img ? '<span class="nfi"><img class="nimg" src="' + esc(x.img) + '" data-k="' + k + '" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer"></span>'
+    : '<span class="nfi ph">' + bottle(k, themeNow() === 'light') + '</span>';
+  return '<button type="button" class="nwc" data-u="' + esc(x.u) + '"><span class="nfh"><i class="nfa" style="background:' + (NW_COL[x.s] || '#5b4bd6') + '">' + esc(NW_ABB[x.s] || nm.slice(0, 2) || '؟') + '</i>'
+    + '<span class="nfs"><b>' + esc(x.sn || '') + '</b>' + (ago ? '<small>' + ago + '</small>' : '') + '</span>' + (isNew ? '<em class="nfnew">جدید</em>' : '') + '</span>'
+    + pic + '<span class="nft">' + esc(x.t) + '</span>' + (x.x ? '<span class="nfx">' + esc(x.x) + '</span>' : '') + '<span class="nfg">خواندن در مرورگر ‹</span></button>';
 }
 function mkNewsSec() {
-  var items = news.items, h = '<div class="mks">خبر از سایت‌های فروشگاهی</div>';
-  if (items.length) {
-    var cap = 5 + (mkMore.news | 0) * 7, shown = items.slice(0, cap), more = items.length - shown.length;
-    h += '<div class="mkh">تازه‌ترین نوشته‌های مجلهٔ فروشگاه‌ها' + (news.t ? ' (' + agoText(Date.now() - news.t) + ' بروز شد)' : '') + '. روی خبر بزنید تا در مرورگر باز شود.</div>' + shown.map(newsCard).join('')
-      + (more > 0 ? '<button type="button" class="mkmore" data-s="news">نمایش بیشتر (' + fa(Math.min(more, 7)) + ' خبر دیگر)</button>' : '')
-      + (newsBusy ? '<div class="mkn"><span class="spn"></span>در حال گرفتن خبرهای تازه…</div>' : '');
-  } else if (newsBusy) h += '<div class="mkn"><span class="spn"></span>در حال گرفتن خبر از سایت‌ها…</div>';
-  else h += '<div class="mkn">فعلاً خبری از سایت‌ها نرسید. شاید اینترنت ضعیف است یا سایت‌ها خبر تازه نگذاشته‌اند.</div><button type="button" class="mkmore" data-act="news">دوباره امتحان کن</button>';
+  var items = news.items, h = '';
+  var st = newsBusy ? '<span class="spn"></span>در حال گرفتن خبر تازه…' : (news.t ? 'بروزرسانی: ' + agoText(Date.now() - news.t) + ' (هر ۳ ساعت خودکار)' : '');
+  if (st) h += '<div class="nfst">' + st + '</div>';
+  if (items.length) h += items.map(newsCard).join('') + '<div class="nfend">خبرهای بیشتری فعلاً نیست</div>';
+  else if (newsBusy) h += '<div class="nfsk"></div><div class="nfsk"></div>';
+  else h += '<div class="mkn">فعلاً خبری از سایت‌ها نرسید. شاید اینترنت ضعیف است یا سایت‌ها خبر تازه نگذاشته‌اند.</div>';
+  h += '<button type="button" class="mkmore" data-act="news"' + (newsBusy ? ' disabled' : '') + '>' + (newsBusy ? 'در حال گرفتن…' : items.length ? 'تازه‌سازیِ خبرها' : 'دوباره امتحان کن') + '</button>';
   return h;
 }
 function mkRender() {
@@ -749,33 +760,16 @@ function mkRender() {
   Array.prototype.forEach.call($('mkt2').children, function (b) { b.classList.toggle('on', b.dataset.t === mkTab); });
   var h = '', V = mkView(), hs = mkTab === 'news' || mkTab === 'chg';
   var R = hs ? Core.histReport(hist, FLAT, Date.now(), { thr: 0.08, sig: order().join(','), lab: function (g) { return [GN[g.gn], g.conc].filter(Boolean).join(' · '); } }) : null;
-  if (R) ['up', 'down', 'gone', 'back', 'low', 'fresh'].forEach(function (k) { R[k] = R[k].filter(vis); });
+  if (R) { ['up', 'down', 'gone', 'back', 'low', 'fresh'].forEach(function (k) { R[k] = R[k].filter(vis); }); mkChgN = R.down.length + R.up.length + R.fresh.length + R.back.length + R.gone.length; }
+  var ct = $('mkt2').querySelector('[data-t="chg"]'); if (ct) ct.innerHTML = 'قیمت‌ها' + (mkChgN ? '<i>' + (mkChgN > 99 ? '۹۹+' : fa(mkChgN)) + '</i>' : '');      // شمارنده: چند عطر قیمت یا موجودی‌شان عوض شده
   var dealRow = function (r) {
     return mkRow(r, ['gn', pct(r.pct) + ' اختلاف', '<span class="pnum">' + tm(r.d) + '</span> فرق'], 'ارزان‌تر: ' + esc(srcName(r.loS)) + '، ' + pzh(r.lo, 'dn') + '<br>گران‌تر: ' + esc(srcName(r.hiS)) + '، ' + pzh(r.hi, 'up'));
   };
   var rowFresh = function (r) { return mkRow(r, ['dn', 'تازه آمده', dayT(r.ago)], 'قیمت: ' + pzh(r.price)); };
   var rowBack = function (r) { return mkRow(r, ['dn', 'دوباره موجود شد', dayT(r.ago)], 'قیمت: ' + pzh(r.price)); };
   if (mkTab === 'news') {
-    /* ۱) تیترهای امروز: هر کدام با یک لمس به فهرستِ کامل می‌رود */
-    var hl = [], hb = function (cls, n, txt, go) { hl.push('<button type="button" class="hl" data-go="' + go + '"><i class="' + cls + '">' + fa(n) + '</i><span>' + txt + '</span><em aria-hidden="true">‹</em></button>'); };
-    if (R.down.length) hb('dn', R.down.length, 'عطر ارزان‌تر شده', 'chg');
-    if (R.fresh.length) hb('dn', R.fresh.length, 'عطر تازه به بازار آمده', 'chg');
-    if (R.back.length) hb('dn', R.back.length, 'عطر دوباره موجود شده', 'chg');
-    if (R.up.length) hb('up', R.up.length, 'عطر گران‌تر شده', 'chg');
-    if (R.gone.length) hb('up', R.gone.length, 'عطر ناموجود شده', 'chg');
-    if (V.nDeals) hb('gn', V.nDeals, 'عطر در فروشگاه‌ها قیمتِ متفاوت دارد', 'cmp');
-    h += '<div class="mks first">امروز در بازار</div>';
-    h += hl.length ? '<div class="mkhl">' + hl.join('') + '</div>' : '';
-    if (!R.down.length && !R.up.length && !R.fresh.length && !R.back.length && !R.gone.length)
-      h += '<div class="mkh">' + (R.span < 1 ? 'ثبتِ تغییرِ قیمت‌ها از امروز شروع شده. بعد از چند روز این‌جا می‌نویسد کدام عطرها ارزان یا گران شده‌اند.' : 'در روزهای اخیر تغییرِ قابل‌توجهی در قیمت‌ها نبوده.') + '</div>';
-    /* ۲) خبرِ سایت‌ها */
+    /* خبرِ سایت‌ها: یک فیدِ اسکرولی مثل اینستاگرام. تغییرِ قیمت‌ها و مقایسه در دو تبِ بالا هستند (روی تبِ «قیمت‌ها» شمارنده می‌آید) */
     h += mkNewsSec();
-    /* ۳) تازه‌ها و دوباره‌موجودها */
-    if (R.fresh.length) h += mkSec('nfresh', 'تازه‌های بازار', 'در هفته‌ی اخیر برای اولین بار در فروشگاه‌ها دیده شده‌اند.', R.fresh.map(rowFresh), 4);
-    if (R.back.length) h += mkSec('nback', 'دوباره موجود شدند', 'مدتی نبودند و دوباره پیدا شدند.', R.back.map(rowBack), 3);
-    /* ۴) بهترین فرصت‌های خرید */
-    var dl = V.deals.slice().sort(function (a, b) { return b.d - a.d; }).slice(0, 3);
-    if (dl.length) h += mkInfo('بهترین فرصت‌های خرید', 'بیشترین صرفه‌جویی با خرید از ارزان‌ترین فروشگاه. قبل از خرید، قیمت را خودتان هم چک کنید.') + dl.map(dealRow).join('') + '<button type="button" class="mkmore" data-go="cmp">دیدن همهٔ مقایسه‌ها</button>';
   } else if (mkTab === 'cmp') {
     var MS = Core.marketStats(FLAT.filter(function (g) { return vis({ gid: g.id }); })), lo = lastOk();
     h += '<div class="mkh first">' + (lo ? 'قیمت‌ها ' + esc(agoText(Date.now() - lo)) + ' بروز شد. ' : '') + fa(V.nPerf) + ' عطر از ' + fa(TREE.length) + ' برند.</div>';
@@ -821,7 +815,7 @@ function mkRender() {
   if (mkOn) fitPz($('mkr'));
 }
 function openReport() {
-  mkTab = 'news';
+  mkTab = 'news'; newsSeenAt = newsSeenMax();      // پیش از اولین نقاشیِ صفحه: خبرِ تازه‌تر از آخرین دیدن «جدید» می‌شود
   try { mkRender(); } catch (e) { console.error(e); toast('گزارش ساخته نشد', 3000); return; }      // تاریخچه‌ی سالم هرگز به‌خاطر یک خطا پاک نمی‌شود (داده‌ی خراب هنگام خواندن اصلاح می‌شود)
   layerMark(); mkOn = true; closeSearch(); if (open) closeSheet(); $('mk').classList.add('on'); $('mkr').scrollTop = 0; fitPz($('mkr'));
   newsMarkSeen(); newsLoad('open');
