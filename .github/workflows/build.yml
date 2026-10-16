@@ -31,9 +31,29 @@ jobs:
           f=$(find . -name settings.gradle -not -path './.git/*' | head -n1)
           if [ -z "$f" ]; then echo "settings.gradle not found. Files in repo:"; find . -not -path './.git/*' | head -60; exit 1; fi
           echo "dir=$(dirname "$f")" >> "$GITHUB_OUTPUT"
+      - name: Signing key from repository secrets (optional)
+        env:
+          KS_B64: ${{ secrets.SIGN_KEYSTORE_B64 }}
+          KS_PASS: ${{ secrets.SIGN_STORE_PASS }}
+          KS_KEYPASS: ${{ secrets.SIGN_KEY_PASS }}
+        run: |
+          # اگر رازها گذاشته شده باشند، APK با کلیدِ سری امضا می‌شود؛ وگرنه با کلیدِ قدیمیِ مخزن (رفتار قبلی)
+          if [ -n "$KS_B64" ] && [ -n "$KS_PASS" ]; then
+            echo "$KS_B64" | base64 -d > "$RUNNER_TEMP/release.keystore"
+            echo "SIGN_KEYSTORE=$RUNNER_TEMP/release.keystore" >> "$GITHUB_ENV"
+            echo "SIGN_STORE_PASS=$KS_PASS" >> "$GITHUB_ENV"
+            [ -n "$KS_KEYPASS" ] && echo "SIGN_KEY_PASS=$KS_KEYPASS" >> "$GITHUB_ENV"
+            echo "Signing with the key from repository secrets"
+          else
+            echo "No signing secrets: using the old key in the repository"
+          fi
       - name: Build release APK
         working-directory: ${{ steps.p.outputs.dir }}
         run: gradle --no-daemon assembleRelease
+      - name: Show signing certificate (which key signed the APK)
+        run: |
+          A=$(ls -d "$ANDROID_HOME"/build-tools/*/ | sort -V | tail -n1)
+          "${A}apksigner" verify --print-certs "${{ steps.p.outputs.dir }}/app/build/outputs/apk/release/app-release.apk" | grep -i "SHA-256" || echo "could not read the certificate (not important)"
       - name: Copy APK
         run: cp "${{ steps.p.outputs.dir }}/app/build/outputs/apk/release/app-release.apk" "$RUNNER_TEMP/PerfumePrice.apk"
       - name: Build web bundle (update without install)

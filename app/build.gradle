@@ -15,13 +15,22 @@ android {
         versionName '1.35'
     }
 
-    // امضای ثابت: همیشه با همین کلید امضا می‌شود، پس آپدیت «conflict» نمی‌دهد
+    // امضای ثابت: همیشه با همین کلید امضا می‌شود، پس آپدیت «conflict» نمی‌دهد.
+    // اگر ساختِ گیت‌هاب کلیدِ سری را بدهد (SIGN_KEYSTORE و ...)، با آن امضا می‌شود؛ وگرنه کلیدِ قدیمیِ داخلِ مخزن (تا وقتی کلیدِ تازه جا بیفتد)
+    def signKs = System.getenv('SIGN_KEYSTORE')
     signingConfigs {
         shop {
-            storeFile file('perfume.keystore')
-            storePassword 'perfume123'
-            keyAlias 'perfume'
-            keyPassword 'perfume123'
+            if (signKs) {
+                storeFile file(signKs)
+                storePassword System.getenv('SIGN_STORE_PASS')
+                keyAlias (System.getenv('SIGN_KEY_ALIAS') ?: 'perfume')
+                keyPassword (System.getenv('SIGN_KEY_PASS') ?: System.getenv('SIGN_STORE_PASS'))
+            } else {
+                storeFile file('perfume.keystore')
+                storePassword 'perfume123'
+                keyAlias 'perfume'
+                keyPassword 'perfume123'
+            }
         }
     }
     buildTypes {
