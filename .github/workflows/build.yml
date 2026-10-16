@@ -45,9 +45,10 @@ jobs:
         run: |
           mkdir -p "$RUNNER_TEMP/jt"
           J="${{ steps.p.outputs.dir }}/app/src/main/java/ir/perfume/price"
-          javac -encoding UTF-8 -d "$RUNNER_TEMP/jt" "$J/Ota.java" "$J/OtaGuard.java" tests/java/ir/perfume/price/OtaTest.java tests/java/ir/perfume/price/GuardTest.java
+          javac -encoding UTF-8 -d "$RUNNER_TEMP/jt" "$J/Ota.java" "$J/OtaGuard.java" "$J/Http.java" tests/java/ir/perfume/price/OtaTest.java tests/java/ir/perfume/price/GuardTest.java tests/java/ir/perfume/price/HttpTest.java
           java -Dstdout.encoding=UTF-8 -cp "$RUNNER_TEMP/jt" ir.perfume.price.OtaTest "${{ steps.p.outputs.dir }}/app/src/main/assets/www" "$RUNNER_TEMP/ota"
           java -Dstdout.encoding=UTF-8 -cp "$RUNNER_TEMP/jt" ir.perfume.price.GuardTest
+          java -Dstdout.encoding=UTF-8 -cp "$RUNNER_TEMP/jt" ir.perfume.price.HttpTest
       - uses: actions/upload-artifact@v4
         with:
           name: PerfumePrice-apk
@@ -59,8 +60,22 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release delete latest --yes --cleanup-tag || true
-          gh release create latest "$RUNNER_TEMP/PerfumePrice.apk" "$RUNNER_TEMP/ota/www.zip" --target "$GITHUB_SHA" --title "PerfumePrice (latest)" --notes "code=$((GITHUB_RUN_NUMBER + 100))"
+          CODE=$((GITHUB_RUN_NUMBER + 100))
+          # release قبلی پاک نمی‌شود (اگر ساختنِ تازه وسط کار خراب شود، برنامه‌ی نصب‌شده هنوز یک release سالم دارد):
+          # فایل‌ها جای فایل‌های قبلی می‌نشینند و «code=» آخر از همه عوض می‌شود تا گوشی‌ای که نسخه‌ی تازه را دید، APKِ تازه را هم پیدا کند
+          if gh api "repos/$GITHUB_REPOSITORY/releases/tags/latest" > /dev/null 2>&1; then
+            gh release delete-asset latest ota.json --yes || true      # ota.json قدیمی با www.zip تازه جور نیست؛ تا ota.json تازه نیامده، بروزرسانیِ بی‌نصب فقط «نیست» دیده می‌شود
+            up=0
+            for i in 1 2 3; do
+              if gh release upload latest "$RUNNER_TEMP/PerfumePrice.apk" "$RUNNER_TEMP/ota/www.zip" --clobber; then up=1; break; fi
+              sleep 5
+            done
+            [ "$up" = 1 ] || { echo "APK upload failed (the previous release is untouched)"; exit 1; }
+            gh release edit latest --title "PerfumePrice (latest)" --notes "code=$CODE"
+            git tag -f latest "$GITHUB_SHA" && git push -f origin refs/tags/latest || echo "could not move the tag (not important)"
+          else
+            gh release create latest "$RUNNER_TEMP/PerfumePrice.apk" "$RUNNER_TEMP/ota/www.zip" --target "$GITHUB_SHA" --title "PerfumePrice (latest)" --notes "code=$CODE"
+          fi
           # ota.json آخر بارگذاری می‌شود: گوشی‌ای که آن را دید، www.zip را هم حتماً پیدا می‌کند
           up=0
           for i in 1 2 3; do

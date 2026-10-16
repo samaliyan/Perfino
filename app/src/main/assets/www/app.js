@@ -1,7 +1,7 @@
 (function () {
 'use strict';
 var RM = !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
-var VERSION = '1.34';
+var VERSION = '1.35';
 var myCode = (function () { var m = /\/b(\d{1,10})\/index\.html$/.exec(String(location.pathname || '')); return m ? m[1] : '0'; })();      // نسخه‌ی این صفحه از روی آدرسش؛ در گزارش‌ها به جاوا فرستاده می‌شود تا صفحه‌ی کهنه نتواند نسخه‌ی تازه را «سالم» اعلام کند
 function otaCall(n) { try { if (window.Native && typeof window.Native[n] === 'function') window.Native[n](myCode); } catch (e) { } }
 otaCall('otaBoot');      // «جاوااسکریپتِ این صفحه شروع شد»: برنامه به صفحه‌ی بی‌نصب مهلتِ بیشتری برای ساختن فهرست می‌دهد

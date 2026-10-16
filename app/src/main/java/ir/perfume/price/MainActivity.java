@@ -188,53 +188,22 @@ public class MainActivity extends Activity {
                 public void run() {
                     int status = 0;
                     String body;
-                    HttpURLConnection c = null;
                     try {
                         if (url == null || !url.startsWith("https://")) throw new java.io.IOException("bad url");      // فقط https
-                        URL u0 = new URL(url);
-                        if (!allowedHost(u0.getHost())) throw new java.io.IOException("host not allowed");
-                        c = (HttpURLConnection) u0.openConnection();
-                        c.setConnectTimeout(15000);
-                        c.setReadTimeout(25000);
-                        c.setInstanceFollowRedirects(false);
-                        c.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 13; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Mobile Safari/537.36");
-                        c.setRequestProperty("Accept-Language", "fa-IR,fa;q=0.9,en;q=0.5");
-                        c.setRequestProperty("Accept", "application/json, text/html;q=0.9, */*;q=0.5");
+                        java.util.Map<String, String> hm = new java.util.HashMap<String, String>();
                         try {
                             JSONObject h = new JSONObject(headersJson == null ? "{}" : headersJson);
                             Iterator<String> it = h.keys();
-                            while (it.hasNext()) { String k = it.next(); c.setRequestProperty(k, h.getString(k)); }
+                            while (it.hasNext()) { String k = it.next(); hm.put(k, h.getString(k)); }
                         } catch (Exception ignore) { }
-                        status = c.getResponseCode();
-                        for (int hop = 0; hop < 5 && status >= 300 && status < 400; hop++) {   // تغییر مسیر فقط به همان چهار سایت
-                            String loc = c.getHeaderField("Location");
-                            if (loc == null) break;
-                            URL nu = new URL(u0, loc);
-                            if (!nu.getProtocol().equals("https") || !allowedHost(nu.getHost())) throw new java.io.IOException("redirect not allowed");
-                            c.disconnect();
-                            u0 = nu;
-                            c = (HttpURLConnection) u0.openConnection();
-                            c.setConnectTimeout(15000);
-                            c.setReadTimeout(25000);
-                            c.setInstanceFollowRedirects(false);
-                            c.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 13; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Mobile Safari/537.36");
-                            c.setRequestProperty("Accept-Language", "fa-IR,fa;q=0.9,en;q=0.5");
-                            status = c.getResponseCode();
-                        }
-                        InputStream in = status >= 400 ? c.getErrorStream() : c.getInputStream();
-                        ByteArrayOutputStream out = new ByteArrayOutputStream();
-                        if (in != null) {
-                            byte[] buf = new byte[16384];
-                            int n, total = 0;
-                            while ((n = in.read(buf)) > 0 && total < MAX_BYTES) { out.write(buf, 0, n); total += n; }
-                            in.close();
-                        }
-                        body = out.toString("UTF-8");
+                        // تغییر مسیر فقط به همان چهار سایت؛ هدرها در هر مرحله دوباره گذاشته می‌شوند؛ پاسخِ بزرگ‌تر از حد، «موفق» حساب نمی‌شود
+                        Http.Result r = Http.fetch(url, hm, Http.sitesOnly(ALLOW_HOSTS), MAX_BYTES);
+                        if (r.truncated) throw new java.io.IOException("response too large (> " + MAX_BYTES + " bytes)");
+                        status = r.status;
+                        body = new String(r.body, java.nio.charset.StandardCharsets.UTF_8);
                     } catch (Exception e) {
                         status = 0;
                         body = e.getClass().getSimpleName() + ": " + String.valueOf(e.getMessage());
-                    } finally {
-                        if (c != null) c.disconnect();
                     }
                     final String js = "window.__nat(" + JSONObject.quote(id) + "," + status + "," + JSONObject.quote(body) + ")";
                     runOnUiThread(new Runnable() {
@@ -280,14 +249,8 @@ public class MainActivity extends Activity {
                     if (!ok) {
                         HttpURLConnection c = null;
                         try {
-                            URL iu = new URL(url);
-                            String ih = iu.getHost() == null ? "" : iu.getHost().toLowerCase(java.util.Locale.ROOT);
-                            if (!iu.getProtocol().equals("https") || ih.isEmpty() || ih.equals("localhost") || ih.matches("[0-9.]+") || ih.contains(":") || ih.endsWith(".local")) throw new java.io.IOException("image host not allowed");
-                            c = (HttpURLConnection) iu.openConnection();
-                            c.setConnectTimeout(12000);
-                            c.setReadTimeout(20000);
-                            c.setInstanceFollowRedirects(true);
-                            c.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 13; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Mobile Safari/537.36");
+                            // تغییر مسیرها دستی دنبال می‌شوند و مقصدِ هر کدام دوباره سنجیده می‌شود (https، نه آدرسِ داخلی/محلی)
+                            c = Http.open(url, null, Http.publicHttps(), 12000, 20000, false);
                             if (c.getResponseCode() == 200) {
                                 InputStream in = c.getInputStream();
                                 FileOutputStream out = new FileOutputStream(tmp);

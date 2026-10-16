@@ -126,7 +126,7 @@ python3 tests/t65_update_rules.py   # بروزرسانی: گیر کردن روی
 python3 tests/t3_flow.py       # full refresh flow
 ```
 
-Python tests need Playwright with Chromium. The Java code is compiled only by CI and has not been run in the automated tests.
+Python tests need Playwright with Chromium. `Ota.java`, `OtaGuard.java` and `Http.java` (no Android dependency) are unit-tested with the JDK in CI (`tests/java/`); `MainActivity.java` and `Updater.java` are only compiled by CI.
 
 ## Known limitations
 
@@ -265,6 +265,7 @@ python3 tests/t57_ota.py       # بروزرسانی بدون نصب در راب�
 python3 tests/t58_ota_build.py # ساخت بسته، همخوانیِ نسخه‌ها و آزمایش‌های جاوای Ota.java و OtaGuard.java
 ```
 
+`Http.java` (دانلودِ امن: ریدایرکتِ دستی، هدرها، بریده‌شدنِ پاسخ، آدرس‌های داخلی) با `tests/java/ir/perfume/price/HttpTest.java` و دو سرور محلیِ واقعی آزمایش می‌شود (در CI اجرا می‌شود).
 تست‌های پایتون به Playwright و Chromium نیاز دارند. `Ota.java` و `OtaGuard.java` (بدون وابستگی به اندروید) با JDK و ساعت ساختگی آزمایش می‌شوند؛ بقیه‌ی کد جاوا (`MainActivity`، `Updater`) فقط در CI ساخته می‌شود و روی گوشی واقعی در تست خودکار اجرا نشده است.
 
 ## محدودیت‌های شناخته‌شده
