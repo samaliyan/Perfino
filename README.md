@@ -257,6 +257,7 @@ python3 tests/t36_features.py  # جستجو، لیست مغازه، پنهان �
 python3 tests/t38_market.py    # صفحهٔ گزارش بازار
 python3 tests/t53_viewer.py    # بزرگ‌نمایی و کشیدنِ عکس
 python3 tests/t54_fontscale.py # اندازهٔ نوشته روی کل برنامه (۴ شکل × ۴ اندازه × ۲ عرض)
+python3 tests/t66_price_ui.py   # ظاهر و جاشدنِ قیمت‌ها (حباب، ارزان‌ترین، گزارش، خوانایی)
 python3 tests/t55_voice.py     # گفتن نام عطر، نوار پایین، آخرین‌ها
 python3 tests/t3_flow.py       # روند کامل بروزرسانی
 python3 tests/t56_search_real.py   # جستجو روی ۱۲ هزار عطر واقعی (نیاز به /tmp/w/realdb.json)

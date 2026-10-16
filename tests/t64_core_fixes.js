@@ -146,6 +146,70 @@ var meta = function (g) { return { b: 'brand-' + g.id, m: 'model-' + g.id }; };
   var nc = C.nextDataCards(nd([{ label: 'عطر الف', price: 0, isAvailable: true, canBuy: true, frontEndUrl: '/p/1' }, { label: 'عطر ب', price: 0, isAvailable: false, frontEndUrl: '/p/2' }, { label: 'عطر ج', price: 5000000, isAvailable: true, canBuy: true, frontEndUrl: '/p/3' }]), 'https://www.safirstores.com/');
   chk(nc.length === 3 && nc[0].np === 1 && nc[1].np === 0 && nc[2].np === 0 && nc[0].st === 1 && nc[1].st === 1 && nc[2].st === 0, 'next data cards: np flag only for available-without-price: ' + JSON.stringify(nc.map(function (x) { return [x.np, x.st]; })));
 
+  // ---- محصولِ چنداندازه‌ای (بازه‌ی قیمت): هر اندازه با قیمتِ خودش
+  function pr(v, extra) { return Object.assign({ price: String(v), currency_code: 'IRT', currency_minor_unit: 0, price_range: null }, extra || {}); }
+  var calls2 = [];
+  function wooNet(variants, fail) {
+    var simple = { id: 11, name: 'عطر ادکلن ورساچه اروس ادوتویلت 100 میل', type: 'simple', is_in_stock: true, is_purchasable: true, prices: pr(4000000), categories: [{ name: 'عطر' }], images: [], attributes: [] };
+    var vp = { id: 900, name: 'عطر ادکلن دیور ساواج ادوتویلت', type: 'variable', is_in_stock: true, is_purchasable: true, prices: pr(3000000, { price_range: { min_amount: '3000000', max_amount: '9000000' } }), categories: [{ name: 'عطر' }], images: [{ thumbnail: 't.jpg', src: 'b.jpg' }], attributes: [] };
+    return { get: async function (u) {
+      calls2.push(u);
+      if (u.indexOf('type=variation') >= 0) { if (fail) return { status: 500, body: '' }; return { status: 200, body: JSON.stringify(u.indexOf('parent=900') >= 0 ? variants : []) }; }
+      if (/[?&]page=1(&|$)/.test(u)) return { status: 200, body: JSON.stringify([simple, vp]) };
+      return { status: 200, body: '[]' };
+    } };
+  }
+  var VAR = [
+    { id: 901, type: 'variation', is_in_stock: true, is_purchasable: true, prices: pr(3000000), attributes: [{ name: 'حجم', value: '50ML' }] },
+    { id: 902, type: 'variation', is_in_stock: true, is_purchasable: true, prices: pr(9000000), attributes: [{ name: 'حجم', value: '۲۰۰ میل' }] },
+    { id: 903, type: 'variation', is_in_stock: false, is_purchasable: true, prices: pr(6000000), attributes: [{ name: 'حجم', value: '100ML' }] },
+    { id: 904, type: 'variation', is_in_stock: true, is_purchasable: true, prices: pr(5000000), attributes: [] }];
+  var LIL = C.SOURCES.filter(function (x) { return x.id === 'liliome'; })[0];
+  var rr = await LIL.run(wooNet(VAR), function () { }, 'full');
+  var byId = {}; rr.items.forEach(function (x) { byId[x.id] = x; });
+  var vid = function (n) { return 'https://liliome.com/?p=900#v' + n; };      // شناسه‌ی هر اندازه = نشانیِ محصولِ اصلی + شماره‌ی تنوع
+  [901, 902, 903].forEach(function (n) { byId[n] = byId[vid(n)]; }); byId[904] = byId[vid(904)];
+  chk(byId[11] && byId[11].price === 4000000, 'a normal product is unchanged');
+  chk(!byId[900], 'the range product itself is replaced by its sizes');
+  chk(C.itemUrl('liliome', vid(901)) === vid(901) && C.itemUrl('liliome', vid(901)).indexOf('?p=900') > 0, 'the see-on-site link of a size opens the parent product page (variations have no page of their own)');
+  chk(byId[901] && byId[901].price === 3000000 && /50 میل/.test(byId[901].t) && /دیور ساواج/.test(byId[901].t), 'variation 50 ml has its own price and size in the title: ' + JSON.stringify(byId[901]));
+  chk(byId[902] && byId[902].price === 9000000 && /200 میل/.test(byId[902].t), 'Persian digits in the size are read: ' + JSON.stringify(byId[902] && byId[902].t));
+  chk(byId[903] && byId[903].price === 0, 'an out-of-stock size is unavailable (price 0)');
+  chk(!byId[904], 'a size that cannot be read is not guessed');
+  chk(byId[901].img === 't.jpg', 'the size uses the product photo');
+  var ing = C.newDb(), ix = C.dbIndex(ing); rr = await LIL.run(wooNet(VAR), function () { }, 'full');
+  C.ingest(ing, ix, 'liliome', rr.items, true);
+  var lst = C.buildList(ing, ['liliome'], {}, 0), dsv = lst.filter(function (g) { return /ساواج/.test(g.name); })[0];
+  chk(dsv && dsv.sizes.length === 2 && dsv.sizes.map(function (z) { return z.ml + ':' + z.price; }).sort().join() === '200:9000000,50:3000000', 'after ingest the perfume has two sizes with their own prices: ' + JSON.stringify(dsv && dsv.sizes.map(function (z) { return z.ml + ':' + z.price; })));
+  rr = await LIL.run(wooNet(VAR, true), function () { }, 'full');
+  var ids2 = {}; rr.items.forEach(function (x) { ids2[x.id] = x; });
+  chk(ids2[900] && ids2[900].price === 0 && ids2[11], 'variations could not be read: the range product stays "no price", nothing else changes');
+  chk(rr.complete === false, 'a server error on the variations makes the list incomplete (so nothing is deleted because of it): complete=' + rr.complete);
+  var net404 = wooNet(VAR); var g0 = net404.get; net404.get = async function (u) { if (u.indexOf('type=variation') >= 0) return { status: 404, body: '' }; return g0(u); };
+  rr = await LIL.run(net404, function () { }, 'full');
+  chk(rr.complete === true, 'a 404 on type=variation (site does not support it) does not make the list incomplete forever');
+  calls2.length = 0; rr = await LIL.run(wooNet(VAR), function () { }, 'price');
+  var ids3 = {}; rr.items.forEach(function (x) { ids3[x.id] = x; });
+  chk(ids3[vid(901)] && ids3[vid(901)].price === 3000000 && ids3[vid(903)] && ids3[vid(903)].price === 0, 'price-only refresh returns the same ids as the full fetch');
+  chk(!ids3[vid(904)], 'price-only refresh also skips sizes that cannot be read (otherwise every refresh would ask for a full fetch)');
+  chk(calls2.some(function (u) { return u.indexOf('type=variation') >= 0 && u.indexOf('_fields') < 0; }), 'the variation request in price mode keeps the attributes (needs them to read the size)');
+  // غلظت در نام، اندازه‌ی ۵ میل، و بیش از ۱۰۰ تنوع (صفحه‌ی دوم)
+  var VAR2 = [
+    { id: 911, type: 'variation', is_in_stock: true, is_purchasable: true, prices: pr(5000000), attributes: [{ name: 'حجم', value: '100ML' }, { name: 'غلظت', value: 'ادو پرفیوم' }] },
+    { id: 912, type: 'variation', is_in_stock: true, is_purchasable: true, prices: pr(4000000), attributes: [{ name: 'حجم', value: '100ML' }, { name: 'غلظت', value: 'ادو تویلت' }] },
+    { id: 913, type: 'variation', is_in_stock: true, is_purchasable: true, prices: pr(800000), attributes: [{ name: 'حجم', value: '5ML' }] },
+    { id: 914, type: 'variation', is_in_stock: true, is_purchasable: true, prices: pr(1800000), attributes: [{ name: 'حجم', value: '1.5ml' }] }];
+  rr = await LIL.run(wooNet(VAR2), function () { }, 'full');
+  var b2 = {}; rr.items.forEach(function (x) { b2[x.id] = x; });
+  chk(b2[vid(911)] && b2[vid(912)] && b2[vid(911)].t !== b2[vid(912)].t && /پرفیوم/.test(b2[vid(911)].t) && /تویلت/.test(b2[vid(912)].t), 'two sizes with the same ml but different concentration get different titles: ' + JSON.stringify([b2[vid(911)] && b2[vid(911)].t, b2[vid(912)] && b2[vid(912)].t]));
+  chk(b2[vid(913)] && /5 میل/.test(b2[vid(913)].t), 'a 5 ml size is read: ' + JSON.stringify(b2[vid(913)] && b2[vid(913)].t));
+  chk(!b2[vid(914)], '1.5 ml is not misread as 5 ml');
+  var many = []; for (var q = 0; q < 101; q++) many.push({ id: 2000 + q, type: 'variation', is_in_stock: true, is_purchasable: true, prices: pr(1000000 + q), attributes: [{ name: 'حجم', value: (30 + (q % 60)) + 'ML' }] });
+  var netMany = wooNet([]); var g1 = netMany.get;
+  netMany.get = async function (u) { if (u.indexOf('type=variation') >= 0 && u.indexOf('parent=900') >= 0) return { status: 200, body: JSON.stringify(u.indexOf('&page=1&') >= 0 ? many.slice(0, 100) : u.indexOf('&page=2&') >= 0 ? many.slice(100) : []) }; return g1(u); };
+  rr = await LIL.run(netMany, function () { }, 'full');
+  chk(rr.items.filter(function (x) { return /p=900#v/.test(String(x.id)); }).length === 101, 'more than 100 variations are all read (second page): ' + rr.items.filter(function (x) { return /p=900#v/.test(String(x.id)); }).length);
+
   // ---- نوشته‌ی HTML: «&amp;lt;» دوبار کدشده و نامِ خاصِ «constructor»
   chk(C.normFa('&amp;lt;b&amp;gt; عطر') === C.normFa('<b> عطر') || C.normFa('&amp;lt;b&amp;gt; عطر').indexOf('&') < 0, 'double-encoded entity is decoded: ' + C.normFa('&amp;lt;b&amp;gt; عطر'));
   chk(typeof C.normFa('&constructor; &__proto__; عطر') === 'string' && C.normFa('&constructor; عطر').indexOf('function') < 0, 'entity names like constructor are not looked up on Object');

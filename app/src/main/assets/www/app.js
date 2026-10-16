@@ -1,7 +1,7 @@
 (function () {
 'use strict';
 var RM = !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
-var VERSION = '1.33';
+var VERSION = '1.34';
 var myCode = (function () { var m = /\/b(\d{1,10})\/index\.html$/.exec(String(location.pathname || '')); return m ? m[1] : '0'; })();      // نسخه‌ی این صفحه از روی آدرسش؛ در گزارش‌ها به جاوا فرستاده می‌شود تا صفحه‌ی کهنه نتواند نسخه‌ی تازه را «سالم» اعلام کند
 function otaCall(n) { try { if (window.Native && typeof window.Native[n] === 'function') window.Native[n](myCode); } catch (e) { } }
 otaCall('otaBoot');      // «جاوااسکریپتِ این صفحه شروع شد»: برنامه به صفحه‌ی بی‌نصب مهلتِ بیشتری برای ساختن فهرست می‌دهد
@@ -220,11 +220,13 @@ function decorate(list, title, sub, crumb) {
 function div(cls, html) { var d = document.createElement('div'); d.className = cls; if (html) d.innerHTML = html; return d; }
 function idxOf(list, id) { for (var i = 0; i < list.length; i++) if (list[i].id === id) return i; return 0; }
 var CHEV = '<svg class="chev" width="11" height="18" viewBox="0 0 10 16" aria-hidden="true"><path d="M8 1L2 8l6 7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+/* قیمت همه‌جا یک شکل دارد: حبابِ رنگی با عددِ درشت و «تومان» (cls: dn سبز، up قرمز، خالی زرد) */
+function pzh(n, cls) { return '<span class="pz' + (cls ? ' ' + cls : '') + '"><b>' + fa(n) + '</b><span class="tu">تومان</span></span>'; }
 function priceHtml(p, max) {
   if (!p.sizes.length) return CHEV;
   return p.sizes.slice(0, max).map(function (z, j) {
-    return j ? '<div class="p2">' + fa(z.ml) + ' میل · ' + fa(z.price) + '</div>'
-      : '<div class="p1">' + fa(z.price) + (z.n < 2 ? '<i title="فقط یک سایت"></i>' : '') + '<small>' + fa(z.ml) + ' میل</small></div>';
+    return j ? '<div class="p2"><span>' + fa(z.ml) + ' میل</span><b>' + fa(z.price) + '</b></div>'
+      : '<div class="p1">' + pzh(z.price) + (z.n < 2 ? '<i title="فقط یک سایت"></i>' : '') + '<small>' + fa(z.ml) + ' میل</small></div>';
   }).join('');
 }
 var GN = { m: 'مردانه', w: 'زنانه', u: 'یونیسکس' };
@@ -749,10 +751,10 @@ function mkRender() {
   var R = hs ? Core.histReport(hist, FLAT, Date.now(), { thr: 0.08, sig: order().join(','), lab: function (g) { return [GN[g.gn], g.conc].filter(Boolean).join(' · '); } }) : null;
   if (R) ['up', 'down', 'gone', 'back', 'low', 'fresh'].forEach(function (k) { R[k] = R[k].filter(vis); });
   var dealRow = function (r) {
-    return mkRow(r, ['gn', pct(r.pct) + ' اختلاف', tm(r.d) + ' فرق'], 'ارزان‌تر: ' + esc(srcName(r.loS)) + '، ' + tm(r.lo) + '<br>گران‌تر: ' + esc(srcName(r.hiS)) + '، ' + tm(r.hi));
+    return mkRow(r, ['gn', pct(r.pct) + ' اختلاف', '<span class="pnum">' + tm(r.d) + '</span> فرق'], 'ارزان‌تر: ' + esc(srcName(r.loS)) + '، ' + pzh(r.lo, 'dn') + '<br>گران‌تر: ' + esc(srcName(r.hiS)) + '، ' + pzh(r.hi, 'up'));
   };
-  var rowFresh = function (r) { return mkRow(r, ['dn', 'تازه آمده', dayT(r.ago)], 'قیمت: ' + tm(r.price)); };
-  var rowBack = function (r) { return mkRow(r, ['dn', 'دوباره موجود شد', dayT(r.ago)], 'قیمت: ' + tm(r.price)); };
+  var rowFresh = function (r) { return mkRow(r, ['dn', 'تازه آمده', dayT(r.ago)], 'قیمت: ' + pzh(r.price)); };
+  var rowBack = function (r) { return mkRow(r, ['dn', 'دوباره موجود شد', dayT(r.ago)], 'قیمت: ' + pzh(r.price)); };
   if (mkTab === 'news') {
     /* ۱) تیترهای امروز: هر کدام با یک لمس به فهرستِ کامل می‌رود */
     var hl = [], hb = function (cls, n, txt, go) { hl.push('<button type="button" class="hl" data-go="' + go + '"><i class="' + cls + '">' + fa(n) + '</i><span>' + txt + '</span><em aria-hidden="true">‹</em></button>'); };
@@ -782,10 +784,10 @@ function mkRender() {
     Object.keys(MS.bySrc).forEach(function (id) { var s = MS.bySrc[id]; if (s.shared < 5) return; if (!best || s.avg < MS.bySrc[best].avg) best = id; if (!worst || s.avg > MS.bySrc[worst].avg) worst = id; });
     var ins = [];
     if (best && worst && best !== worst && MS.bySrc[worst].avg - MS.bySrc[best].avg >= 0.01) ins.push('<b>' + esc(srcName(best)) + '</b> در عطرهای مشترک معمولاً ارزان‌ترین است (' + pct(MS.bySrc[best].avg - 1) + ' زیر میانهٔ بازار)؛ <b>' + esc(srcName(worst)) + '</b> معمولاً گران‌تر است (' + pct(MS.bySrc[worst].avg - 1) + ' بالاتر).');
-    if (V.nDeals) ins.push('در <b>' + fa(V.nDeals) + '</b> عطر، فروشگاه‌ها بیش از ۵٪ با هم اختلاف دارند. اگر همه را از ارزان‌ترین فروشگاه بخرید، در مجموع <b>' + tm(V.save) + '</b> صرفه‌جویی می‌شود.');
+    if (V.nDeals) ins.push('در <b>' + fa(V.nDeals) + '</b> عطر، فروشگاه‌ها بیش از ۵٪ با هم اختلاف دارند. اگر همه را از ارزان‌ترین فروشگاه بخرید، در مجموع <span class="pnum">' + tm(V.save) + '</span> صرفه‌جویی می‌شود.');
     var bs = V.brands.filter(function (b) { return b.n >= 3; }).sort(function (a, b) { return b.med - a.med; });
-    if (bs.length >= 2) ins.push('گران‌ترین برند (میانهٔ ۱۰۰ میل): <b>' + esc(bs[0].name) + '</b> با ' + tmM(bs[0].med) + ' تومان؛ ارزان‌ترین: <b>' + esc(bs[bs.length - 1].name) + '</b> با ' + tmM(bs[bs.length - 1].med) + ' تومان.');
-    if (V.top[0] && V.low[0]) ins.push('گران‌ترین عطر ۱۰۰ میلی: <b>' + esc(V.top[0].name) + '</b> (' + tmM(V.top[0].price) + ' تومان)؛ ارزان‌ترین: <b>' + esc(V.low[0].name) + '</b> (' + tmM(V.low[0].price) + ' تومان).');
+    if (bs.length >= 2) ins.push('گران‌ترین برند (میانهٔ ۱۰۰ میل): <b>' + esc(bs[0].name) + '</b> با <span class="pnum">' + tmM(bs[0].med) + ' تومان</span>؛ ارزان‌ترین: <b>' + esc(bs[bs.length - 1].name) + '</b> با <span class="pnum">' + tmM(bs[bs.length - 1].med) + ' تومان</span>.');
+    if (V.top[0] && V.low[0]) ins.push('گران‌ترین عطر ۱۰۰ میلی: <b>' + esc(V.top[0].name) + '</b> (<span class="pnum">' + tmM(V.top[0].price) + ' تومان</span>)؛ ارزان‌ترین: <b>' + esc(V.low[0].name) + '</b> (<span class="pnum">' + tmM(V.low[0].price) + ' تومان</span>).');
     if (ins.length) h += '<div class="mks">نتیجه</div>' + ins.map(function (t) { return '<div class="mki">' + t + '</div>'; }).join('');
     var rowsS = Object.keys(MS.bySrc).sort(function (a, b) { return MS.bySrc[b].n - MS.bySrc[a].n; }).map(function (id) {
       var s = MS.bySrc[id], line1 = fa(s.n) + ' اندازه‌ی عطر دارد', line2 = '', cls = 'gn', val = '—';
@@ -805,22 +807,23 @@ function mkRender() {
     h += '<div class="mkh first">' + (R.span < 1 ? 'ثبت تاریخچه از همین امروز شروع شده است؛ بعد از چند روز این صفحه پر می‌شود.' : 'تاریخچه ' + fa(R.span) + ' روز است ثبت می‌شود.') + '</div>';
     if (T.n >= 5) h += mkInfo('روند کلی', 'از ' + fa(T.n) + ' عطری که تاریخچه دارد: <b>' + fa(T.up) + '</b> گران‌تر شده، <b>' + fa(T.down) + '</b> ارزان‌تر شده و <b>' + fa(T.same) + '</b> تقریباً ثابت مانده است. میانهٔ تغییر: <b>' + (T.med > 0.0005 ? pct(T.med) + ' گران‌تر' : T.med < -0.0005 ? pct(T.med) + ' ارزان‌تر' : 'تقریباً بدون تغییر') + '</b>.');
     h += mkSec('down', 'ارزان شده‌اند', 'قیمت در ۳۰ روز اخیر دست‌کم ۸٪ پایین آمده. زمان خوبی برای خرید است.',
-      R.down.map(function (r) { return mkRow(r, ['dn', pct(r.pct) + ' ارزان‌تر', dayT(r.ago)], 'قبلاً: ' + tm(r.from) + '<br>الان: <b class="nw">' + tm(r.to) + '</b>', spark(r.pts)); }), 8);
+      R.down.map(function (r) { return mkRow(r, ['dn', pct(r.pct) + ' ارزان‌تر', dayT(r.ago)], 'قبلاً: <span class="was">' + tm(r.from) + '</span><br>الان: ' + pzh(r.to, 'dn'), spark(r.pts)); }), 8);
     h += mkSec('up', 'گران شده‌اند', 'قیمت در ۳۰ روز اخیر دست‌کم ۸٪ بالا رفته. اگر از این‌ها دارید، احتمالاً می‌توانید گران‌تر بفروشید؛ اگر ندارید، زودتر بخرید.',
-      R.up.map(function (r) { return mkRow(r, ['up', pct(r.pct) + ' گران‌تر', dayT(r.ago)], 'قبلاً: ' + tm(r.from) + '<br>الان: <b class="nw">' + tm(r.to) + '</b>', spark(r.pts)); }), 8);
+      R.up.map(function (r) { return mkRow(r, ['up', pct(r.pct) + ' گران‌تر', dayT(r.ago)], 'قبلاً: <span class="was">' + tm(r.from) + '</span><br>الان: ' + pzh(r.to, 'up'), spark(r.pts)); }), 8);
     h += mkSec('back', 'دوباره موجود شده‌اند', 'مدتی نبودند و در دو هفته‌ی اخیر دوباره پیدا شدند.', R.back.map(rowBack), 8);
     h += mkSec('fresh', 'تازه‌های بازار', 'در هفته‌ی اخیر برای اولین بار در فروشگاه‌ها دیده شده‌اند.', R.fresh.map(rowFresh), 8);
     h += mkSec('gone', 'ناموجود شده‌اند', 'این اندازه الان در هیچ‌کدام از فروشگاه‌ها دیده نمی‌شود. اگر مشتری خواست، زودتر تهیه کنید.',
-      R.gone.map(function (r) { return mkRow(r, ['up', 'ناموجود', dayT(r.ago)], (r.price ? 'آخرین قیمت: ' + tm(r.price) : '') + (r.was ? '<br>قبلاً در ' + fa(r.was) + ' فروشگاه بود' : '')); }), 8);
+      R.gone.map(function (r) { return mkRow(r, ['up', 'ناموجود', dayT(r.ago)], (r.price ? 'آخرین قیمت: ' + pzh(r.price) : '') + (r.was ? '<br>قبلاً در ' + fa(r.was) + ' فروشگاه بود' : '')); }), 8);
     h += mkSec('low', 'موجودی کم شده', 'تعداد فروشگاه‌هایی که این را دارند کمتر شده؛ یعنی دارد کم‌یاب می‌شود.',
-      R.low.map(function (r) { return mkRow(r, ['gn', 'کم‌یاب', 'در ' + fa(r.now) + ' فروشگاه'], 'قبلاً در ' + fa(r.was) + ' فروشگاه بود، قیمت: ' + tm(r.price)); }), 6);
+      R.low.map(function (r) { return mkRow(r, ['gn', 'کم‌یاب', 'در ' + fa(r.now) + ' فروشگاه'], 'قبلاً در ' + fa(r.was) + ' فروشگاه بود، قیمت: ' + pzh(r.price)); }), 6);
   }
   $('mkr').innerHTML = h;
+  if (mkOn) fitPz($('mkr'));
 }
 function openReport() {
   mkTab = 'news';
   try { mkRender(); } catch (e) { console.error(e); toast('گزارش ساخته نشد', 3000); return; }      // تاریخچه‌ی سالم هرگز به‌خاطر یک خطا پاک نمی‌شود (داده‌ی خراب هنگام خواندن اصلاح می‌شود)
-  layerMark(); mkOn = true; closeSearch(); if (open) closeSheet(); $('mk').classList.add('on'); $('mkr').scrollTop = 0;
+  layerMark(); mkOn = true; closeSearch(); if (open) closeSheet(); $('mk').classList.add('on'); $('mkr').scrollTop = 0; fitPz($('mkr'));
   newsMarkSeen(); newsLoad('open');
 }
 function closeReport() { layerMark(); mkOn = false; $('mk').classList.remove('on'); nwDot(); }
@@ -982,18 +985,23 @@ function renderDetail() {
     var lab = [GN[v.gn], v.conc].filter(Boolean).join(' · ') || 'اندازه‌ها و قیمت‌ها';
     return '<div class="vr g-' + (v.gn || 'x') + '"><div class="vh">' + esc(lab) + '</div>' + v.sizes.map(function (z, zi) {
       var key = v.id + ':' + z.ml, op = szOpen[key] ? ' on' : '';
-      return '<div class="sz' + op + '" data-k="' + esc(key) + '"><span class="zm"><bdi>' + fa(z.ml) + '</bdi> میل</span><span class="zp"><b>' + fa(z.price) + '</b><small>تومان</small>' + (z.n < 2 ? '<i title="فقط یک سایت"></i>' : '') + '<em class="cv"></em></span></div>'
-        + '<div class="srl' + op + '">' + (z.srcs || []).map(function (q) {
-          var u = Core.itemUrl(q.s, q.pid), nmS = srcName(q.s);
-          return '<div class="sr' + (q.used ? '' : ' x') + '"><span class="sn">' + esc(nmS) + '</span><span class="sp"><bdi>' + fa(q.price) + '</bdi>' + (q.used ? '' : '<small>در محاسبه نیامد</small>') + '</span>' + (u ? '<button class="go" data-u="' + esc(u) + '">دیدن در سایت</button>' : '') + '</div>';
-        }).join('') + '</div>';
+      return '<div class="sz' + op + '" data-k="' + esc(key) + '"><span class="zm"><bdi>' + fa(z.ml) + '</bdi> میل</span><span class="zp">' + pzh(z.price) + (z.n < 2 ? '<i title="فقط یک سایت"></i>' : '') + '<em class="cv"></em></span></div>'
+        + '<div class="srl' + op + '">' + (function (ss) {
+          var lo = 0, hi = 0, nu = 0;      // ارزان‌ترین فروشگاه (فقط وقتی چند فروشگاه با قیمتِ متفاوت هست) با رنگِ سبز
+          ss.forEach(function (q) { if (q.used && q.price > 0) { nu++; if (!lo || q.price < lo) lo = q.price; if (q.price > hi) hi = q.price; } });
+          return ss.map(function (q) {
+            var u = Core.itemUrl(q.s, q.pid), nmS = srcName(q.s), cheap = nu > 1 && lo < hi && q.used && q.price === lo;
+            return '<div class="sr' + (q.used ? '' : ' x') + (cheap ? ' lo' : '') + '"><span class="sn">' + esc(nmS) + (cheap ? '<span class="lob">ارزان‌ترین</span>' : '') + '</span><span class="sp"><bdi>' + pzh(q.price) + '</bdi>' + (q.used ? '' : '<small>در محاسبه نیامد</small>') + '</span>' + (u ? '<button class="go" data-u="' + esc(u) + '">دیدن در سایت</button>' : '') + '</div>';
+          }).join('');
+        })(z.srcs || []) + '</div>';
     }).join('') + '</div>';
   }).join('');
   var keep = $('dtc').scrollTop;
   $('dtc').innerHTML = '<div class="dtop"><div class="dpic" data-vw="1">' + tile({ loc: im.loc, img: im.img, k: im.k }) + '<em>بزرگ‌نمایی</em></div><div class="dti"><div class="dbn">' + esc(BR_BY[m.brandId].name) + '</div><div class="dnm">' + esc(m.name) + '</div></div></div>' + dact(dtId) + vs
-    + '<div class="dnote">روی هر اندازه بزنید تا قیمتِ هر سایت و دکمه‌ی دیدن در سایت بیاید. نقطه‌ی کوچک یعنی فقط یک سایت آن را داشته.</div>';
+    + '<div class="dnote">روی هر اندازه بزنید تا قیمتِ هر سایت و دکمه‌ی دیدن در سایت بیاید. سبز یعنی ارزان‌ترین سایت. نقطه‌ی کوچک یعنی فقط یک سایت آن را داشته.</div>';
   var nm = $('dtc').querySelector('.dnm'); fitLines(nm, 3, 16);
   $('dtc').scrollTop = keep;
+  if (dtEl.classList.contains('on')) fitPz($('dtc'));
 }
 function recAdd(id) {
   var m = MD_BY[id]; if (!m || !BR_BY[m.brandId]) return;
@@ -1013,7 +1021,7 @@ document.addEventListener('click', function (e) {      // یک نگهبانِ ه
 function openDetail(id) {
   layerMark(); recAdd(id);
   dtId = id; renderDetail(); $('dtc').scrollTop = 0;
-  dtEl.classList.add('on'); layerMark();
+  dtEl.classList.add('on'); layerMark(); fitPz($('dtc'));
 }
 function closeDetail() { layerMark(); dtId = null; dtEl.classList.remove('on'); if (typeof fvOn !== 'undefined' && fvOn) { var sc = $('fvr').scrollTop; favRender(); $('fvr').scrollTop = sc; } }      // از صفحه‌ی قیمت لیست مغازه عوض شده باشد، لیستِ زیرش هم تازه شود
 $('dtx').onclick = closeDetail;
@@ -1027,7 +1035,7 @@ $('dtc').addEventListener('click', function (e) {
   }
   if (e.target.closest('.dpic') && dtId) { var bm = MD_BY[dtId] && BR_BY[MD_BY[dtId].brandId]; viewImg(dtId, bm ? bm.models.map(function (m) { return m.id; }) : [dtId], 'detail'); return; }
   var g = e.target.closest('.go'); if (g) { openLink(g.dataset.u); return; }
-  var z = e.target.closest('.sz'); if (z && z.dataset.k) { layerMark(); var on = !z.classList.contains('on'); szOpen[z.dataset.k] = on; z.classList.toggle('on', on); if (z.nextElementSibling) z.nextElementSibling.classList.toggle('on', on); }
+  var z = e.target.closest('.sz'); if (z && z.dataset.k) { layerMark(); var on = !z.classList.contains('on'); szOpen[z.dataset.k] = on; z.classList.toggle('on', on); if (z.nextElementSibling) { z.nextElementSibling.classList.toggle('on', on); if (on) fitPz(z.nextElementSibling); } }
 });
 
 /* ---- عکس بزرگ: بزرگ‌نمایی (دو انگشت / دو بار لمس)، جابه‌جایی، و کشیدن به چپ و راست برای عطر بعدی و قبلی ---- */
@@ -1578,10 +1586,33 @@ function srDup(list) {
   };
 }
 function genOf(m) { var g = {}, o = []; (m.variants || []).forEach(function (v) { if (v.gn && GN[v.gn] && !g[v.gn]) { g[v.gn] = 1; o.push(GN[v.gn]); } }); return o.join(' و '); }
-/* کارتِ عطر: عکسِ بزرگ، نام، برند. o: {best, gone, lab} */
+/* قیمتِ نمونه برای کارتِ جستجو: اندازه‌ی ۱۰۰ میل (اگر نبود، اولین اندازه). چند نسخه (مردانه/زنانه/غلظت) با قیمتِ متفاوت: ارزان‌ترین */
+function pcPrice(m) {
+  var c = [];
+  (m.variants || []).forEach(function (v) {
+    var z = null; (v.sizes || []).forEach(function (q) { if (q && q.price > 0 && (!z || (q.ml === 100 && z.ml !== 100))) z = q; });
+    if (z) c.push(z);
+  });
+  if (c.some(function (z) { return z.ml === 100; })) c = c.filter(function (z) { return z.ml === 100; }); else if (c.length) c = c.filter(function (z) { return z.ml === c[0].ml; });
+  if (!c.length) return null;
+  var lo = c[0], diff = false; c.forEach(function (z) { if (z.price !== lo.price) diff = true; if (z.price < lo.price) lo = z; });
+  return { z: lo, many: diff };
+}
+/* قیمتِ بلند (مثلاً ۱۴۲ میلیون) در فونتِ خیلی بزرگ از حباب بیرون نزند: فقط همان حباب کمی کوچک می‌شود */
+function fitPz(box) {
+  try {
+    var all = box.querySelectorAll('.pz'), bad = [], i;
+    for (i = 0; i < all.length; i++) if (all[i].scrollWidth > all[i].clientWidth + 1) bad.push(all[i]);      // اول فقط خواندن (یک بار چیدمان)؛ فقط حباب‌های بیرون‌زده کوچک می‌شوند
+    bad.forEach(function (z) {
+      var n = 0, fs = parseFloat(getComputedStyle(z).fontSize);
+      while (z.scrollWidth > z.clientWidth + 1 && fs > 9 && n++ < 30) { fs -= .5; z.style.fontSize = fs + 'px'; }
+    });
+  } catch (e) { }
+}
+/* کارتِ عطر: عکسِ بزرگ، نام، برند، قیمت. o: {best, gone, lab} */
 function pcard(m, b, o) {
-  o = o || {}; var im = entryImg(m.id), gl = genOf(m);
-  return '<button type="button" class="pc' + (o.best ? ' best' : '') + '" data-id="' + esc(m.id) + '"><span class="pph">' + tile({ loc: im ? im.loc : '', img: im ? im.img : '', k: im ? im.k : 0 }) + '</span><span class="pin">' + (o.best ? '<span class="pbest">بهترین حدس</span>' : '') + '<b>' + esc(m.name) + '</b><small>' + esc(b.name) + (gl ? ' · ' + esc(gl) : '') + esc(o.lab || '') + '</small></span><span class="pgo" aria-hidden="true">‹</span></button>';
+  o = o || {}; var im = entryImg(m.id), gl = genOf(m), pp = pcPrice(m);
+  return '<button type="button" class="pc' + (o.best ? ' best' : '') + '" data-id="' + esc(m.id) + '"><span class="pph">' + tile({ loc: im ? im.loc : '', img: im ? im.img : '', k: im ? im.k : 0 }) + '</span><span class="pin">' + (o.best ? '<span class="pbest">بهترین حدس</span>' : '') + '<b>' + esc(m.name) + '</b><small>' + esc(b.name) + (gl ? ' · ' + esc(gl) : '') + esc(o.lab || '') + '</small>' + (pp ? '<span class="pcp">' + pzh(pp.z.price) + '<small>' + (pp.many ? 'ارزان‌ترین ' : '') + fa(pp.z.ml) + ' میل</small></span>' : '') + '</span><span class="pgo" aria-hidden="true">‹</span></button>';
 }
 /* list: [{x: ردیفِ نمایه, sim: شبیه است؟}] */
 function srCards(list, bestFirst) {
@@ -1604,7 +1635,7 @@ function srRender() {
     var rc = set.rec.filter(function (x) { return x && MD_BY[x[0]]; }).slice(0, 8);
     html = (rc.length ? '<div class="srvh">آخرین‌هایی که دیدید</div><div class="pcs">' + rc.map(function (x) { var m = MD_BY[x[0]]; return pcard(m, BR_BY[m.brandId]); }).join('') + '</div>' : '')
       + '<div class="sremp">نام عطر یا برند را بنویسید، یا با دکمه‌ی میکروفون بگویید.<br>مثلاً «ساواج» یا «sauvage» یا «ورساچه».</div>';
-    box.innerHTML = html; return;
+    box.innerHTML = html; fitPz(box); return;
   } else {
     typed = true;
     var out = Core.searchRank(srIdx, [raw], srTools, { prefixLast: true, similar: 8 });
@@ -1613,7 +1644,7 @@ function srRender() {
     html = out.length ? srCards(out.map(function (r) { return { x: srIdx[r.i], sim: !!r.sim }; }), false) + (more ? '<div class="sremp">فقط ۴۰ مورد اول نشان داده شد؛ دقیق‌تر بنویسید.</div>' : '')
       : '<div class="sremp">در فهرستِ گوشی چیزی پیدا نشد.</div>';
   }
-  box.innerHTML = html + '<div id="srlv" class="srlive"></div>';
+  box.innerHTML = html + '<div id="srlv" class="srlive"></div>'; fitPz(box);
   if (!srLv && typed && q.length >= 3 && strong === 0) { clearTimeout(srLvT); srLvT = setTimeout(function () { if (srOn && !srLv && $('srq').value === raw) srLvStart(raw); }, 900); }      // چیزی پیدا نشد: بعد از مکثِ تایپ، از خودِ سایت‌ها هم می‌پرسد
   srLvUi(strong);
 }
@@ -1645,7 +1676,7 @@ function srLvMap(items, tok) {
   });
 }
 function lvCard(it) {
-  return '<button type="button" class="pc live" data-u="' + esc(it.u || '') + '"' + (it.u ? '' : ' disabled') + '><span class="pph">' + tile({ loc: '', img: it.img, k: (String(it.t).length * 7) % 64 }) + '</span><span class="pin"><b>' + esc(String(it.t).length > 70 ? String(it.t).slice(0, 70) + '…' : it.t) + '</b><small>' + esc(srcName(it.s)) + ' · ' + (it.price > 0 ? fa(it.price) + ' تومان' : it.price < 0 ? 'قیمت در سایت' : 'ناموجود') + '</small><small>فقط در سایت است؛ برای دیدن بزنید</small></span><span class="pgo" aria-hidden="true">‹</span></button>';
+  return '<button type="button" class="pc live" data-u="' + esc(it.u || '') + '"' + (it.u ? '' : ' disabled') + '><span class="pph">' + tile({ loc: '', img: it.img, k: (String(it.t).length * 7) % 64 }) + '</span><span class="pin"><b>' + esc(String(it.t).length > 70 ? String(it.t).slice(0, 70) + '…' : it.t) + '</b><small>' + esc(srcName(it.s)) + '</small><span class="pcp">' + (it.price > 0 ? pzh(it.price) : it.price < 0 ? '<span class="pz nu"><b>قیمت در سایت</b></span>' : '<span class="pz no"><b>ناموجود</b></span>') + '</span><small>فقط در سایت است؛ برای دیدن بزنید</small></span><span class="pgo" aria-hidden="true">‹</span></button>';
 }
 function srLvUi(strong) {
   var el = $('srlv'); if (!el || !srOn) return;
@@ -1659,7 +1690,7 @@ function srLvUi(strong) {
     else h = '<div class="sremp">' + (allFail ? 'سایت‌ها جواب ندادند؛ اینترنت را ببینید.' : 'در سایت‌ها هم چیزی شبیه آن پیدا نشد.<br>املای دیگری را امتحان کنید.') + '</div>' + (allFail ? '<button type="button" class="srbtn" id="srLvBtn">دوباره امتحان کن</button>' : '');
   } else if (strong !== 99 && ($('srq').value || '').trim().length >= 2 && !(srVoice && $('srq').value === srVoice.text && !srVoice.ranks.length)) h = '<button type="button" class="srbtn" id="srLvBtn">اینها نبود؟ در سایت‌ها هم بگرد</button>';
   el.className = 'srlive' + (srLv && !srLv.err ? ' has' : '');
-  el.innerHTML = h;
+  el.innerHTML = h; fitPz(el);
 }
 function openSearch(q) {
   var was = srOn; if (!was) layerMark(); srOn = true; $('srch').classList.add('on');
@@ -1697,6 +1728,7 @@ function favRender() {
   }).join('');
   $('fvr').innerHTML = rows.length ? '<div class="srvh">عطرهایی که در مغازه دارید<small>روی عکس بزنید تا قیمت‌ها را ببینید. ستاره‌ی کنارِ هر عطر برای برداشتن از لیست است.</small></div><div class="pcs">' + h + '</div>'
     : '<div class="sremp">لیست مغازه خالی است.<br>در صفحه‌ی قیمتِ هر عطر روی «افزودن به لیست مغازه» بزنید.</div>';
+  fitPz($('fvr'));
 }
 function openFav() { layerMark(); fvOn = true; $('fv').classList.add('on'); favRender(); $('fvr').scrollTop = 0; }
 function closeFav() { layerMark(); fvOn = false; $('fv').classList.remove('on'); }

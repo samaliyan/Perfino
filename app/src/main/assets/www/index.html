@@ -270,7 +270,7 @@ body.dk #nw.on{display:flex}
 .pc.best{border-color:var(--ac);box-shadow:inset 0 0 0 1.5px var(--ac)}
 .pc .pbest{display:inline-block;margin-bottom:3px;padding:1px 10px;border-radius:12px;background:var(--ac);color:#0c0f1f;font-size:12px;font-weight:700}
 .pc.gone{opacity:.55}
-.pc .pfv{flex:none;width:48px;height:48px;border:0;border-radius:50%;background:none;color:#e0a030;font-size:26px;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0}
+.pcw .pfv{flex:none;width:48px;height:48px;border:0;border-radius:50%;background:none;color:#e0a030;font-size:26px;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0}
 .pcw{display:flex;align-items:center;gap:6px;width:100%}
 .pcw .pc{flex:1 1 0;min-width:0}
 .sremp{padding:30px 10px;text-align:center;color:var(--mu);line-height:2}
@@ -356,8 +356,6 @@ body.dk #nw.on{display:flex}
 .sz>*+*{margin-inline-start:10px}
 .zm{font-size:16px;white-space:nowrap}
 .zp{white-space:nowrap;font-variant-numeric:tabular-nums;min-width:0;flex:none;padding-inline-end:2px}
-.zp b{font-size:22px;font-size:clamp(18px,5.8vw,22px);font-weight:800}
-.zp small{font-size:12px;color:var(--mu);margin-inline-start:5px}
 .zp i{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--mu);opacity:.55;margin-inline-start:6px}
 .dnote{margin-top:14px;font-size:12px;color:var(--mu);text-align:center}
 /* عکس بزرگ */
@@ -379,6 +377,66 @@ body.dk #nw.on{display:flex}
 .sr{display:flex;flex-wrap:wrap;row-gap:6px;align-items:center;justify-content:space-between;font-size:14px;padding:6px 10px;margin:3px 0;border-radius:12px;background:var(--cb)}
 .sr>*+*{margin-inline-start:8px}.sr .sn{flex:1 1 110px;min-width:0;font-weight:700;overflow-wrap:anywhere}.sr .sp{white-space:nowrap;font-variant-numeric:tabular-nums}.sr .sp small{display:block;font-size:11px;color:var(--mu)}
 .sr.x{opacity:.75}.sr .go{border:0;border-radius:10px;padding:9px 12px;min-height:44px;background:var(--ac);color:#0c0f1f;font-size:13px;font-weight:700;white-space:nowrap;cursor:pointer}
+/* ---- قیمت‌ها: ظاهرِ یکدست در همه‌ی بخش‌ها (۱.۳۴) ----
+   قیمت = حبابِ زرد با عددِ درشت و «تومان»؛ ارزان‌ترین = سبز؛ گران‌تر/ناموجود = قرمز؛ «قیمت در سایت» = خاکستریِ خط‌چین */
+:root{--pc:#ffd479;--pbg:rgba(255,196,70,.17);--pbd:rgba(255,196,70,.55);--lo:#4fe3a0;--lobg:rgba(47,174,107,.2);--lobd:rgba(79,227,160,.6);--lot:#052a17;--up:#ff8f84;--upbg:rgba(224,86,74,.2);--upbd:rgba(255,143,132,.55);--rb:rgba(255,255,255,.09);--lk:#7fb2ff}
+:root[data-th="light"]{--pc:#7a4a00;--pbg:rgba(255,184,50,.32);--pbd:rgba(160,100,0,.55);--lo:#0b6b3c;--lobg:rgba(47,174,107,.18);--lobd:rgba(11,107,60,.55);--lot:#fff;--up:#a8231b;--upbg:rgba(224,86,74,.15);--upbd:rgba(168,35,27,.5);--rb:rgba(26,34,56,.07);--lk:#1f4fbf}
+.mh .rw.on{--pc:#7a4a00;--pbg:rgba(255,184,50,.32);--pbd:rgba(160,100,0,.55)}
+.pz{display:inline-flex;flex-wrap:wrap;align-items:baseline;gap:0 5px;max-width:100%;min-width:0;padding:2px 10px 3px;border-radius:12px;background:var(--pbg);border:1.5px solid var(--pbd);color:var(--pc);font-variant-numeric:tabular-nums;white-space:nowrap;line-height:1.35;text-shadow:none}
+.pz b{font-weight:800}
+.pz .tu{font-size:.58em;font-weight:700}
+.pz.dn{color:var(--lo);background:var(--lobg);border-color:var(--lobd)}
+.pz.up,.pz.no{color:var(--up);background:var(--upbg);border-color:var(--upbd)}
+.pz.nu{color:var(--mu);background:transparent;border-style:dashed;border-color:var(--mu)}
+.pnum{color:var(--pc);font-weight:800;white-space:nowrap}
+.was{color:var(--mu);text-decoration:line-through}
+/* صفحه‌ی قیمت */
+.zm{font-size:17px;font-weight:800;padding:4px 12px;border-radius:12px;background:var(--rb)}
+.sz{align-items:center;padding:10px 0}
+.zp{display:inline-flex;align-items:center;flex:0 1 auto;min-width:0;max-width:100%;padding-inline:0 0}
+.zp .cv{margin-inline-start:12px;margin-inline-end:3px}
+.zp .pz{font-size:clamp(19px,6vw,24px)}
+.zp i{margin-inline-start:8px}
+.sr{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;padding:10px 12px;margin:6px 0;border-radius:14px;background:var(--rb);border:1.5px solid transparent;font-size:14px}
+.sr>*+*{margin-inline-start:0}
+.sr .sn{flex:1 1 90px;min-width:0;font-size:16px;font-weight:800;overflow-wrap:anywhere}
+.sr .sp{flex:0 1 auto;min-width:0;max-width:100%;display:flex;flex-direction:column;align-items:flex-end;gap:2px;font-size:18px}
+.sr .sp small{display:block;font-size:11px;color:var(--mu)}
+.sr .lob{display:inline-block;margin-inline-start:8px;padding:1px 9px 2px;border-radius:10px;background:var(--lo);color:var(--lot);font-size:12px;font-weight:800;white-space:nowrap;vertical-align:middle}
+.sr.lo{background:var(--lobg);border-color:var(--lobd)}
+.sr.lo .pz{color:var(--lo);background:transparent;border-color:var(--lobd)}
+.sr.x{opacity:.85}
+.sr.x .pz{color:var(--mu);background:transparent;border-style:dashed;border-color:var(--mu)}
+.sr .go{flex:1 1 100%;display:flex;align-items:center;justify-content:center;gap:8px;min-height:40px;padding:6px 14px;border:1.5px solid var(--lk);border-radius:12px;background:transparent;color:var(--lk);font-size:14px;font-weight:700}
+.sr .go:active{background:var(--rb)}
+/* ردیف‌های فهرست */
+.rw .pr{max-width:52%}
+.rw .p1{font-size:calc(clamp(14px,4.6vw,18px)*var(--zs));line-height:1.35}
+.rw .p1 small{margin-top:2px;font-size:calc(12px*var(--zs))}
+.rw .p2{display:flex;align-items:baseline;justify-content:space-between;gap:8px;font-size:calc(12px*var(--zs));margin-top:3px}
+.rw .p2 b{color:var(--pc);font-weight:800;font-size:calc(13px*var(--zs))}
+/* چرخ */
+.ma .ln{align-items:center}
+.ma .ln span{font-size:calc(15px*var(--zs));font-weight:800;opacity:1}
+.ma .ln b{padding:0 10px 2px;border-radius:12px;background:var(--pbg);border:1.5px solid var(--pbd);color:var(--pc);font-weight:800}
+.ma .ln b::after{content:'تومان';font-size:.46em;font-weight:700;margin-inline-start:5px}
+/* کارت‌های جستجو */
+.pc .pcp{display:flex;align-items:center;flex-wrap:wrap;gap:4px 8px;margin-top:5px}
+.pc .pin .pcp .pz{font-size:calc(clamp(13px,4.6vw,17px)/var(--zs));padding:2px 6px 3px}
+@media(max-width:340px){.pc .pph{flex:0 0 80px;height:80px}}
+.pc .pin .pz b{display:inline;font-size:inherit;line-height:inherit;overflow-wrap:normal}
+.pc .pin .pcp small{display:inline;margin:0;font-size:13px}
+.pc .pin .pcp .pz.nu b,.pc .pin .pcp .pz.no b{font-size:14px}
+#fvr .pc .pin .pcp .pz{font-size:clamp(13px,4.6vw,17px)}
+/* گزارش */
+.mkr .mv b,.mkr.pr .mv b{display:inline-block;padding:2px 12px 3px;border-radius:12px;font-size:15px;color:var(--tc,var(--pc));background:var(--tbg,var(--pbg));border:1.5px solid var(--tbd,var(--pbd))}
+.mv.up{--tc:var(--up);--tbg:var(--upbg);--tbd:var(--upbd)}
+.mv.dn{--tc:var(--lo);--tbg:var(--lobg);--tbd:var(--lobd)}
+.mkr .mi .pz,.mkr.pr .mi .pz{font-size:15px}
+.mkr .mi .pz b,.mkr.pr .mi .pz b{display:inline;font-size:inherit;line-height:inherit;color:inherit}
+.mkr .mi .pz.big{font-size:18px}
+.mkr .mi small .pz{margin:2px 0}
+.mki .pnum{font-size:1.05em}
 .audl{display:block !important;font-size:11px;line-height:1.9;color:var(--mu);overflow-wrap:anywhere}.aud-t{cursor:pointer;color:var(--ac);text-decoration:underline;background:none;border:0;padding:12px 8px;min-height:44px;font:inherit;font-size:12px}
 .hint2{font-size:12px;color:var(--mu);margin-top:6px;line-height:1.8}
 #sBrList{margin-top:8px;max-height:46vh;overflow-y:auto;border-radius:16px;border:1px solid var(--cb)}

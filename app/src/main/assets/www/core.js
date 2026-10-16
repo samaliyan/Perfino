@@ -1599,7 +1599,7 @@ async function wooSource(base, net, rep, mode) {
   var out = [], notes = [], failed = 0, fields = mode === 'price';
   var FIELDS = '&_fields=id,prices,price_html,is_in_stock,is_purchasable,is_on_backorder,type';
   function url(p) { return base + '/wp-json/wc/store/v1/products?per_page=100&page=' + p + (fields ? FIELDS : ''); }
-  var diag = { total: 0, priced: 0, sizeTitle: 0, sizeSpec: 0, noSize: 0, sample: '' };
+  var diag = { total: 0, priced: 0, sizeTitle: 0, sizeSpec: 0, noSize: 0, sample: '' }, vparents = [];      // vparents: محصولِ چنداندازه‌ای (بازه‌ی قیمت)؛ هر اندازه‌اش جدا گرفته می‌شود
   function conv(it) {
     var pr = it.prices || {}, name = it.name || '';
     var minor = pr.currency_minor_unit == null ? 0 : +pr.currency_minor_unit;
@@ -1614,7 +1614,7 @@ async function wooSource(base, net, rep, mode) {
     var st = 0, needSz = false;
     if (cur && !/^(IRT|IRR|IRHT|IRHR)$/.test(cur) && !/تومان|ریال/.test(pr.currency_symbol || '')) v = 0;     // ارزِ ناشناخته (دلار و ...) قیمتِ تومانی نیست
     if (typeof it.is_in_stock !== 'boolean' || it.is_in_stock === false || it.is_purchasable === false || it.is_on_backorder === true || !(v > 0)) st = 1;   // فقط کالای موجود و قابل خرید
-    if (pr.price_range && pr.price_range.min_amount !== pr.price_range.max_amount) st = 1;
+    if (pr.price_range && pr.price_range.min_amount !== pr.price_range.max_amount) { st = 1; if (it.type === 'variable' && it.id != null && vparents.length < 80) vparents.push(it); }
     if (it.price_html && OUT_RE.test(normFa(stripTags(it.price_html)))) st = 1;
     var cats = (it.categories || []).map(function (c) { return c.name; }).join(' ');
     var title = name;
@@ -1628,6 +1628,43 @@ async function wooSource(base, net, rep, mode) {
     }
     var im = it.images && it.images[0];
     return { id: it.id, u: needSz ? it.permalink : '', t: title, e: slugText(it.slug), price: st === 1 ? 0 : v, img: im ? (im.thumbnail || im.src || '') : '', big: im ? (im.src || im.thumbnail || '') : '', b: brandHints(it.categories), st: st };
+  }
+  /* محصولِ چنداندازه‌ای (ووکامرس «متغیر»): قیمتش بازه است (از ... تا ...)، پس یک عدد نیست. هر اندازه (تنوع) جداگانه گرفته می‌شود:
+     /products?type=variation&parent=شناسه؛ اندازه از ویژگی‌های همان تنوع خوانده می‌شود. اگر اندازه‌ای خوانده نشد، چیزی حدس زده نمی‌شود. */
+  function varSize(v) {
+    var tx = (v.attributes || []).map(function (a) { return a && typeof a === 'object' ? [a.name, a.value].join(' ') : ''; }).join(' ') + ' ' + String(v.variation || '');
+    tx = normFa(stripTags(tx), true);
+    var m = /(?:^|[^\d.٫])(\d{1,3})\s*(?:ml|cc|میل|میلی)/i.exec(tx) || /(?:حجم|سایز|اندازه|size|volume)[^\d]{0,12}(\d{2,3})(?!\d)/i.exec(tx);
+    var ml = m ? +m[1] : 0, kind = [];
+    (v.attributes || []).forEach(function (a) { var t = a && typeof a === 'object' ? normFa(stripTags(String(a.value || '')), true) : ''; if (t && t.length <= 30 && /ادو|ادکلن|پرفیوم|تویلت|اکستریت|کلون|\bedp\b|\bedt\b|parfum|مردانه|زنانه|یونیسکس/i.test(t) && kind.indexOf(t) < 0) kind.push(t); });      // غلظت/جنسیتِ همان تنوع؛ تا دو تنوعِ هم‌اندازه یکی نشوند
+    return { ml: ml >= 5 && ml <= 600 ? ml : 0, tester: /tester|تستر/i.test(tx), kind: kind.slice(0, 2).join(' ') };
+  }
+  async function expandVariants(parents, outArr) {
+    var made = 0, okIds = {}, i = 0;
+    async function worker() {
+      while (i < parents.length) {
+        var P = parents[i++];
+        try {
+          for (var pg = 1; pg <= 3; pg++) {      // تا ۳۰۰ تنوع برای هر محصول
+            var r = await getR(net, base + '/wp-json/wc/store/v1/products?type=variation&per_page=100&page=' + pg + '&parent=' + encodeURIComponent(P.id), { Accept: 'application/json' }, 2), a = r.status === 200 ? parseJson(r.body) : undefined;
+            if (!Array.isArray(a)) { if (!r.status || r.status >= 500 || r.status === 429) { failed++; notes.push('تنوعِ محصول نشد'); } break; }      // خطای شبکه/سرور: فهرست ناقص است؛ ۴۰۰/۴۰۴ یعنی سایت این را پشتیبانی نمی‌کند (ناقص حساب نمی‌شود)
+            a.forEach(function (v) {
+              if (!v || typeof v !== 'object' || v.id == null || wIds[v.id]) return;
+              var sz = varSize(v);
+              if (!sz.ml) return;      // اندازه معلوم نیست: حدس نزن (در هر دو حالتِ دریافت، تا کالای ناشناخته مدام دریافتِ کامل نخواهد)
+              var syn = Object.assign({}, P, { id: base + '/?p=' + P.id + '#v' + v.id, type: 'variation', prices: v.prices, is_in_stock: v.is_in_stock, is_purchasable: v.is_purchasable, is_on_backorder: v.is_on_backorder, price_html: v.price_html, attributes: [], short_description: '', description: '' });      // شناسه = نشانیِ همان محصولِ اصلی (لینکِ «دیدن در سایت» درست باز شود؛ تنوع صفحه‌ی جدا ندارد)
+              if (!fields) syn.name = (sz.tester ? 'تستر ' : '') + (P.name || '') + (sz.kind ? ' ' + sz.kind : '') + ' ' + sz.ml + ' میل';
+              if (syn.prices && syn.prices.price_range && syn.prices.price_range.min_amount !== syn.prices.price_range.max_amount) return;
+              wIds[v.id] = 1; outArr.push(conv(syn)); made++; okIds[P.id] = 1;
+            });
+            if (a.length < 100) break;
+          }
+        } catch (e) { failed++; notes.push('تنوعِ محصول نشد'); }
+      }
+    }
+    await Promise.all([worker(), worker(), worker()]);
+    if (made) for (var k = outArr.length - 1; k >= 0; k--) if (okIds[outArr[k].id] && parents.some(function (P) { return P.id === outArr[k].id; })) outArr.splice(k, 1);      // خودِ محصولِ بازه‌ای که اندازه‌هایش آمد، حذف شود
+    return made;
   }
   async function one(p) {
     var r = await getR(net, url(p), { Accept: 'application/json' });
@@ -1655,10 +1692,12 @@ async function wooSource(base, net, rep, mode) {
     page += CFG.conc; rep(out.length);
   }
   if (!out.length) throw new Error('محصولی پیدا نشد');
+  var vN = 0;
+  if (vparents.length) vN = await expandVariants(vparents, out);
   var szN = 0;
   if (!fields) szN = await fillSizes(base, out, net);
   var dn = (!fields && diag.total) ? ' · قیمت‌دار ' + diag.priced + ' از ' + diag.total + ' · اندازه از عنوان ' + diag.sizeTitle + '، از توضیحات ' + diag.sizeSpec + '، بدون اندازه ' + diag.noSize + (diag.sample ? ' (نمونه: ' + diag.sample + ')' : '') : '';
-  return { items: out, complete: ended && !failed, note: (failed ? 'ناقص: ' + failed + ' صفحه' : '') + dn + (szN ? ' · اندازه از صفحه‌ی محصول ' + szN : ''), diag: diag };
+  return { items: out, complete: ended && !failed, note: (failed ? 'ناقص: ' + failed + ' صفحه' : '') + dn + (szN ? ' · اندازه از صفحه‌ی محصول ' + szN : '') + (vN ? ' · اندازه‌های محصولِ چنداندازه‌ای ' + vN : ''), diag: diag };
 }
 
 var DK_URLS = [
