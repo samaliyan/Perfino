@@ -12,4 +12,4 @@ chk(db.it.liliome[2][2] === 0, 'stored clone purged');
 db.t.liliome = Date.now(); var L = C.buildList(db, ['liliome'], { liliome: 1 }, 0), T = C.tree(L, 'fa', db.wd), prices = [];
 T.forEach(function (b) { b.models.forEach(function (m) { m.variants.forEach(function (v) { JSON.stringify(v).replace(/\d{6,}/g, function (x) { prices.push(+x); }); }); }); });
 chk(prices.length && prices.indexOf(2000000) < 0 && prices.indexOf(5000000) >= 0, 'only real price shown ' + prices);
-console.log(ok + ' ok ' + bad + ' bad');
+console.log(ok + ' ok ' + bad + ' bad'); process.exit(bad ? 1 : 0);

@@ -17,7 +17,6 @@ async def main():
             n0=await pg.evaluate("__pp.list.length"); first=await pg.evaluate("__pp.list[0].id"); fname=await pg.evaluate("__pp.list[0].name")
             await pg.click('#gear'); await pg.wait_for_timeout(600)
             t=await pg.evaluate("document.getElementById('sBrBtn').innerText")
-            chk('%d'%n0 or True,'x')
             chk(await pg.evaluate("document.getElementById('sBrList').style.display")=='none','%s: list collapsed by default'%model)
             await pg.click('#sBrBtn'); await pg.wait_for_timeout(300)
             rows=await pg.evaluate("document.querySelectorAll('#sBrList .brw').length")

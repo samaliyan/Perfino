@@ -31,6 +31,7 @@ final class Http {
         return new Policy() {
             @Override public boolean allow(URL u) {
                 if (u == null || !"https".equals(u.getProtocol())) return false;
+                if (u.getUserInfo() != null || u.toString().indexOf('\\') >= 0) return false;      // «evil.com\@liliome.com»: کتابخانه‌ی شبکه \ را مثل / می‌خواند و میزبانِ دیگری می‌بیند
                 String h = u.getHost();
                 if (h == null) return false;
                 h = h.toLowerCase(Locale.ROOT);

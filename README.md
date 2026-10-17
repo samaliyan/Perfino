@@ -62,7 +62,7 @@ Online-shop titles are messy. A multi-stage pipeline keeps the list clean:
 - **Product photos** cached on the device, with a drawn bottle as fallback.
 
 ### Updates
-- **Updates without installing.** All screens and logic live in `assets/www`, so a normal update downloads only those files (about 115 KB, `www.zip` + `ota.json` in the `latest` release), checks size and SHA-256, and stores them in the app's own folder. Nothing is installed, so Android and Google Play Protect show no “Install anyway” question. If the new files do not start (no “I am alive” signal after a clean start, or three failed starts in a row), the app returns by itself to the previous working files, or to the version inside the APK. If there is no internet, the update is simply postponed; the APK flow is never started just because the check failed.
+- **Updates without installing.** All screens and logic live in `assets/www`, so a normal update downloads only those files (about 150 KB, `www.zip` + `ota.json` in the `latest` release), checks size and SHA-256, and stores them in the app's own folder. Nothing is installed, so Android and Google Play Protect show no “Install anyway” question. If the new files do not start (no “I am alive” signal after a clean start, or three failed starts in a row), the app returns by itself to the previous working files, or to the version inside the APK. If there is no internet, the update is simply postponed; the APK flow is never started just because the check failed.
 - A full APK is needed only when the Java part changes (`api` in `www/version.json` is higher than `NATIVE_API` in `Ota.java`); then the old flow is used (download, confirm, install, and Play Protect may ask).
 - **No button, no question.** The app checks by itself when it opens and about every 20 minutes while it stays open, downloads silently, and restarts its own page when the person is idle (nothing open, no touch for 15 seconds, prices not loading). Settings only shows a short status line; a “check now” button and an on/off switch exist only under Advanced settings (for the developer).
 - If an APK is ever needed, a single card with one button (“Install”) appears when the person is idle; the Android system may still ask once. The app itself never mentions “Install anyway”.
@@ -195,7 +195,7 @@ Python tests need Playwright with Chromium. `Ota.java`, `OtaGuard.java` and `Htt
 - **عکس محصول** روی گوشی نگه‌داری می‌شود و اگر نبود، یک بطری ترسیمی جایگزین می‌شود.
 
 ### به‌روزرسانی خود برنامه
-- **بروزرسانی بدون نصب:** همه‌ی رابط و منطق برنامه در `assets/www` است؛ پس بروزرسانیِ معمولی فقط همان فایل‌ها (حدود ۱۱۵ کیلوبایت: `www.zip` و `ota.json` در Release با برچسب `latest`) را می‌گیرد، اندازه و SHA-256 را بررسی می‌کند و در پوشه‌ی خودِ برنامه می‌گذارد. چیزی نصب نمی‌شود، پس اندروید و Play Protect پنجره‌ی «Install anyway» نشان نمی‌دهند. اگر فایل‌های تازه سالم بالا نیایند (بدون خطا و با فهرستِ کشیده‌شده)، برنامه خودش به فایل‌های سالمِ قبلی و در نبودِ آن به نسخه‌ی داخل APK برمی‌گردد. اگر اینترنت نباشد، بروزرسانی فقط عقب می‌افتد و هرگز به‌خاطر ناموفق بودن بررسی، فایل APK دانلود نمی‌شود.
+- **بروزرسانی بدون نصب:** همه‌ی رابط و منطق برنامه در `assets/www` است؛ پس بروزرسانیِ معمولی فقط همان فایل‌ها (حدود ۱۵۰ کیلوبایت: `www.zip` و `ota.json` در Release با برچسب `latest`) را می‌گیرد، اندازه و SHA-256 را بررسی می‌کند و در پوشه‌ی خودِ برنامه می‌گذارد. چیزی نصب نمی‌شود، پس اندروید و Play Protect پنجره‌ی «Install anyway» نشان نمی‌دهند. اگر فایل‌های تازه سالم بالا نیایند (بدون خطا و با فهرستِ کشیده‌شده)، برنامه خودش به فایل‌های سالمِ قبلی و در نبودِ آن به نسخه‌ی داخل APK برمی‌گردد. اگر اینترنت نباشد، بروزرسانی فقط عقب می‌افتد و هرگز به‌خاطر ناموفق بودن بررسی، فایل APK دانلود نمی‌شود.
 - فقط وقتی بخش جاوا عوض شود (عدد `api` در `www/version.json` بالاتر از `NATIVE_API` در `Ota.java`) هنوز فایل APK لازم است؛ آن‌وقت همان روش قبلی (دانلود، تأیید، نصب) اجرا می‌شود و Play Protect ممکن است بپرسد.
 - **بدون دکمه و بدون پرسیدن:** برنامه هنگام باز شدن و هر حدود ۲۰ دقیقه (تا وقتی باز است) خودش نسخهٔ جدید را می‌پرسد، بی‌صدا می‌گیرد و وقتی کاربر کاری نمی‌کند (چیزی باز نیست، ۱۵ ثانیه دست نزده، قیمت‌ها در حال گرفتن نیست) صفحه را با فایل‌های تازه از نو باز می‌کند و بعدش یک پیام کوتاه «برنامه بروز شد» می‌دهد. در تنظیمات فقط یک خط وضعیت هست؛ دکمهٔ «همین حالا بپرس» و کلید خاموش/روشن فقط در تنظیمات پیشرفته (برای سازنده) است.
 - اگر روزی نصب APK لازم شود، فقط یک کارت با یک دکمهٔ «نصب» وقتی کاربر بیکار است نشان داده می‌شود (اندروید ممکن است یک بار تأیید بخواهد). خودِ برنامه هیچ‌جا «Install anyway» نمی‌نویسد و راهنمایی برایش لازم نیست.
@@ -254,7 +254,6 @@ node tests/gen.js              # ساخت دادهٔ آزمایشی
 node tests/t35_vet.js          # بازرسی نام، شناخت برند و خط محصول
 node tests/t37_hist.js         # منطق تاریخچهٔ قیمت و موجودی
 python3 tests/t36_features.py  # جستجو، لیست مغازه، پنهان کردن، واژهٔ ممنوع، اندازهٔ نوشته
-python3 tests/t38_market.py    # صفحهٔ گزارش بازار
 python3 tests/t53_viewer.py    # بزرگ‌نمایی و کشیدنِ عکس
 python3 tests/t54_fontscale.py # اندازهٔ نوشته روی کل برنامه (۴ شکل × ۴ اندازه × ۲ عرض)
 python3 tests/t66_price_ui.py   # ظاهر و جاشدنِ قیمت‌ها (حباب، ارزان‌ترین، گزارش، خوانایی)
@@ -264,6 +263,9 @@ node tests/t69_news_more.js     # منطقِ صفحه‌به‌صفحه‌ی خ�
 node tests/t68_stock_filter.js  # فروشگاهِ بزرگ: فقط موجودها خوانده می‌شود (کلینیکِ لیلیوم)
 python3 tests/t71_diag_report.py  # گزارش کامل تشخیص برای سازنده (پرسش زنده + حافظه)
 node tests/t72_page_retry.js     # صفحه‌های خرابِ فروشگاه دوباره خوانده می‌شود (۴۲۹/۵۰۰/قطعی)
+node tests/t73_round1_core.js    # ردیف خراب، ك/ي عربی، عنوان غول‌پیکر، تطبیقِ تکه‌تکه
+python3 tests/t74_round1_ui.py   # دکمه‌ی بستن تنظیمات، حافظه‌ی خراب، درختِ بدون بازسازی
+bash tests/run_node.sh           # همه‌ی آزمون‌های Node با هم (در CI هم اجرا می‌شود)
 python3 tests/t55_voice.py     # گفتن نام عطر، نوار پایین، آخرین‌ها
 python3 tests/t3_flow.py       # روند کامل بروزرسانی
 python3 tests/t56_search_real.py   # جستجو روی ۱۲ هزار عطر واقعی (نیاز به /tmp/w/realdb.json)

@@ -6,7 +6,6 @@ eq(C.fa2en(n('وان میلیون'),null),'One Million','phrase');
 eq(C.fa2en(n('بلو دو'),null),'Bleu de','small word lower');
 eq(C.en2fa(['good','girl','gone','bad'],null),'گود گرل گان بد','en phrase → fa');
 eq(C.en2fa(['black','orchid'],null)!=='' ,true,'en→fa nonempty');
-eq(C.slug,undefined,'-');
 eq(C.enTokens('Dior Sauvage Eau de Parfum For Men 100ml'),['dior','sauvage'],'enTokens');
 eq(C.enTokens("Guerlain L'Homme Ideal EDT 50 ml"),['guerlain','lhomme','ideal'],'apostrophe joined');
 eq(C.titleEn(["l'homme",'ideal','pour','homme','de','marly']),"L'Homme Ideal Pour Homme de Marly",'title case');

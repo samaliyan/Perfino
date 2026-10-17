@@ -1,7 +1,7 @@
 (function () {
 'use strict';
 var RM = !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
-var VERSION = '1.40';
+var VERSION = '1.41';
 var myCode = (function () { var m = /\/b(\d{1,10})\/index\.html$/.exec(String(location.pathname || '')); return m ? m[1] : '0'; })();      // نسخه‌ی این صفحه از روی آدرسش؛ در گزارش‌ها به جاوا فرستاده می‌شود تا صفحه‌ی کهنه نتواند نسخه‌ی تازه را «سالم» اعلام کند
 function otaCall(n) { try { if (window.Native && typeof window.Native[n] === 'function') window.Native[n](myCode); } catch (e) { } }
 otaCall('otaBoot');      // «جاوااسکریپتِ این صفحه شروع شد»: برنامه به صفحه‌ی بی‌نصب مهلتِ بیشتری برای ساختن فهرست می‌دهد
@@ -486,7 +486,15 @@ if (!(set.fs >= 0 && set.fs <= 3)) set.fs = 0;
 Core.setBlock(set.block);
 if (!Object.prototype.hasOwnProperty.call(MODELS, set.model)) set.model = 'a';
 var db = ls.get('pp.db', null);
-if (!db || db.v !== 3 || db.fv !== 5 || !db.g || !db.it) db = Core.newDb();   // نسخه‌ی ۱.۳ همه چیز را یک‌بار از نو و کامل می‌گیرد
+function dbSane(d) {      // حافظه‌ی نیمه‌خراب (مثلاً یک ردیفِ null) نباید برنامه را برای همیشه در بوت‌لوپ نگه دارد؛ خراب = از نو دریافت
+  try {
+    if (!d || typeof d !== 'object' || !d.g || typeof d.g !== 'object' || !d.it || typeof d.it !== 'object') return false;
+    for (var s in d.it) { var m = d.it[s]; if (!m || typeof m !== 'object') return false; for (var k in m) { var e = m[k]; if (!Array.isArray(e) || e.length < 4) return false; } }
+    for (var g in d.g) { var x = d.g[g]; if (!x || typeof x !== 'object' || !Array.isArray(x.k)) return false; }
+    return true;
+  } catch (e) { return false; }
+}
+if (!db || db.v !== 3 || db.fv !== 5 || !dbSane(db)) db = Core.newDb();   // نسخه‌ی ۱.۳ همه چیز را یک‌بار از نو و کامل می‌گیرد
 db.fv = 5;
 db.full = db.full || {}; db.t = db.t || {}; db.fa = db.fa || {}; db.sc = db.sc || {};
 try { localStorage.removeItem('pp.raw'); } catch (e) {}
@@ -600,10 +608,10 @@ function overlay() {
     $('gv1').innerHTML = '<bdi>' + fa(sd) + '</bdi> از <bdi>' + fa(N) + '</bdi> سایت' + (phase === 'src' && total() ? ' · <bdi>' + fa(total()) + '</bdi> محصول' : '');
     $('gr2').className = ps.need && il === 0 && ps.have >= ps.need ? 'ok' : '';
     $('gv2').innerHTML = ps.need ? '<bdi>' + fa(ps.have) + '</bdi> از <bdi>' + fa(ps.need) + '</bdi>' + (il > 0 && ps.have > 0 ? ' · <bdi>' + fa(il) + '</bdi> مانده' : '') : phase === 'src' ? 'بعد از فهرست' : '—';
-    var bk = phase === 'fail' ? (list.length ? 'f2' : 'f1') : '';
+    var bk = phase === 'fail' ? (list.length ? 'f2' : 'f1') : (list.length && sd >= 1 && Date.now() - gateT0 > 30000 ? 'f3' : '');      // بعد از ۳۰ ثانیه، اگر فهرست آماده است، راهِ ورود هست (اینترنتِ کند راه را نبندد)
     if (o._bk !== bk) {                   // دکمه‌ها فقط وقتی حالت عوض شد
       o._bk = bk;
-      $('gbt').innerHTML = bk ? '<button id="retry">تلاش دوباره</button>' + (bk === 'f2' ? '<button id="goon" class="gh2">ادامه با اطلاعات فعلی</button>' : '') : '';
+      $('gbt').innerHTML = bk ? (bk === 'f3' ? '' : '<button id="retry">تلاش دوباره</button>') + (bk !== 'f1' ? '<button id="goon" class="gh2">ادامه با اطلاعات فعلی</button>' : '') : '';
       var rb = $('retry'); if (rb) rb.onclick = function () { refresh(true); };
       var gb = $('goon'); if (gb) gb.onclick = function () { db.ready = true; saveDb(); enter(); histTake(); };
     }
@@ -899,9 +907,12 @@ function dataStamp(lang) {
   var now = Date.now(), wc = 0; try { if (window.Native && window.Native.webCode) wc = window.Native.webCode() | 0; } catch (e) { }
   var p = [VERSION, wc, lang, Object.keys(db.g).length, Object.keys(db.wd || {}).length, db.dv | 0];
   order().forEach(function (s) {
-    var m = db.it[s] || {}, n = 0, a = 0, b = 0, c = 0;
-    for (var k in m) { var e = m[k]; n++; a += e[1] | 0; b += e[4] | 0; c += e[2] ? e[2].charCodeAt(e[2].length - 1) + e[2].length : 0; }
-    p.push(s + ':' + (db.t[s] | 0) + ':' + n + ':' + a + ':' + b + ':' + c + ':' + ((db.t[s] && now - db.t[s] <= 12 * 3600e3) ? 1 : 0));
+    var m = db.it[s] || {}, n = 0, a = 0, b = 0, c = 0, tmin = db.t[s] ? Math.floor(Math.min(db.t[s], now) / 60000) : 0, nowM = Math.floor(now / 60000);
+    for (var k in m) {
+      var e = m[k]; n++; a += e[1] | 0; c += e[2] ? e[2].charCodeAt(e[2].length - 1) + e[2].length : 0;
+      if (!e[4] || e[4] > nowM + 10 || (tmin && e[4] < tmin - 240)) b += n * 7 + 1;      // «کهنه» بودن (همان قاعده‌ی buildList)؛ نه خودِ زمانِ دیده‌شدن: دریافتِ بی‌تغییر نباید درخت را دوباره بسازد
+    }
+    p.push(s + ':' + n + ':' + a + ':' + b + ':' + c + ':' + ((db.t[s] && now - db.t[s] <= 12 * 3600e3) ? 1 : 0));
   });
   return p.join('|');
 }
@@ -974,9 +985,15 @@ function mountModel(anchor) {
 }
 /* ورود به برنامه (بعد از پایان دانلود اولیه) */
 function enter() { setEntries(); mountModel(nav.lvl ? null : startAnchor); overlay(); navUi(); updPill(); }
+var gateImgT = 0, gateTm = 0, gateT0 = Date.now();
+setTimeout(function () { if (!db.ready) overlay(); }, 31000);
 function checkReady() {
   if (db.ready || busy) return;
-  if (imgLeft() > 0) { overlay(); return; }
+  if (imgLeft() > 0) {      // عکس‌ها در حال دانلود: تا ۴۵ ثانیه صبر؛ بعد وارد می‌شویم و عکس‌ها پشت‌صحنه ادامه می‌دهند (اینترنتِ کند پدر را پای صفحه‌ی انتظار نگه ندار)
+    if (!gateImgT) gateImgT = Date.now();
+    var wl = 45000 - (Date.now() - gateImgT);
+    if (wl > 0 || srcDone() < 1 || !list.length) { overlay(); clearTimeout(gateTm); gateTm = setTimeout(checkReady, Math.max(1000, wl)); return; }
+  }
   if (srcDone() < actv().length && !gateRetried) { gateRetried = 1; overlay(); setTimeout(function () { refresh(false); }, 2500); return; }   // سایتِ ناموفق یک‌بار دیگر امتحان می‌شود؛ بعد هر سایتی که در دسترس بود کافی است
   if (srcDone() < 1 || !list.length) { overlay(); return; }
   db.ready = true; saveDb(); enter(); histTake();
@@ -1456,7 +1473,8 @@ function openSheet() { layerMark(); open = true; if (!window.__forceAdv) $('sAdv
 function closeSheet() { layerMark(); open = false; sSp.x = sheetY; sSp.to(1, { response: .36, damping: 1 }); }
 sSp.cb(1);
 $('sVer').onclick = function () { if (++advN >= 5 && !adv) { adv = true; renderSheet(); toast('گزینه‌های سازنده نشان داده شد', 2200); } };
-$('gear').onclick = openSheet; scm.onclick = closeSheet;
+$('upd').onclick = function () { if (!busy && db.ready && !open) refresh(true); };      // زدن روی نوار وضعیت = بروزرسانی همین حالا (بدون رفتن به تنظیمات)
+$('gear').onclick = openSheet; scm.onclick = closeSheet; $('sClose').onclick = closeSheet;
 var dy0 = null, sy = 0;
 sheet.addEventListener('pointerdown', function (e) { if (sheet.scrollTop <= 0 && e.target.closest && !e.target.closest('button')) { dy0 = e.clientY; sy = 0; } });
 sheet.addEventListener('pointermove', function (e) { if (dy0 == null) return; sy = e.clientY - dy0; if (sy > 0) { sSp.stop(); sSp.cb(clamp(sy / sheet.offsetHeight / 1.1, 0, 1)); } });
@@ -2072,6 +2090,7 @@ window.__resume = function () {
   if (updDue()) updCheck(false); else updAuto(); if (!busy && (autoDue() || launchDue())) refresh(false); };
 document.addEventListener('visibilitychange', function () { if (!document.hidden) window.__resume(); });
 window.addEventListener('beforeunload', function () { if (curModel && nav.lvl === 0) { var a = curModel.getAnchor(); if (a) ls.set('pp.last', a); } });
+window.__gateTest = function (ms) { gateT0 = Date.now() - ms; db.ready = false; overlay(); };      // فقط برای آزمون
 window.__pp = { newsStale: function (mode) { news.t = 1; ls.set('pp.newsTry', 0); newsLoad(mode); }, voice: function (a) { return voiceGo(a); }, setHide: function (id, on) { var m = MD_BY[id]; if (on && m) set.hide[id] = BR_BY[m.brandId].name + ' | ' + m.name; else delete set.hide[id]; ls.set('pp.set', set); rebuild(); renderSheet(); }, get fav() { return set.fav; }, openFav: openFav, openSearch: openSearch, get allBrands() { return ALLB; }, open: openEntry, up: goUp, view: viewImg, closeView: closeViewer, get nav() { return nav; }, get tree() { return TREE; }, get gate() { var ps = photoStat(); return { need: ps.need, have: ps.have, ready: !!db.ready, tot: imgTot, left: imgLeft(), ok: imgOk, bad: imgBad }; }, mount: function (m) { var t = performance.now(); set.model = m; mountModel(curModel ? curModel.getAnchor() : null); return performance.now() - t; }, get model() { return curModel; }, get list() { return list; }, get flat() { return FLAT; }, get state() { return { db: db, st: stt, busy: busy, imgLoc: imgLoc }; }, refresh: refresh, net: net };
 
 /* شروع */

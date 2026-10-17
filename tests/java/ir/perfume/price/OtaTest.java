@@ -131,6 +131,7 @@ public class OtaTest {
         chk("state: new", o.state(i157).equals("new"));
         chk("state: همان نسخه = same", o.state(info(z157, 156, "1.33", 2)).equals("same"));
         chk("state: api بالاتر = apk", o.state(info(z157, 157, "1.33", 3)).equals("apk"));
+        chk("state: شماره‌ی خیلی جلوتر از APK (دروغین) = same، نه نصبِ دائمی", o.state(info(z157, 156 + Ota.MAX_AHEAD + 1, "1.33", 2)).equals("same") && o.state(info(z157, 156 + Ota.MAX_AHEAD, "1.33", 2)).equals("new"));
         net.infoJson = "{\"code\":157,\"v\":\"1.33\",\"api\":2,\"size\":" + z157.length + ",\"sha\":\"" + sha(z157) + "\"}";
         Ota.Info f = o.fetchInfo(net);
         chk("fetchInfo", f.code == 157 && f.v.equals("1.33") && f.sha.equals(sha(z157)));

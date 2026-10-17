@@ -45,5 +45,5 @@ var net={get:async function(u){var m=/[?&]page=(\d+)/.exec(u);if(m){if(+m[1]>1)r
   var net0=net.get;net.get=async function(u){if(/multi/.test(u))return {status:200,body:PAGE2};return net0(u)};
   var rm=await C.wooSource('https://liliome.com',net,function(){},'full');
   eq(/میل/.test(rm.items[0].t),false,'page with several sizes is not guessed: '+rm.items[0].t);
-  console.log(ok,'ok',bad,'bad');
+  console.log(ok,'ok',bad,'bad'); process.exit(bad?1:0);
 })();

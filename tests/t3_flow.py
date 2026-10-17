@@ -132,7 +132,7 @@ async def main():
         # ---- ۷) عکس‌های خراب → بطری
         os.environ['NOIMG']='1'
         b,ctx,pg,errs=await load(p,360,780,'dark',"localStorage.setItem('pp.set',JSON.stringify({theme:'dark',model:'c'}));window.Native.cacheImg=function(id){setTimeout(function(){window.__imgFail&&window.__imgFail(id)},2)};"); await ready(pg); await pg.wait_for_timeout(1500)
-        chk('broken photos -> bottle fallback',await pg.evaluate("document.querySelectorAll('.tile.fb svg').length")>5 and await pg.evaluate("document.querySelectorAll('.tile img').length")==0 or True)
+        chk('broken photos -> bottle fallback',await pg.evaluate("document.querySelectorAll('.tile.fb svg').length")>5 and await pg.evaluate("document.querySelectorAll('.tile img').length")==0)
         info=await pg.evaluate("[document.querySelectorAll('.tile.fb svg').length,document.querySelectorAll('.tile img').length]")
         chk('fallback bottles rendered',info[0]>5,info)
         await b.close(); os.environ['NOIMG']='0'

@@ -49,6 +49,7 @@ final class Ota {
     /** این‌قدر بار پشت‌سرهم باز شدنِ برنامه بدون «زنده‌ام» از صفحه، یعنی بسته خراب است */
     static final int MAX_TRIES = 3;
     static final long MAX_CODE = 1000000000L;
+    static final int MAX_AHEAD = 5000;      // بسته‌ی OTA حداکثر این‌قدر از شماره‌ی APK جلوتر باشد
     private static final Pattern NAME_OK = Pattern.compile("[A-Za-z0-9_][A-Za-z0-9_.\\-/]{0,119}");
     private static final Set<String> EXT = new HashSet<String>();
     static {
@@ -369,6 +370,7 @@ final class Ota {
     String state(Info i) {
         if (i.api > NATIVE_API) return "apk";
         if (i.code <= webCode() || i.code <= badCode()) return "same";
+        if (apkCode > 0 && i.code > (long) apkCode + MAX_AHEAD) return "same";      // شماره‌ی بسته‌ی دروغین/اشتباهی (خیلی جلوتر از APK) نباید برنامه را برای همیشه به نسخه‌ی قدیمی میخکوب کند
         if (failCount() >= 2) return "apk";
         return "new";
     }

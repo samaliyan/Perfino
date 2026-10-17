@@ -85,6 +85,7 @@ public class HttpTest {
         // قاعده‌ی سایت‌ها
         Http.Policy sites = Http.sitesOnly(new String[]{"liliome.com", "digikala.com"});
         chk("sitesOnly: https on an allowed site and its subdomain", sites.allow(new URL("https://liliome.com/x")) && sites.allow(new URL("https://www.digikala.com/y")));
+        chk("sitesOnly: refuses userinfo tricks", !sites.allow(new URL("https://liliome.com@evil.com/")) && !sites.allow(new URL("https://user:pw@liliome.com/")));
         chk("sitesOnly: refuses http, other hosts and look-alikes", !sites.allow(new URL("http://liliome.com/x")) && !sites.allow(new URL("https://evil.com/")) && !sites.allow(new URL("https://notliliome.com/")) && !sites.allow(new URL("https://liliome.com.evil.com/")));
 
         // قاعده‌ی عکس‌ها

@@ -69,6 +69,8 @@ jobs:
           java -Dstdout.encoding=UTF-8 -cp "$RUNNER_TEMP/jt" ir.perfume.price.OtaTest "${{ steps.p.outputs.dir }}/app/src/main/assets/www" "$RUNNER_TEMP/ota"
           java -Dstdout.encoding=UTF-8 -cp "$RUNNER_TEMP/jt" ir.perfume.price.GuardTest
           java -Dstdout.encoding=UTF-8 -cp "$RUNNER_TEMP/jt" ir.perfume.price.HttpTest
+      - name: Core logic tests (Node; a failing test stops the release)
+        run: bash tests/run_node.sh
       - uses: actions/upload-artifact@v4
         with:
           name: PerfumePrice-apk

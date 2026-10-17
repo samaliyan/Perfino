@@ -41,7 +41,6 @@ var L=C.buildList(db,['liliome','digikala','safir'],{liliome:1,digikala:1},0);
   T(names.filter(function(n){return /sauvage elixir|ساواج الکسیر/i.test(n)}).length===1,lang+': Sauvage Elixir appears once',names);
   var el=d.models.filter(function(m){return /sauvage elixir|ساواج الکسیر/i.test(m.name)})[0];
   T(el&&el.variants.length===1&&el.variants[0].sizes.length===1&&el.variants[0].sizes[0].srcs.length>=3,lang+': Elixir has 60ml with ≥3 sources (liliome,digikala,safir)',el&&el.variants.map(function(v){return v.sizes}));
-  T(!names.some(function(n){return /miss|میس/i.test(n)&&false}),'-');
 });
 var au=C.tree(L,'fa',db.wd).audit;
 T(au.nb>=1,'bare "Dior EDP" removed (nb='+au.nb+')',au.bare);

@@ -60,5 +60,24 @@ function range(a,b){var r=[];for(var i=a;i<=b;i++)r.push(i);return r}
   var r8=await C.wooSource('https://x.shop',s8,function(){},'full');
   var seen={};r8.items.forEach(function(x){seen[x.id]=(seen[x.id]||0)+1});
   eq(Object.keys(seen).every(function(k){return seen[k]===1}),true,'no product twice');
+  // ۹) دیجی‌کالا: ۱۵ صفحه‌ی پشت‌سرهم خراب → توقف؛ بعد دوباره‌خوانی همان‌ها خوب شد، ولی صفحه‌های نخواسته‌شده را «کامل» حساب نکن
+  function dkp(i){return {id:i,title_fa:'عطر ادکلن تست '+i,images:{main:{url:['https://x/i.jpg']}},default_variant:{price:{selling_price:50000000+i}},status:'marketable'}}
+  var DKP=[];for(var q=0;q<100;q++){var pg=[];for(var z=0;z<20;z++)pg.push(dkp(q*20+z+1));DKP.push(pg)}
+  function dkserver(o){var tries={};return {get:async function(u){var m=/page=(\d+)/.exec(u);var p=+m[1];tries[p]=(tries[p]||0)+1;
+    if(o.flaky&&o.flaky.indexOf(p)>=0&&tries[p]<=o.n)return {status:503,body:''};
+    if(o.empty&&o.empty.indexOf(p)>=0)return {status:200,body:JSON.stringify({data:{products:[],pager:{total_pages:100}}})};
+    return {status:200,body:JSON.stringify({data:{products:DKP[p-1],pager:{total_pages:100}}})}}}}
+  var d1=await C.digikalaSource(dkserver({flaky:range(60,80),n:3}),function(){},'full');
+  eq(d1.complete,false,'Digikala: pages never requested are not counted as complete: '+d1.note);
+  eq(d1.items.length<2000,true,'...and the list really is partial: '+d1.items.length);
+  var d2=await C.digikalaSource(dkserver({flaky:range(5,9),n:4}),function(){},'full');
+  eq([d2.items.length,d2.complete],[2000,true],'Digikala: short outage recovered: '+d2.items.length+' '+d2.note);
+  var d3=await C.digikalaSource(dkserver({empty:range(90,95)}),function(){},'full');
+  eq(d3.complete,false,'Digikala: empty pages before the last page are an error, not the end: '+d3.note);
+  // ۱۰) ووکامرس: صفحه‌ی خالی وقتی صفحه‌ی قبلش خراب بود پایان حساب نمی‌شود
+  var s10=server({dead:[9],st:503}),g10=s10.get;
+  s10.get=async function(u){var m=/[?&]page=(\d+)/.exec(u);if(m&&+m[1]===10)return {status:200,body:'[]'};return g10(u)};
+  var r10=await C.wooSource('https://x.shop',s10,function(){},'full');
+  eq(r10.complete,false,'empty page after a failed page is not accepted as the end: '+r10.note);
   console.log('PASS',ok,'FAIL',bad);process.exit(bad?1:0);
 })();

@@ -43,6 +43,7 @@ class Updater {
     private volatile File apk;
     private volatile int apkCode = 0;
     private BroadcastReceiver rx;
+    private volatile String tok;
     private volatile int sessId = -1;
     private volatile boolean installing = false;
 
@@ -182,7 +183,7 @@ class Updater {
             if (rx == null) {
                 rx = new BroadcastReceiver() {
                     @Override public void onReceive(Context ctx, Intent it) {
-                        if (it.getIntExtra(PackageInstaller.EXTRA_SESSION_ID, -2) != sessId) return;      // فقط پاسخِ نصبِ خودِ ما (برنامه‌ی دیگر نتواند پیام جعلی بفرستد)
+                        if (it.getIntExtra(PackageInstaller.EXTRA_SESSION_ID, -2) != sessId || tok == null || !tok.equals(it.getStringExtra("tok"))) return;      // فقط پاسخِ نصبِ خودِ ما: شماره‌ی نشست + رمزِ تصادفیِ همین نصب (در اندروید قدیمی‌تر از ۱۳ هر برنامه‌ای می‌تواند به گیرنده پیام بفرستد و نیت بدهد)      // فقط پاسخِ نصبِ خودِ ما (برنامه‌ی دیگر نتواند پیام جعلی بفرستد)
                         int st = it.getIntExtra(PackageInstaller.EXTRA_STATUS, -999);
                         if (st == PackageInstaller.STATUS_PENDING_USER_ACTION) {
                             Intent c = it.getParcelableExtra(Intent.EXTRA_INTENT);
@@ -209,7 +210,8 @@ class Updater {
                 byte[] buf = new byte[65536]; int n;
                 while ((n = in.read(buf)) > 0) o.write(buf, 0, n);
                 s.fsync(o); in.close(); o.close();
-                Intent it = new Intent(ACTION).setPackage(act.getPackageName());
+                tok = java.util.UUID.randomUUID().toString();
+                Intent it = new Intent(ACTION).setPackage(act.getPackageName()).putExtra("tok", tok);
                 int fl = PendingIntent.FLAG_UPDATE_CURRENT | (Build.VERSION.SDK_INT >= 31 ? PendingIntent.FLAG_MUTABLE : 0);
                 PendingIntent pend = PendingIntent.getBroadcast(act, id, it, fl);
                 s.commit(pend.getIntentSender());

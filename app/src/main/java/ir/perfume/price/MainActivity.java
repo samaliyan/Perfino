@@ -42,7 +42,10 @@ import java.util.concurrent.Executors;
 public class MainActivity extends Activity {
     private WebView web;
     private FrameLayout root;
+    private static long rgT;
+    private static int rgN;
     private volatile Uri lastBackup;
+    private volatile String lastBackupText;      // اندروید ۹ و قدیمی‌تر: بدون FileProvider فایل را نمی‌شود فرستاد؛ خودِ متن فرستاده می‌شود
     private final ExecutorService pool = Executors.newFixedThreadPool(8);
     private final ExecutorService imgPool = Executors.newFixedThreadPool(3);
     private File imgDir;
@@ -124,7 +127,9 @@ public class MainActivity extends Activity {
         s.setJavaScriptEnabled(true);
         s.setDomStorageEnabled(true);
         s.setAllowFileAccess(true);
-        s.setMixedContentMode(WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE);
+        s.setAllowFileAccessFromFileURLs(false);       // صریحاً بسته (پیش‌فرضِ نسخه‌های جدید هم همین است)
+        s.setAllowUniversalAccessFromFileURLs(false);
+        s.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
         s.setCacheMode(WebSettings.LOAD_DEFAULT);
         s.setSupportZoom(false);
         s.setTextZoom(100); // اندازه‌ی فونت سیستم نوشته‌ها را به‌هم نریزد
@@ -139,7 +144,11 @@ public class MainActivity extends Activity {
             @Override
             public boolean onRenderProcessGone(WebView v, android.webkit.RenderProcessGoneDetail d) {
                 if (guard != null) guard.renderGone(d != null && d.didCrash());      // خرابیِ دوم در دو دقیقه: بسته‌ی بی‌نصب کنار گذاشته می‌شود (بسته شدن برای کمبود حافظه شمرده نمی‌شود)
-                runOnUiThread(new Runnable() { @Override public void run() { recreate(); } });   // WebView مرده قابل استفاده نیست؛ صفحه از نو ساخته می‌شود
+                long now = System.currentTimeMillis();
+                if (now - rgT > 60000) rgN = 0;
+                rgT = now; rgN++;
+                final boolean again = rgN <= 3;      // پشت‌سرهم بیش از سه بار مرد: حلقه‌ی بی‌پایان نساز، برنامه بسته شود
+                runOnUiThread(new Runnable() { @Override public void run() { if (again) recreate(); else finish(); } });   // WebView مرده قابل استفاده نیست؛ صفحه از نو ساخته می‌شود
                 return true;
             }
         });
@@ -425,6 +434,7 @@ public class MainActivity extends Activity {
                 File f = new File(dir, safe);
                 FileOutputStream fo = new FileOutputStream(f);
                 try { fo.write(data); } finally { fo.close(); }
+                lastBackupText = data.length <= 100000 ? text : null;      // محدودیتِ Binder حدود ۱ مگابایت است
                 return f.getAbsolutePath();
             } catch (Exception e) {
                 return "";
@@ -435,14 +445,15 @@ public class MainActivity extends Activity {
         @JavascriptInterface
         public boolean shareBackup() {
             final Uri u = lastBackup;
-            if (u == null) return false;
+            final String tx = lastBackupText;
+            if (u == null && tx == null) return false;
             runOnUiThread(new Runnable() {
                 @Override public void run() {
                     try {
                         Intent send = new Intent(Intent.ACTION_SEND);
                         send.setType("text/plain");
-                        send.putExtra(Intent.EXTRA_STREAM, u);
-                        send.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                        if (u != null) { send.putExtra(Intent.EXTRA_STREAM, u); send.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION); }
+                        else send.putExtra(Intent.EXTRA_TEXT, tx);
                         startActivity(Intent.createChooser(send, "ارسال پشتیبان"));
                     } catch (Exception ignore) { }
                 }

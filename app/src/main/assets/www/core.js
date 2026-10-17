@@ -88,7 +88,7 @@ var LINEW = {}; ('intense intenso elixir extreme absolu absolute flame sport noi
 var BAD_CAT = /best ?sellers?|featured|gifts?|new ?arrivals?|^brands?$|\bsale\b|\bkids?\b|\bhome\b|tester|\bmini\b|eau de|\bedt\b|\bedp\b|ادو|عطر|ادکلن|ادکلون|مردانه|زنانه|یونیسکس|بانوان|آقایان|perfume|parfum|cologne|women|men\b|unisex|uncategorized|بدون دسته|^برند|فروشگاه|محصولات|پرفروش|جدید|تخفیف|پک|ست\b|گیفت|لوازم|آرایش|بهداشت|پوست|اسپری|بادی|خوشبو|نیش|niche|لوکس|luxury|عربی|arabic|اورجینال|original|متفرقه|سایر|نامشخص|other|generic|unknown|no brand|^all$|همه/i;
 function brandHints(cats) {
   var o = [];
-  (cats || []).forEach(function (c) {
+  (Array.isArray(cats) ? cats : []).forEach(function (c) {
     var n = typeof c === 'string' ? c : (c && c.name) || '';
     n = decodeEnt(n).replace(/\s+/g, ' ').trim();
     if (n && n.length <= 40 && !BAD_CAT.test(n) && o.indexOf(n) < 0) o.push(n);
@@ -351,7 +351,7 @@ function letterOf(name, lang) {
 /* ---------- یکی‌کردن نام‌ها ---------- */
 function dels(w) { var o = [w]; for (var i = 0; i < w.length; i++) o.push(w.slice(0, i) + w.slice(i + 1)); return o; }   // همسایگیِ «حذف یک حرف» برای یافتنِ سریعِ واژه‌های یک‌ویرایشی
 function Index() { this.m = {}; this.fz = {}; this.xm = {}; }
-var XK = {}, XK_N = 0;
+var XK = {}, XK_N = 0, CAND_MAX = 150;
 function xk(w) {      // کلیدِ مستقل از خط (فارسی/لاتین): اسکلتِ همخوان‌ها
   var h = XK[w]; if (h !== undefined) return h;
   var k = null;
@@ -369,11 +369,17 @@ Index.prototype.add = function (g) {
 };
 Index.prototype.cands = function (key, fuzz) {   // شناسه‌ی گروه‌هایی که حداقل یک واژه‌ی (تقریباً) یکسان دارند
   var cand = {}, m = this.m, fz = this.fz;
-  key.forEach(function (w) { (m[w] || []).forEach(function (g) { cand[g] = 1; }); });
-  if (fuzz) key.forEach(function (w) { var x = xk(w); if (x && this.xm[x]) this.xm[x].forEach(function (g) { cand[g] = 1; }); }, this);
+  var kk = key;
+  if (key.length > 1) {      // واژه‌ی خیلی پرتکرار (برند، «ادو»، «اینتنس») همه‌ی گروه‌ها را نامزد می‌کند و کار را درجه‌دو می‌کند: اگر واژه‌ی کم‌تکرارتری هست، فقط آن‌ها
+    var rare = key.filter(function (w) { return (m[w] || []).length <= CAND_MAX; });
+    if (rare.length) kk = rare;
+  }
+  kk.forEach(function (w) { (m[w] || []).forEach(function (g) { cand[g] = 1; }); });
+  var cap = key.length > 1 ? CAND_MAX * 3 : 1e9;      // نامزدِ فازی هم: دسته‌ی بزرگ (برند) را نادیده بگیر؛ نامِ یکسان واژه‌های دیگری هم دارد
+  if (fuzz) key.forEach(function (w) { var x = xk(w); if (x && this.xm[x] && this.xm[x].length <= cap) this.xm[x].forEach(function (g) { cand[g] = 1; }); }, this);
   if (fuzz) key.forEach(function (w) {
     if (w.length < 3 || w.length > 24 || /\d/.test(w)) return;
-    dels(w).forEach(function (k) { (fz[k] || []).forEach(function (iw) { if (iw !== w && tokEq(iw, w)) m[iw].forEach(function (x) { cand[x] = 1; }); }); });
+    dels(w).forEach(function (k) { (fz[k] || []).forEach(function (iw) { if (iw !== w && m[iw].length <= cap && tokEq(iw, w)) m[iw].forEach(function (x) { cand[x] = 1; }); }); });
   });
   return Object.keys(cand);
 };
@@ -984,7 +990,15 @@ function junkTok(w) { var n = normFa(w); return !n || YEAR_RE.test(n) || /^\d{5,
 function cleanBrandName(h) {                      // نامِ برندِ گرفته‌شده از دسته‌بندیِ سایت: سال و واژه‌ی تبلیغاتی و کد نمی‌خواهد
   return String(h).split(/\s+/).filter(function (w) { return w && !junkTok(w); }).join(' ').replace(/\s*&\s*/g, ' & ').trim();
 }
-function brandOf(key, hints, noLine) {
+var BO_C = {}, BO_N = 0;
+function brandOf(key, hints, noLine) {      // بدون راهنمای سایت، تابعی خالص از کلید است (جدولِ برندها ثابت): نتیجه نگه داشته می‌شود
+  if (hints && hints.length) return brandOf0(key, hints, noLine);
+  var ck = (noLine ? 1 : 0) + key.join(' '), r = BO_C[ck];
+  if (r) return r;
+  if (++BO_N > 30000) { BO_C = {}; BO_N = 0; }
+  return (BO_C[ck] = brandOf0(key, hints, noLine));
+}
+function brandOf0(key, hints, noLine) {
   var T = brandTable(), ent = null, unk = null;
   (hints || []).some(function (h) {
     h = cleanBrandName(h);
@@ -1317,11 +1331,11 @@ function resolve(db, idx, G, byG, p, price, src) {
   return cor.length === 1 ? cor[0].id : null;     // مبهم یا ناهم‌خوان → هرگز حدس نمی‌زنیم
 }
 /* گروه‌های دارای ویژگی نامشخص (غلظت/جنسیت) که یک هم‌نامِ مشخص‌تر دارند و قیمتشان فقط با یکی از آن‌ها جور است، به همان بپیوندند */
-function reconcile(db, idx) {
+function* reconcileGen(db, idx) {      // مولّد: هر چند گروه یک‌بار می‌ایستد تا نسخه‌ی ناهمزمان صفحه را قفل نکند
   setLex(db.wd);
   var G = gview(db), byG = pricesByGroup(db), moved = 0, SM = {};
   Object.keys(db.it).forEach(function (sr) { var m = db.it[sr]; Object.keys(m).forEach(function (pid) { var e = m[pid]; if (e[2]) (SM[e[2]] = SM[e[2]] || {})[sr + '|' + e[3]] = 1; }); });
-  Object.keys(G).forEach(function (hid) {
+  function step1(hid) {
     var H = G[hid]; if (!H || !(H.conc === '' || H.gn === '')) return;
     var hp = byG[hid]; if (!hp || !hp.length) return;
     var sib = idx.cands(H.key, true).filter(function (id) {
@@ -1337,10 +1351,11 @@ function reconcile(db, idx) {
     });
     var cor = sib.filter(function (id) { return hp.some(function (x) { return corrob(byG[id], x.ml, [x.p]); }); });
     if (cor.length === 1) { var tt = SM[cor[0]] = SM[cor[0]] || {}; for (var q2 in mine) tt[q2] = 1; moveGroup(db, hid, cor[0]); delete G[hid]; moved++; }
-  });
+  }
+  var K1 = Object.keys(G); for (var i1 = 0; i1 < K1.length; i1++) { step1(K1[i1]); if (i1 % 100 === 99) yield; }
   /* مرحله‌ی ۲: دو گروهِ کاملاً مشخص (غلظت و جنسیت یکی) که فقط خط یا املای نامشان فرق دارد («ورساچه اروس» / Versace Eros) */
   byG = pricesByGroup(db);
-  Object.keys(G).sort(function (x, y) { return +x - +y; }).forEach(function (hid) {
+  function step2(hid) {
     var H = G[hid]; if (!H || H.conc === '' || H.gn === '') return;
     var hp = byG[hid]; if (!hp || !hp.length) return;
     var mine = SM[hid] || {};
@@ -1357,9 +1372,12 @@ function reconcile(db, idx) {
       var tt2 = SM[to] = SM[to] || {}, fm = SM[from] || {}; for (var q3 in fm) tt2[q3] = 1;
       moveGroup(db, from, to); delete G[from]; moved++;
     }
-  });
+  }
+  var K2 = Object.keys(G).sort(function (x, y) { return +x - +y; }); for (var i2 = 0; i2 < K2.length; i2++) { step2(K2[i2]); if (i2 % 100 === 99) yield; }
   return moved;
 }
+function reconcile(db, idx) { var g = reconcileGen(db, idx), r; while (!(r = g.next()).done); return r.value; }
+async function reconcileAsync(db, idx) { var g = reconcileGen(db, idx), r; while (!(r = g.next()).done) await sleep(0); return r.value; }
 /* list: [{id,t,price,img,st}]  st: 0 عادی | 1 ناموجود | 2 عطر نیست | 3 فقط قیمت (عنوان نداریم)
    complete: همه‌ی صفحه‌ها خوانده شد → محصولاتِ دیده‌نشده پاک شوند */
 function ingestStart(db, idx, src) {
@@ -1406,6 +1424,7 @@ function ingestChunk(C, list) {
   var db = C.db, idx = C.idx, src = C.src, M = C.M, G = C.G, seen = C.seen, st = C.st;
   list.forEach(function (x) {
     if (!x || x.id == null) return;                       // ردیفِ خراب یا بی‌شناسه کل تکه را نمی‌اندازد
+    if (typeof x.t === 'string' && x.t.length > 300) x = Object.assign({}, x, { t: x.t.slice(0, 300) });      // عنوانِ غول‌پیکر (ریجکس‌های کند)
     var pid = String(x.id); seen[pid] = 1;
     var cur = M[pid], nowMin = Math.floor(Date.now() / 60000);
     var price = x.st === 1 || !(x.price > 0) ? 0 : x.price;
@@ -1455,7 +1474,7 @@ function purgeStored(db) {      // بیرون‌بردنِ کالاهای ذخی
   return n;
 }
 var DEDUPE_V = 8;
-function ingestEnd(C, complete) {
+function ingestEnd0(C, complete) {
   if (complete) {                                      // فهرستِ ناگهان خیلی کوچک‌تر شده (صفحه‌ی خطا/کپچا): پاک‌سازی نکن
     var live = Object.keys(C.M).filter(function (pid) { return C.M[pid][1] > 0; }), seenN = live.filter(function (pid) { return C.seen[pid]; }).length;      // فقط کالاهای قیمت‌دار شمرده می‌شوند: فروشگاهی که فقط موجودها را می‌دهد، ناموجودِ قبلی را «ندیده» حساب نکند
     if (live.length >= 20 && seenN < live.length * 0.7) { complete = false; C.st.suspect = true; }
@@ -1465,7 +1484,15 @@ function ingestEnd(C, complete) {
     Object.keys(C.M).forEach(function (pid) { if (C.seen[pid]) return; var e = C.M[pid]; if (e[1] > 0) { e[1] = 0; C.st.soldOut = (C.st.soldOut | 0) + 1; } else if (!(e[4] > lim)) { delete C.M[pid]; C.st.removed++; } });
   } else if (complete) Object.keys(C.M).forEach(function (pid) { if (!C.seen[pid]) { delete C.M[pid]; C.st.removed++; } });
   if (C.db.dv !== DEDUPE_V) C.st.purged = purgeStored(C.db);           // نسخه‌ی قاعده‌ها عوض شده: کالاهای ردشده‌ی قبلی از حافظه بیرون بروند
+}
+function ingestEnd(C, complete) {
+  ingestEnd0(C, complete);
   if (C.st.added || C.db.dv !== DEDUPE_V) { C.st.merged = reconcile(C.db, C.idx); C.db.dv = DEDUPE_V; }      // نسخه‌ی قاعده‌ها عوض شده = یک‌بار کل حافظه دوباره بازرسی شود
+  return C.st;
+}
+async function ingestEndAsync(C, complete) {
+  ingestEnd0(C, complete);
+  if (C.st.added || C.db.dv !== DEDUPE_V) { C.st.merged = await reconcileAsync(C.db, C.idx); C.db.dv = DEDUPE_V; }
   return C.st;
 }
 function ingest(db, idx, src, list, complete) {
@@ -1484,7 +1511,7 @@ async function ingestSlices(db, idx, src, list, complete) {
     ingestChunk(C, list.slice(i, i + 250));
     if (i + 250 < list.length) await sleep(0);
   }
-  return ingestEnd(C, complete);
+  return ingestEndAsync(C, complete);
 }
 /* ساخت فهرست نمایشی از db */
 var STALE_MIN = 240;   // دقیقه
@@ -1541,7 +1568,8 @@ function urlJoin(base, h) {
   try { return new URL(h, base).href; } catch (e) { return ''; }
 }
 function titleLooksPerfume(t) {
-  return /عطر|ادکلن|ادکلون|ادو ?(پرفیوم|تویلت|کلن|پارفوم)|edp|edt|parfum|cologne|perfume|eau de/i.test(t);
+  var n = normFa(String(t || ''), true);      // ک/ی عربی و نیم‌فاصله نباید یک عطرِ واقعی را «عطر نیست» کند
+  return /عطر|ادکلن|ادکلون|ادو ?(پرفیوم|تویلت|کلن|پارفوم)|edp|edt|parfum|cologne|perfume|eau de/i.test(n) || /عطر|ادکلن|ادکلون|ادو ?(پرفیوم|تویلت|کلن|پارفوم)|edp|edt|parfum|cologne|perfume|eau de/i.test(String(t || ''));
 }
 
 var CFG = { retryMs: 700, conc: 4 };
@@ -1621,7 +1649,7 @@ async function wooSource(base, net, rep, mode) {
     if (typeof it.is_in_stock !== 'boolean' || it.is_in_stock === false || it.is_purchasable === false || it.is_on_backorder === true || !(v > 0)) st = 1;   // فقط کالای موجود و قابل خرید
     if (pr.price_range && pr.price_range.min_amount !== pr.price_range.max_amount) { st = 1; if (it.type === 'variable' && it.id != null && vparents.length < 80) vparents.push(it); }
     if (it.price_html && OUT_RE.test(normFa(stripTags(it.price_html)))) st = 1;
-    var cats = (it.categories || []).map(function (c) { return c.name; }).join(' ');
+    var cats = (Array.isArray(it.categories) ? it.categories : []).map(function (c) { return c && c.name || ''; }).join(' ');
     var title = name;
     if (name && it.categories && !titleLooksPerfume(name + ' ' + cats)) st = 2;
     else if (!name) st = st === 1 ? 1 : 3;
@@ -1684,13 +1712,13 @@ async function wooSource(base, net, rep, mode) {
   if (first.k === 'fail') throw new Error(first.s ? 'HTTP ' + first.s : (first.b || 'اینترنت وصل نیست'));
   var res = [first], page = 2, ended = first.a.length === 0;            // صفحه‌ی کوتاه = پایان نیست (سایت ممکن است per_page را کم کرده باشد)
   var wIds = {};
-  var pgN = 0;
-  function eat(r) { pgN++; r.a.forEach(function (it) { if (wIds[it.id]) return; wIds[it.id] = 1; out.push(conv(it)); }); }      // فهرستِ زنده وسط کار جابه‌جا می‌شود: یک محصول دو بار نیاید
+  var pgN = 0, badN = 0;
+  function eat(r) { pgN++; r.a.forEach(function (it) { if (!it || typeof it !== 'object' || wIds[it.id]) return; wIds[it.id] = 1; try { out.push(conv(it)); } catch (e) { badN++; } }); }      // یک ردیفِ خراب کلِ فروشگاه را نمی‌اندازد      // فهرستِ زنده وسط کار جابه‌جا می‌شود: یک محصول دو بار نیاید
   function isDup(r) { return r.a.length > 0 && r.a.every(function (it) { return wIds[it.id]; }); }
   eat(first); rep(out.length);
   /* صفحه‌ی خراب بلافاصله شکست حساب نمی‌شود: فشار کم می‌شود (هم‌زمانی کمتر + مکث) و بعد از پایانِ کار، صفحه‌های خراب آرام‌تر دوباره
      خوانده می‌شوند. (گزارش واقعی: ۳۶ صفحه از ۹۰ صفحه‌ی لیلیوم خطا داده بود و عطرهای قدیمی‌تر، مثل کلینیک، هرگز وارد حافظه نشدند.) */
-  var bad = {}, conc = CFG.conc, run = 0, t0 = Date.now();
+  var bad = {}, conc = CFG.conc, run = 0, t0 = Date.now(), lens = { 1: first.a.length };
   function late() { return Date.now() - t0 > 480000; }      // سقفِ ۸ دقیقه برای خواندنِ صفحه‌ها (شبکه‌ی ضعیف بی‌پایان نشود)
   function why(r) { return r.k === 'ok' ? 'صفحه‌ی تکراری' : r.s ? 'HTTP ' + r.s : 'بدون پاسخ'; }
   for (var pass = 0; pass < 4; pass++) {
@@ -1701,7 +1729,10 @@ async function wooSource(base, net, rep, mode) {
         if (ended && r.k === 'ok') { eat(r); return; }
         if (r.k === 'fail') { nf++; run++; bad[ps[i]] = why(r); return; }
         run = 0;
-        if (r.k === 'ok') { if (isDup(r)) { failed++; notes.push('صفحه‌بندی کار نکرد'); ended = true; return; } eat(r); if (r.a.length === 0) ended = true; } else ended = true;
+        if (r.k === 'ok') {
+          if (r.a.length === 0 && !(lens[ps[i] - 1] > 0)) { nf++; run++; bad[ps[i]] = 'صفحه‌ی خالی'; return; }      // صفحه‌ی خالی فقط وقتی پایانِ فهرست است که صفحه‌ی قبلش پر بوده؛ وگرنه خطای موقت است
+          if (isDup(r)) { failed++; notes.push('صفحه‌بندی کار نکرد'); ended = true; return; } lens[ps[i]] = r.a.length; eat(r); if (r.a.length === 0) ended = true;
+        } else ended = true;
       });
       page += ps.length; rep(out.length);
       if (nf) { conc = Math.max(1, conc - 1); await sleep(CFG.retryMs * 2); }
@@ -1713,7 +1744,7 @@ async function wooSource(base, net, rep, mode) {
       for (var k = 0; k < left.length; k += 2) {
         var grp = left.slice(k, k + 2), gr = await Promise.all(grp.map(one));
         gr.forEach(function (r, j) {
-          if (r.k === 'ok' && !isDup(r)) { eat(r); delete bad[grp[j]]; got++; }
+          if (r.k === 'ok' && !isDup(r)) { lens[grp[j]] = r.a.length; if (!r.a.length && lens[grp[j] - 1] > 0) ended = true; eat(r); delete bad[grp[j]]; got++; }
           else if (r.k === 'end') delete bad[grp[j]];      // آن‌طرفِ پایانِ فهرست بود؛ خرابی نیست
           else { bad[grp[j]] = why(r); still.push(grp[j]); }
         });
@@ -1795,6 +1826,7 @@ async function digikalaSource(net, rep, mode) {
     if (r.status !== 200) return { k: 'fail', e: r.status === 0 ? r.body : 'HTTP ' + r.status };
     var j = parseJson(r.body), d = j && j.data;
     if (!d || !Array.isArray(d.products)) return { k: 'fail', e: 'ساختار ناشناخته' };
+    if (!d.products.length) return { k: 'fail', e: 'صفحه‌ی خالی' };      // صفحه‌ی خالی وسطِ فهرست = خطای موقت، نه پایان (وگرنه محصولاتِ بعدی پاک می‌شدند)
     return { k: 'ok', d: d };
   }
   var first = null;
@@ -1802,7 +1834,7 @@ async function digikalaSource(net, rep, mode) {
   if (!first) throw new Error(err || 'دیجی‌کالا جواب نداد');
   var d1 = first.d; eat(d1); rep(out.length, 0);
   total = Math.min(100, (d1.pager && d1.pager.total_pages) || 1);
-  var done = 1, dbad = [];
+  var done = 1, dbad = [], unreq = 0;
   for (var page = 2; page <= total; page += CFG.conc + 1) {
     var ps = []; for (var i = 0; i < CFG.conc + 1 && page + i <= total; i++) ps.push(page + i);
     var rr = await Promise.all(ps.map(function (p) { return one(p, vi); }));
@@ -1810,7 +1842,7 @@ async function digikalaSource(net, rep, mode) {
     rr.forEach(function (r, i) { if (r.k === 'ok') eat(r.d); else dbad.push(ps[i]); });
     done += ps.length; rep(out.length, done / total);
     if (dbad.length > dn0) await sleep(CFG.retryMs * 2);
-    if (dbad.length >= 15) break;      // سایت جواب نمی‌دهد/مسدود کرده؛ بیش از این فشار نیاور
+    if (dbad.length >= 15) { unreq = Math.max(0, total - (page + ps.length - 1)); break; }      // سایت جواب نمی‌دهد/مسدود کرده؛ بیش از این فشار نیاور (صفحه‌های نخواسته‌شده ناقص حساب می‌شوند)
   }
   for (var drd = 1; drd <= 2 && dbad.length; drd++) {      // صفحه‌های خراب آرام‌تر دوباره (دو تا دو تا)
     await sleep(CFG.retryMs * 2 * drd);
@@ -1821,7 +1853,7 @@ async function digikalaSource(net, rep, mode) {
     }
     dbad = dstill;
   }
-  failed += dbad.length;
+  failed += dbad.length + unreq;
   if (!out.length) throw new Error('محصولی پیدا نشد');
   var capped = !(d1.pager && d1.pager.total_pages > 0) || d1.pager.total_pages > 100;
   return { items: out, complete: !failed && total > 0 && !capped, note: failed ? 'ناقص: ' + failed + ' صفحه' : (capped ? 'ناقص: تعداد صفحه‌ها معلوم نیست یا بیش از ۱۰۰ است' : '') };
@@ -2885,7 +2917,7 @@ function searchRank(idx, alts, tools, opts) {
   return out;
 }
 
-root.Core = { probeShop: probeShop, fetchNews: fetchNews, newsMore: newsMore, newsFromWp: newsFromWp, newsFromRss: newsFromRss, newsPickImg: newsPickImg, newsExcerpt: newsExcerpt, NEWS_SRC: NEWS_SRC, liveSearch: liveSearch, liveTerms: liveTerms, liveHit: liveHit, wooLivePrice: wooLivePrice, searchIndex: searchIndex, searchRank: searchRank, searchSimilar: searchSimilar, simWord: simWord, simFold: simFold, srn: srn, fzKey: fzKey, explainTitle: explainTitle, useSz: useSz, sizeFromPage: sizeFromPage, nextDataCards: nextDataCards, RAWC: RAWC, stripPriceTail: stripPriceTail, marketStats: marketStats, marketView: marketView, histNew: histNew, histFix: histFix, histSnap: histSnap, histReport: histReport, purgeStored: purgeStored, setBlock: setBlock, REJ: REJ, vetReason: vetReason, reconcile: reconcile, CLEANSE: CLEANSE, cleanseText: cleanseText, cleanBrandName: cleanBrandName, itemUrl: itemUrl, STALE_MIN: STALE_MIN, fa2en: fa2en, en2fa: en2fa, enTokens: enTokens, titleEn: titleEn, tree: tree, brandOf: brandOf, specInfo: specInfo, enrichTitle: enrichTitle, genderOf: genderOf, nameCmp: nameCmp, CFG: CFG, newDb: newDb, dbIndex: dbIndex, ingest: ingest, ingestAsync: ingestAsync, buildList: buildList, normFa: normFa, parseTitle: parseTitle, aggregate: aggregate, SOURCES: SOURCES, extractCards: extractCards,
+root.Core = { probeShop: probeShop, fetchNews: fetchNews, newsMore: newsMore, newsFromWp: newsFromWp, newsFromRss: newsFromRss, newsPickImg: newsPickImg, newsExcerpt: newsExcerpt, NEWS_SRC: NEWS_SRC, liveSearch: liveSearch, liveTerms: liveTerms, liveHit: liveHit, wooLivePrice: wooLivePrice, searchIndex: searchIndex, searchRank: searchRank, searchSimilar: searchSimilar, simWord: simWord, simFold: simFold, srn: srn, fzKey: fzKey, explainTitle: explainTitle, useSz: useSz, sizeFromPage: sizeFromPage, nextDataCards: nextDataCards, RAWC: RAWC, stripPriceTail: stripPriceTail, marketStats: marketStats, marketView: marketView, histNew: histNew, histFix: histFix, histSnap: histSnap, histReport: histReport, purgeStored: purgeStored, setBlock: setBlock, REJ: REJ, vetReason: vetReason, reconcile: reconcile, reconcileAsync: reconcileAsync, CLEANSE: CLEANSE, cleanseText: cleanseText, cleanBrandName: cleanBrandName, itemUrl: itemUrl, STALE_MIN: STALE_MIN, fa2en: fa2en, en2fa: en2fa, enTokens: enTokens, titleEn: titleEn, tree: tree, brandOf: brandOf, specInfo: specInfo, enrichTitle: enrichTitle, genderOf: genderOf, nameCmp: nameCmp, CFG: CFG, newDb: newDb, dbIndex: dbIndex, ingest: ingest, ingestAsync: ingestAsync, buildList: buildList, normFa: normFa, parseTitle: parseTitle, aggregate: aggregate, SOURCES: SOURCES, extractCards: extractCards,
   wooSource: wooSource, digikalaSource: digikalaSource, htmlSource: htmlSource, letterOf: letterOf, median: median, priceFromText: priceFromText, similar: similar };
 if (typeof module !== 'undefined') module.exports = root.Core;
 })(typeof window !== 'undefined' ? window : globalThis);

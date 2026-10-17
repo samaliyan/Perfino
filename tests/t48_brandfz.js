@@ -34,4 +34,4 @@ db2.t.liliome=db2.t.digikala=Date.now();
 var l2=C.buildList(db2,['liliome','digikala'],{},0),t2=C.tree(l2,'fa',db2.wd);
 T(t2.length===2,'دو برند: دیویدوف و جوپ',t2.map(function(b){return b.name}));
 T(t2.every(function(b){return b.models.length===1&&b.models[0].variants[0].sizes[0].srcs.length===2}),'هر عطر در هر دو فروشگاه یکی شد',t2.map(function(b){return b.name+':'+b.models.length}));
-console.log(ok,'pass',bad,'fail');
+console.log(ok,'pass',bad,'fail'); process.exit(bad?1:0);
