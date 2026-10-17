@@ -770,7 +770,7 @@ var BRAND_LIST = [
 ['لویی ویتون', 'لویی ویتون|لوئی ویتون|لویس ویتون|louis vuitton'], ['ایو روشه', 'ایو روشه|ایو روشر|yves rocher'], ['تیفانی', 'تیفانی|تیفانی اند کو|tiffany'], ['فندی', 'فندی|fendi'],
 ['بالنسیاگا', 'بالنسیاگا|بالنسیاگا|balenciaga'], ['لووه', 'لووه|لوئه|loewe'], ['میزون الهمبرا', 'میزون الهمبرا|مایزون الهمبرا|maison alhambra'], ['الرحاب', 'الرحاب|الرحب|al rehab'],
 ['فرانک الیور', 'فرانک الیور|franck olivier'], ['ارد الزعفران', 'ارد الزعفران|ard al zaafaran'], ['الیزابت آردن', 'الیزابت آردن|الیزابت اردن|elizabeth arden'],
-['استی لودر', 'استی لودر|استی لاودر|estee lauder'], ['کلینیک', 'کلینیک|clinique'], ['سالوادور دالی', 'سالوادور دالی|salvador dali'], ['آنتونیو باندراس', 'آنتونیو باندراس|antonio banderas'],
+['استی لودر', 'استی لودر|استی لاودر|estee lauder'], ['کلینیک', 'کلینیک|کیلینیک|clinique'], ['سالوادور دالی', 'سالوادور دالی|salvador dali'], ['آنتونیو باندراس', 'آنتونیو باندراس|antonio banderas'],
 ['شکیرا', 'شکیرا|shakira'], ['بیانسه', 'بیانسه|beyonce'], ['ریحانا', 'ریحانا|rihanna'], ['پاریس هیلتون', 'پاریس هیلتون|paris hilton'], ['کیم کارداشیان', 'کیم کارداشیان|kim kardashian'],
 ['لیدی گاگا', 'لیدی گاگا|lady gaga'], ['ژاکومو', 'ژاکومو|jacomo'], ['چروتی', 'چروتی|cerruti'], ['روشاس', 'روشاس|rochas'], ['زادیگ و ولتر', 'زادیگ و ولتر|zadig voltaire|zadig and voltaire'],
 ['تام تیلور', 'تام تیلور|tom tailor'],
@@ -1685,26 +1685,54 @@ async function wooSource(base, net, rep, mode) {
   var res = [first], page = 2, ended = first.a.length === 0;            // صفحه‌ی کوتاه = پایان نیست (سایت ممکن است per_page را کم کرده باشد)
   var wIds = {};
   var pgN = 0;
-  function eat(r) { pgN++; r.a.forEach(function (it) { wIds[it.id] = 1; out.push(conv(it)); }); }
+  function eat(r) { pgN++; r.a.forEach(function (it) { if (wIds[it.id]) return; wIds[it.id] = 1; out.push(conv(it)); }); }      // فهرستِ زنده وسط کار جابه‌جا می‌شود: یک محصول دو بار نیاید
   function isDup(r) { return r.a.length > 0 && r.a.every(function (it) { return wIds[it.id]; }); }
   eat(first); rep(out.length);
-  while (!ended && page <= 90) {
-    var ps = []; for (var i = 0; i < CFG.conc; i++) ps.push(page + i);
-    var rr = await Promise.all(ps.map(one));
-    rr.forEach(function (r, i) {
-      if (ended && r.k === 'ok') { eat(r); return; }
-      if (r.k === 'fail') { failed++; notes.push('صفحه ' + ps[i] + ' نشد'); return; }
-      if (r.k === 'ok') { if (isDup(r)) { failed++; notes.push('صفحه‌بندی کار نکرد'); ended = true; return; } eat(r); if (r.a.length === 0) ended = true; } else ended = true;
-    });
-    page += CFG.conc; rep(out.length);
+  /* صفحه‌ی خراب بلافاصله شکست حساب نمی‌شود: فشار کم می‌شود (هم‌زمانی کمتر + مکث) و بعد از پایانِ کار، صفحه‌های خراب آرام‌تر دوباره
+     خوانده می‌شوند. (گزارش واقعی: ۳۶ صفحه از ۹۰ صفحه‌ی لیلیوم خطا داده بود و عطرهای قدیمی‌تر، مثل کلینیک، هرگز وارد حافظه نشدند.) */
+  var bad = {}, conc = CFG.conc, run = 0, t0 = Date.now();
+  function late() { return Date.now() - t0 > 480000; }      // سقفِ ۸ دقیقه برای خواندنِ صفحه‌ها (شبکه‌ی ضعیف بی‌پایان نشود)
+  function why(r) { return r.k === 'ok' ? 'صفحه‌ی تکراری' : r.s ? 'HTTP ' + r.s : 'بدون پاسخ'; }
+  for (var pass = 0; pass < 4; pass++) {
+    while (!ended && page <= 90 && run < 12 && !late()) {      // ۱۲ صفحه‌ی پشت‌سرهم خراب: مکث؛ سایت یا شبکه قطع است، بیش از این فشار نیاور
+      var ps = []; for (var i = 0; i < conc; i++) ps.push(page + i);
+      var rr = await Promise.all(ps.map(one)), nf = 0;
+      rr.forEach(function (r, i) {
+        if (ended && r.k === 'ok') { eat(r); return; }
+        if (r.k === 'fail') { nf++; run++; bad[ps[i]] = why(r); return; }
+        run = 0;
+        if (r.k === 'ok') { if (isDup(r)) { failed++; notes.push('صفحه‌بندی کار نکرد'); ended = true; return; } eat(r); if (r.a.length === 0) ended = true; } else ended = true;
+      });
+      page += ps.length; rep(out.length);
+      if (nf) { conc = Math.max(1, conc - 1); await sleep(CFG.retryMs * 2); }
+    }
+    var left = Object.keys(bad).map(Number).sort(function (a, b) { return a - b; }).slice(0, 60), got = 0;
+    for (var rd = 1; rd <= 2 && left.length && !late(); rd++) {
+      await sleep(CFG.retryMs * 2 * rd);
+      var still = [];
+      for (var k = 0; k < left.length; k += 2) {
+        var grp = left.slice(k, k + 2), gr = await Promise.all(grp.map(one));
+        gr.forEach(function (r, j) {
+          if (r.k === 'ok' && !isDup(r)) { eat(r); delete bad[grp[j]]; got++; }
+          else if (r.k === 'end') delete bad[grp[j]];      // آن‌طرفِ پایانِ فهرست بود؛ خرابی نیست
+          else { bad[grp[j]] = why(r); still.push(grp[j]); }
+        });
+      }
+      left = still; rep(out.length);
+    }
+    if (!(!ended && page <= 90 && run >= 12 && got > 0) || late()) break;      // سایت برگشت: ادامه از همان‌جا که مکث کرده بودیم
+    run = 0;
   }
+  var badKeys = Object.keys(bad), why2 = {};
+  failed += badKeys.length; badKeys.forEach(function (k) { why2[bad[k]] = (why2[bad[k]] || 0) + 1; });
+  var whyTx = Object.keys(why2).map(function (k) { return k + '×' + why2[k]; }).join('، ');
   if (!out.length) throw new Error('محصولی پیدا نشد');
   var vN = 0;
   if (vparents.length) vN = await expandVariants(vparents, out);
   var szN = 0;
   if (!fields) szN = await fillSizes(base, out, net);
   var dn = (!fields && diag.total) ? ' · قیمت‌دار ' + diag.priced + ' از ' + diag.total + ' · اندازه از عنوان ' + diag.sizeTitle + '، از توضیحات ' + diag.sizeSpec + '، بدون اندازه ' + diag.noSize + (diag.sample ? ' (نمونه: ' + diag.sample + ')' : '') : '';
-  return { items: out, complete: ended && !failed ? (stk ? 'soft' : true) : false, note: (failed ? 'ناقص: ' + failed + ' صفحه' : '') + (!ended && !failed ? 'ناقص: به سقفِ ۹۰ صفحه رسید' : '') + ' · ' + pgN + ' صفحه' + (stk ? ' فقط موجود' : ' بی‌فیلتر') + dn + (szN ? ' · اندازه از صفحه‌ی محصول ' + szN : '') + (vN ? ' · اندازه‌های محصولِ چنداندازه‌ای ' + vN : ''), diag: diag };
+  return { items: out, complete: ended && !failed ? (stk ? 'soft' : true) : false, note: (failed ? 'ناقص: ' + failed + ' صفحه' + (whyTx ? ' (' + whyTx + ')' : '') : '') + (!ended && !failed && page > 90 ? 'ناقص: به سقفِ ۹۰ صفحه رسید' : '') + (!ended && page <= 90 ? (failed ? '' : 'ناقص:') + ' خواندن در صفحه‌ی ' + page + ' متوقف شد' : '') + ' · ' + pgN + ' صفحه' + (stk ? ' فقط موجود' : ' بی‌فیلتر') + dn + (szN ? ' · اندازه از صفحه‌ی محصول ' + szN : '') + (vN ? ' · اندازه‌های محصولِ چنداندازه‌ای ' + vN : ''), diag: diag };
 }
 
 /* ---------- بررسی زنده‌ی یک فروشگاه برای گزارش تشخیص ----------
@@ -1774,13 +1802,26 @@ async function digikalaSource(net, rep, mode) {
   if (!first) throw new Error(err || 'دیجی‌کالا جواب نداد');
   var d1 = first.d; eat(d1); rep(out.length, 0);
   total = Math.min(100, (d1.pager && d1.pager.total_pages) || 1);
-  var done = 1;
+  var done = 1, dbad = [];
   for (var page = 2; page <= total; page += CFG.conc + 1) {
     var ps = []; for (var i = 0; i < CFG.conc + 1 && page + i <= total; i++) ps.push(page + i);
     var rr = await Promise.all(ps.map(function (p) { return one(p, vi); }));
-    rr.forEach(function (r) { if (r.k === 'ok') eat(r.d); else failed++; });
+    var dn0 = dbad.length;
+    rr.forEach(function (r, i) { if (r.k === 'ok') eat(r.d); else dbad.push(ps[i]); });
     done += ps.length; rep(out.length, done / total);
+    if (dbad.length > dn0) await sleep(CFG.retryMs * 2);
+    if (dbad.length >= 15) break;      // سایت جواب نمی‌دهد/مسدود کرده؛ بیش از این فشار نیاور
   }
+  for (var drd = 1; drd <= 2 && dbad.length; drd++) {      // صفحه‌های خراب آرام‌تر دوباره (دو تا دو تا)
+    await sleep(CFG.retryMs * 2 * drd);
+    var dstill = [];
+    for (var dk = 0; dk < dbad.length; dk += 2) {
+      var dgrp = dbad.slice(dk, dk + 2), dgr = await Promise.all(dgrp.map(function (p) { return one(p, vi); }));
+      dgr.forEach(function (r, j) { if (r.k === 'ok') eat(r.d); else dstill.push(dgrp[j]); });
+    }
+    dbad = dstill;
+  }
+  failed += dbad.length;
   if (!out.length) throw new Error('محصولی پیدا نشد');
   var capped = !(d1.pager && d1.pager.total_pages > 0) || d1.pager.total_pages > 100;
   return { items: out, complete: !failed && total > 0 && !capped, note: failed ? 'ناقص: ' + failed + ' صفحه' : (capped ? 'ناقص: تعداد صفحه‌ها معلوم نیست یا بیش از ۱۰۰ است' : '') };
