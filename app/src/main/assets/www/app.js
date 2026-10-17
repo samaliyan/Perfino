@@ -1,7 +1,7 @@
 (function () {
 'use strict';
 var RM = !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
-var VERSION = '1.36';
+var VERSION = '1.37';
 var myCode = (function () { var m = /\/b(\d{1,10})\/index\.html$/.exec(String(location.pathname || '')); return m ? m[1] : '0'; })();      // نسخه‌ی این صفحه از روی آدرسش؛ در گزارش‌ها به جاوا فرستاده می‌شود تا صفحه‌ی کهنه نتواند نسخه‌ی تازه را «سالم» اعلام کند
 function otaCall(n) { try { if (window.Native && typeof window.Native[n] === 'function') window.Native[n](myCode); } catch (e) { } }
 otaCall('otaBoot');      // «جاوااسکریپتِ این صفحه شروع شد»: برنامه به صفحه‌ی بی‌نصب مهلتِ بیشتری برای ساختن فهرست می‌دهد
@@ -760,7 +760,14 @@ function mkRender() {
   Array.prototype.forEach.call($('mkt2').children, function (b) { b.classList.toggle('on', b.dataset.t === mkTab); });
   var h = '', V = mkView(), hs = mkTab === 'news' || mkTab === 'chg';
   var R = hs ? Core.histReport(hist, FLAT, Date.now(), { thr: 0.08, sig: order().join(','), lab: function (g) { return [GN[g.gn], g.conc].filter(Boolean).join(' · '); } }) : null;
-  if (R) { ['up', 'down', 'gone', 'back', 'low', 'fresh'].forEach(function (k) { R[k] = R[k].filter(vis); }); mkChgN = R.down.length + R.up.length + R.fresh.length + R.back.length + R.gone.length; }
+  if (R) {
+    ['up', 'down', 'gone', 'back', 'low', 'fresh'].forEach(function (k) { R[k] = R[k].filter(vis); });
+    /* شمارنده‌ی تبِ «قیمت‌ها» = تعدادِ تغییرهایی که هنوز ندیده‌ای. با باز کردنِ تبِ «قیمت‌ها» دیده حساب می‌شوند و عدد محو می‌شود؛ فقط تغییرِ تازه دوباره عدد می‌آورد */
+    var ck = []; [['down', 'd'], ['up', 'u'], ['fresh', 'f'], ['back', 'b'], ['gone', 'g']].forEach(function (c) { R[c[0]].forEach(function (r) { ck.push(c[1] + ':' + r.k); }); });
+    var sn = ls.get('pp.chgSeen', []), sm = {}; if (Array.isArray(sn)) sn.forEach(function (k) { sm[k] = 1; });
+    mkChgN = ck.filter(function (k) { return !sm[k]; }).length;
+    if (mkTab === 'chg') { ls.set('pp.chgSeen', ck); mkChgN = 0; }      // دیده شد (فهرستِ دیده‌شده با فهرستِ فعلی عوض می‌شود تا بزرگ نشود؛ تغییری که رفت و دوباره آمد، تازه حساب می‌شود)
+  }
   var ct = $('mkt2').querySelector('[data-t="chg"]'); if (ct) ct.innerHTML = 'قیمت‌ها' + (mkChgN ? '<i>' + (mkChgN > 99 ? '۹۹+' : fa(mkChgN)) + '</i>' : '');      // شمارنده: چند عطر قیمت یا موجودی‌شان عوض شده
   var dealRow = function (r) {
     return mkRow(r, ['gn', pct(r.pct) + ' اختلاف', '<span class="pnum">' + tm(r.d) + '</span> فرق'], 'ارزان‌تر: ' + esc(srcName(r.loS)) + '، ' + pzh(r.lo, 'dn') + '<br>گران‌تر: ' + esc(srcName(r.hiS)) + '، ' + pzh(r.hi, 'up'));
