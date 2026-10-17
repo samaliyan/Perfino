@@ -26,7 +26,7 @@ final class Http {
         boolean truncated;      // پاسخ از maxBytes بزرگ‌تر بود و ادامه‌اش خوانده نشد
     }
 
-    /** قاعده‌ی برنامه برای کار با سایت‌ها: فقط https و فقط همان چهار سایت (و زیردامنه‌هایشان) */
+    /** قاعده‌ی برنامه برای کار با سایت‌ها: فقط https و فقط سایت‌های فهرست (و زیردامنه‌هایشان) */
     static Policy sitesOnly(final String[] hosts) {
         return new Policy() {
             @Override public boolean allow(URL u) {

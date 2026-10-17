@@ -1,7 +1,7 @@
 (function () {
 'use strict';
 var RM = !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
-var VERSION = '1.37';
+var VERSION = '1.38';
 var myCode = (function () { var m = /\/b(\d{1,10})\/index\.html$/.exec(String(location.pathname || '')); return m ? m[1] : '0'; })();      // نسخه‌ی این صفحه از روی آدرسش؛ در گزارش‌ها به جاوا فرستاده می‌شود تا صفحه‌ی کهنه نتواند نسخه‌ی تازه را «سالم» اعلام کند
 function otaCall(n) { try { if (window.Native && typeof window.Native[n] === 'function') window.Native[n](myCode); } catch (e) { } }
 otaCall('otaBoot');      // «جاوااسکریپتِ این صفحه شروع شد»: برنامه به صفحه‌ی بی‌نصب مهلتِ بیشتری برای ساختن فهرست می‌دهد
@@ -704,6 +704,7 @@ function mkView() {
 }
 /* ---- خبرِ سایت‌ها (مجلهٔ همان فروشگاه‌ها): ذخیره می‌شود، هر چند ساعت یک بار خودش تازه می‌شود، نقطهٔ قرمزِ کنارِ دکمه یعنی خبرِ نادیده ---- */
 var news = (function () { var n = ls.get('pp.news', null); if (!n || typeof n !== 'object' || !Array.isArray(n.items)) return { t: 0, items: [], notes: {} }; n.items = n.items.filter(function (x) { return x && typeof x.t === 'string' && typeof x.u === 'string' && Core.itemUrl('x', x.u); }); n.t = +n.t || 0; n.notes = n.notes && typeof n.notes === 'object' ? n.notes : {}; return n; })();
+var newsOld = [], newsSt = null, newsMoreBusy = false, newsMoreEnd = false, newsMoreErr = false, NEWS_OLD_MAX = 120;      // خبرهای قدیمی‌تر که با اسکرول می‌آیند (فقط در حافظه؛ هر بار تازه‌سازی صفر می‌شود)
 var newsBusy = false, newsTok = 0, newsSeenAt = 0;      // newsSeenAt: «دیده‌شده»ی پیش از باز شدنِ این گزارش؛ خبرِ تازه‌تر از آن «جدید» نشان داده می‌شود
 function newsSeenMax() { return +ls.get('pp.newsSeen', 0) || 0; }
 function nwDot() { try { var seen = newsSeenMax(); $('nw').classList.toggle('nu', !mkOn && news.items.some(function (x) { return x.d > seen; })); } catch (e) { } }
@@ -726,14 +727,16 @@ function newsLoad(mode) {                  // mode: 'force' (دکمه‌ی «د�
       all.sort(function (a, b) { return b.d - a.d; });
       all = all.filter(function (x) { per[x.s] = (per[x.s] | 0) + 1; return per[x.s] <= 10; }).slice(0, 30);      // یک سایتِ پرنوشته همه‌جا را نگیرد
       news = { t: Date.now(), items: all, notes: nt }; ls.set('pp.news', news);
+      if (mode === 'force' || !newsOld.length || !newsSt) { newsSt = r.st || null; newsOld = []; newsMoreEnd = false; newsMoreErr = false; }
+      else { var nu = {}; all.forEach(function (x) { nu[x.u] = 1; }); newsOld = newsOld.filter(function (x) { return !nu[x.u]; }); }      // تازه‌سازیِ خودکارِ وسطِ خواندن: خبرهای قدیمی‌ترِ آمده نمی‌پرند و صفحه نمی‌پرد
     }
     else if (r) news.notes = r.notes || {};
-    if (mkOn && mkTab === 'news') { newsMarkSeen(); mkKeep(); } else nwDot();
+    if (mkOn && mkTab === 'news') { newsMarkSeen(); mkKeep(); if (mode === 'force') $('mkr').scrollTop = 0; } else nwDot();      // دکمه‌ی «تازه‌سازی» ته صفحه است؛ بعدش تازه‌ترین‌ها را از بالا نشان بده
   };
   try { Core.fetchNews(net).then(done, function (e) { console.error(e); done(null); }); } catch (e) { console.error(e); done(null); }
 }
-var NW_ABB = { liliome: 'لی', safir: 'سف', hiland: 'های', digikala: 'دی' };
-var NW_COL = { liliome: '#6d4ad6', safir: '#c8402f', hiland: '#1f8f56', digikala: '#d6303f' };
+var NW_ABB = { liliome: 'لی', safir: 'سف', hiland: 'های', digikala: 'دی', hes: 'حس', flower: 'فل', khalife: 'خل', redmag: 'رد' };
+var NW_COL = { liliome: '#6d4ad6', safir: '#c8402f', hiland: '#1f8f56', digikala: '#d6303f', hes: '#0e7c86', flower: '#c2559a', khalife: '#8a5a1f', redmag: '#b3261e' };
 function newsKey(t) { var k = 0; String(t || '').split('').forEach(function (c) { k = (k * 31 + c.charCodeAt(0)) % 64; }); return k; }
 /* هر خبر یک «پست» است مثل اینستاگرام: بالا نامِ سایت و زمان، عکسِ بزرگ، تیتر، دو خطِ خلاصه؛ لمسِ هرجای کارت خبر را در مرورگر باز می‌کند */
 function newsCard(x) {
@@ -744,11 +747,51 @@ function newsCard(x) {
     + '<span class="nfs"><b>' + esc(x.sn || '') + '</b>' + (ago ? '<small>' + ago + '</small>' : '') + '</span>' + (isNew ? '<em class="nfnew">جدید</em>' : '') + '</span>'
     + pic + '<span class="nft">' + esc(x.t) + '</span>' + (x.x ? '<span class="nfx">' + esc(x.x) + '</span>' : '') + '<span class="nfg">خواندن در مرورگر ‹</span></button>';
 }
+/* ته فید: در حال آوردن / خطا (دکمه) / تمام. وقتی کاربر نزدیکِ ته می‌رسد، خبرهای قدیمی‌تر خودکار می‌آید؛ لازم نیست دکمه‌ای بزند */
+function nfMoreHtml() {
+  if (newsMoreEnd) return 'خبرهای بیشتری فعلاً نیست';
+  if (newsMoreErr) return '<button type="button" class="mkmore" data-act="newsmore">خبرهای قدیمی‌تر را بیاور</button>';
+  return newsMoreBusy ? '<span class="spn"></span>در حال آوردن خبرهای قدیمی‌تر…' : 'پایین‌تر بروید تا خبرهای قدیمی‌تر بیاید';
+}
+function nfSync(cards) {
+  try {
+    if (!mkOn || mkTab !== 'news') return;
+    var el = $('nfmore'); if (!el) return;
+    if (cards && cards.length) el.insertAdjacentHTML('beforebegin', cards.map(newsCard).join(''));      // فقط کارت‌های تازه اضافه می‌شود؛ صفحه نمی‌پرد
+    el.innerHTML = nfMoreHtml();
+  } catch (e) { console.error(e); }
+}
+function nfCheck() {
+  if (!mkOn || mkTab !== 'news' || newsMoreBusy || newsMoreEnd || newsMoreErr || newsBusy || !news.items.length) return;
+  var m = $('mkr'); if (m.scrollHeight - m.scrollTop - m.clientHeight < 900) newsMoreLoad();
+}
+function newsMoreLoad() {
+  if (newsMoreBusy || newsMoreEnd || newsBusy || !news.items.length) return;
+  newsMoreBusy = true; newsMoreErr = false; nfSync();
+  var tok = newsTok, have = {}; news.items.concat(newsOld).forEach(function (x) { have[x.u] = 1; });
+  var fin = function (r) {
+    newsMoreBusy = false;
+    if (tok !== newsTok) {      // وسطِ کار تازه‌سازی شد: نتیجه نمایش داده نمی‌شود؛ ولی خبرها گم نشوند (به صفِ همان سایت برمی‌گردند)
+      if (r && r.items && newsSt) r.items.forEach(function (x) { var e = newsSt[x.s]; if (e && Array.isArray(e.pend)) e.pend.unshift(x); });
+      nfSync(); setTimeout(nfCheck, 150); return;
+    }
+    var cards = [];
+    if (!r) newsMoreErr = true;
+    else {
+      newsSt = r.st || newsSt;
+      if (r.items.length) { cards = r.items.slice(0, Math.max(0, NEWS_OLD_MAX - newsOld.length)); newsOld = newsOld.concat(cards); }
+      if (r.done || newsOld.length >= NEWS_OLD_MAX) newsMoreEnd = true; else if (!r.items.length && r.failed) newsMoreErr = true;
+    }
+    nfSync(cards);
+    if (!newsMoreEnd && !newsMoreErr) setTimeout(nfCheck, 150);      // هنوز نزدیکِ ته است (فید کوتاه بود)؟ ادامه
+  };
+  try { Core.newsMore(net, newsSt, have).then(fin, function (e) { console.error(e); fin(null); }); } catch (e) { console.error(e); fin(null); }
+}
 function mkNewsSec() {
   var items = news.items, h = '';
   var st = newsBusy ? '<span class="spn"></span>در حال گرفتن خبر تازه…' : (news.t ? 'بروزرسانی: ' + agoText(Date.now() - news.t) + ' (هر ۳ ساعت خودکار)' : '');
   if (st) h += '<div class="nfst">' + st + '</div>';
-  if (items.length) h += items.map(newsCard).join('') + '<div class="nfend">خبرهای بیشتری فعلاً نیست</div>';
+  if (items.length) h += items.concat(newsOld).map(newsCard).join('') + '<div class="nfend" id="nfmore">' + nfMoreHtml() + '</div>';
   else if (newsBusy) h += '<div class="nfsk"></div><div class="nfsk"></div>';
   else h += '<div class="mkn">فعلاً خبری از سایت‌ها نرسید. شاید اینترنت ضعیف است یا سایت‌ها خبر تازه نگذاشته‌اند.</div>';
   h += '<button type="button" class="mkmore" data-act="news"' + (newsBusy ? ' disabled' : '') + '>' + (newsBusy ? 'در حال گرفتن…' : items.length ? 'تازه‌سازیِ خبرها' : 'دوباره امتحان کن') + '</button>';
@@ -820,7 +863,9 @@ function mkRender() {
   }
   $('mkr').innerHTML = h;
   if (mkOn) fitPz($('mkr'));
+  if (mkTab === 'news') setTimeout(nfCheck, 200);
 }
+$('mkr').addEventListener('scroll', nfCheck, { passive: true });
 function openReport() {
   mkTab = 'news'; newsSeenAt = newsSeenMax();      // پیش از اولین نقاشیِ صفحه: خبرِ تازه‌تر از آخرین دیدن «جدید» می‌شود
   try { mkRender(); } catch (e) { console.error(e); toast('گزارش ساخته نشد', 3000); return; }      // تاریخچه‌ی سالم هرگز به‌خاطر یک خطا پاک نمی‌شود (داده‌ی خراب هنگام خواندن اصلاح می‌شود)
@@ -841,6 +886,7 @@ $('mkr').addEventListener('click', function (e) {
   var go = e.target.closest('button[data-go]'); if (go) { mkTab = go.dataset.go; mkRender(); $('mkr').scrollTop = 0; return; }
   var nc = e.target.closest('button.nwc'); if (nc) { openLink(nc.dataset.u); return; }
   var ac = e.target.closest('button[data-act="news"]'); if (ac) { newsLoad('force'); return; }
+  var am = e.target.closest('button[data-act="newsmore"]'); if (am) { newsMoreErr = false; newsMoreLoad(); return; }
   var mo = e.target.closest('button.mkmore[data-s]'); if (mo) { mkMore[mo.dataset.s] = (mkMore[mo.dataset.s] | 0) + 1; mkKeep(); return; }
   var b = e.target.closest('button.mkr'); if (!b) return;
   if (b.dataset.m && MD_BY[b.dataset.m]) { openDetail(b.dataset.m); return; }
@@ -1960,7 +2006,7 @@ window.__resume = function () {
   if (updDue()) updCheck(false); else updAuto(); if (!busy && (autoDue() || launchDue())) refresh(false); };
 document.addEventListener('visibilitychange', function () { if (!document.hidden) window.__resume(); });
 window.addEventListener('beforeunload', function () { if (curModel && nav.lvl === 0) { var a = curModel.getAnchor(); if (a) ls.set('pp.last', a); } });
-window.__pp = { voice: function (a) { return voiceGo(a); }, setHide: function (id, on) { var m = MD_BY[id]; if (on && m) set.hide[id] = BR_BY[m.brandId].name + ' | ' + m.name; else delete set.hide[id]; ls.set('pp.set', set); rebuild(); renderSheet(); }, get fav() { return set.fav; }, openFav: openFav, openSearch: openSearch, get allBrands() { return ALLB; }, open: openEntry, up: goUp, view: viewImg, closeView: closeViewer, get nav() { return nav; }, get tree() { return TREE; }, get gate() { var ps = photoStat(); return { need: ps.need, have: ps.have, ready: !!db.ready, tot: imgTot, left: imgLeft(), ok: imgOk, bad: imgBad }; }, mount: function (m) { var t = performance.now(); set.model = m; mountModel(curModel ? curModel.getAnchor() : null); return performance.now() - t; }, get model() { return curModel; }, get list() { return list; }, get flat() { return FLAT; }, get state() { return { db: db, st: stt, busy: busy, imgLoc: imgLoc }; }, refresh: refresh, net: net };
+window.__pp = { newsStale: function (mode) { news.t = 1; ls.set('pp.newsTry', 0); newsLoad(mode); }, voice: function (a) { return voiceGo(a); }, setHide: function (id, on) { var m = MD_BY[id]; if (on && m) set.hide[id] = BR_BY[m.brandId].name + ' | ' + m.name; else delete set.hide[id]; ls.set('pp.set', set); rebuild(); renderSheet(); }, get fav() { return set.fav; }, openFav: openFav, openSearch: openSearch, get allBrands() { return ALLB; }, open: openEntry, up: goUp, view: viewImg, closeView: closeViewer, get nav() { return nav; }, get tree() { return TREE; }, get gate() { var ps = photoStat(); return { need: ps.need, have: ps.have, ready: !!db.ready, tot: imgTot, left: imgLeft(), ok: imgOk, bad: imgBad }; }, mount: function (m) { var t = performance.now(); set.model = m; mountModel(curModel ? curModel.getAnchor() : null); return performance.now() - t; }, get model() { return curModel; }, get list() { return list; }, get flat() { return FLAT; }, get state() { return { db: db, st: stt, busy: busy, imgLoc: imgLoc }; }, refresh: refresh, net: net };
 
 /* شروع */
 applyTheme(); applyFs();

@@ -259,6 +259,9 @@ python3 tests/t53_viewer.py    # بزرگ‌نمایی و کشیدنِ عکس
 python3 tests/t54_fontscale.py # اندازهٔ نوشته روی کل برنامه (۴ شکل × ۴ اندازه × ۲ عرض)
 python3 tests/t66_price_ui.py   # ظاهر و جاشدنِ قیمت‌ها (حباب، ارزان‌ترین، گزارش، خوانایی)
 python3 tests/t67_news_feed.py   # خبرها به شکلِ فیدِ اسکرولی (کارت، عکس، جدید، انباشته‌شدن، هر ۳ ساعت)
+python3 tests/t70_news_scroll.py  # خبرهای قدیمی‌تر با اسکرول (خودکار، بی‌تکرار، خطا، سقف)
+node tests/t69_news_more.js     # منطقِ صفحه‌به‌صفحه‌ی خبر
+node tests/t68_stock_filter.js  # فروشگاهِ بزرگ: فقط موجودها خوانده می‌شود (کلینیکِ لیلیوم)
 python3 tests/t55_voice.py     # گفتن نام عطر، نوار پایین، آخرین‌ها
 python3 tests/t3_flow.py       # روند کامل بروزرسانی
 python3 tests/t56_search_real.py   # جستجو روی ۱۲ هزار عطر واقعی (نیاز به /tmp/w/realdb.json)

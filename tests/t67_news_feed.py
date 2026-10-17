@@ -145,7 +145,8 @@ async def main():
         await pg.goto('file://'+ROOT+'/index.html'); await wait_ready(pg,180000); await pg.wait_for_timeout(1000)
         ev=pg.evaluate
         await open_report(pg,1500)
-        chk('2 hours old: not fetched when the report opens (every 3 hours)',await ev("window.__NEWSCALLS.length")==0 and await ev("document.querySelectorAll('#mkr .nwc').length")==1)
+        sv=json.loads(await ev("localStorage.getItem('pp.news')"))
+        chk('2 hours old: not refreshed when the report opens (every 3 hours): saved list untouched (a one-card feed may fill the screen with older articles)',sv['t']==now-2*H and len(sv['items'])==1 and sv['items'][0]['t']=='ذخیره‌شده',sv['t']-now)
         chk('status line shows how old and "هر ۳ ساعت"',await ev("document.querySelector('#mkr .nfst').innerText")=='بروزرسانی: ۲ ساعت پیش (هر ۳ ساعت خودکار)',await ev("document.querySelector('#mkr .nfst').innerText"))
         await b.close()
         # (ب) کهنه (۴ ساعت) و گزارش بسته: برنامه‌ی باز خودش در پس‌زمینه می‌گیرد

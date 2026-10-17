@@ -444,7 +444,8 @@ function pickEntry(arr) {   // چند قیمت از یک سایت برای یک 
   var cl = s.filter(function (v) { return v.p >= top / 1.35; });   // قیمت‌های نزدیک به بالاترین؛ خیلی ارزان‌تر = احتمالاً اشتباه یا کالای دیگر
   return cl[cl.length - 1];                                        // در همان خوشه، قیمتِ با تخفیف
 }
-var SRC_BASE = { liliome: 'https://liliome.com', digikala: 'https://www.digikala.com', safir: 'https://www.safirstores.com', hiland: 'https://hilandbeauty.com' };
+var SRC_BASE = { liliome: 'https://liliome.com', digikala: 'https://www.digikala.com', safir: 'https://www.safirstores.com', hiland: 'https://hilandbeauty.com',
+  hes: 'https://hesperfume.ir', flower: 'https://flower-perfume.com', khalife: 'https://khalifechi.com', redmag: 'https://redmag.ir' };      // چهار سایتِ آخر فقط برای خبر هستند
 /* آدرسِ صفحه‌ی محصول در سایت؛ از روی شناسه ساخته می‌شود (ذخیره‌ی آدرس‌های بلند حافظه را پر می‌کند) */
 function itemUrl(src, pid) {
   pid = String(pid || '');
@@ -1456,10 +1457,13 @@ function purgeStored(db) {      // بیرون‌بردنِ کالاهای ذخی
 var DEDUPE_V = 8;
 function ingestEnd(C, complete) {
   if (complete) {                                      // فهرستِ ناگهان خیلی کوچک‌تر شده (صفحه‌ی خطا/کپچا): پاک‌سازی نکن
-    var known = Object.keys(C.M).length, seenN = Object.keys(C.seen).length;
-    if (known >= 20 && seenN < known * 0.7) { complete = false; C.st.suspect = true; }
+    var live = Object.keys(C.M).filter(function (pid) { return C.M[pid][1] > 0; }), seenN = live.filter(function (pid) { return C.seen[pid]; }).length;      // فقط کالاهای قیمت‌دار شمرده می‌شوند: فروشگاهی که فقط موجودها را می‌دهد، ناموجودِ قبلی را «ندیده» حساب نکند
+    if (live.length >= 20 && seenN < live.length * 0.7) { complete = false; C.st.suspect = true; }
   }
-  if (complete) Object.keys(C.M).forEach(function (pid) { if (!C.seen[pid]) { delete C.M[pid]; C.st.removed++; } });
+  if (complete === 'soft') {      // فروشگاهی که فقط موجودها را می‌دهد: ندیده = ناموجود (قیمت ۰) و نگه داشته می‌شود تا دوباره‌موجودشدن بی‌دریافتِ کامل ثبت شود؛ ۳۰ روز ندیده = پاک
+    var lim = Math.floor(Date.now() / 60000) - 30 * 1440;
+    Object.keys(C.M).forEach(function (pid) { if (C.seen[pid]) return; var e = C.M[pid]; if (e[1] > 0) { e[1] = 0; C.st.soldOut = (C.st.soldOut | 0) + 1; } else if (!(e[4] > lim)) { delete C.M[pid]; C.st.removed++; } });
+  } else if (complete) Object.keys(C.M).forEach(function (pid) { if (!C.seen[pid]) { delete C.M[pid]; C.st.removed++; } });
   if (C.db.dv !== DEDUPE_V) C.st.purged = purgeStored(C.db);           // نسخه‌ی قاعده‌ها عوض شده: کالاهای ردشده‌ی قبلی از حافظه بیرون بروند
   if (C.st.added || C.db.dv !== DEDUPE_V) { C.st.merged = reconcile(C.db, C.idx); C.db.dv = DEDUPE_V; }      // نسخه‌ی قاعده‌ها عوض شده = یک‌بار کل حافظه دوباره بازرسی شود
   return C.st;
@@ -1596,9 +1600,10 @@ async function fillSizes(base, out, net) {
   return got;
 }
 async function wooSource(base, net, rep, mode) {
-  var out = [], notes = [], failed = 0, fields = mode === 'price';
+  var out = [], notes = [], failed = 0, fields = mode === 'price', stk = true;
   var FIELDS = '&_fields=id,prices,price_html,is_in_stock,is_purchasable,is_on_backorder,type';
-  function url(p) { return base + '/wp-json/wc/store/v1/products?per_page=100&page=' + p + (fields ? FIELDS : ''); }
+  /* فقط کالای موجود: فروشگاه‌های بزرگ (مثل لیلیوم، بیش از ۱۶ هزار محصول با ناموجودها) از سقفِ ۹۰ صفحه می‌گذشتند و عطرهای قدیمی‌تر (مثل کلینیک) هرگز خوانده نمی‌شدند */
+  function url(p) { return base + '/wp-json/wc/store/v1/products?per_page=100&page=' + p + (stk ? '&stock_status=instock' : '') + (fields ? FIELDS : ''); }
   var diag = { total: 0, priced: 0, sizeTitle: 0, sizeSpec: 0, noSize: 0, sample: '' }, vparents = [];      // vparents: محصولِ چنداندازه‌ای (بازه‌ی قیمت)؛ هر اندازه‌اش جدا گرفته می‌شود
   function conv(it) {
     var pr = it.prices || {}, name = it.name || '';
@@ -1673,6 +1678,7 @@ async function wooSource(base, net, rep, mode) {
     return { k: 'fail', s: r.status, b: r.body };
   }
   var first = await one(1);
+  if ((first.k !== 'ok' || !first.a.length) && stk) { stk = false; first = await one(1); }      // سایت فیلترِ موجودی را نپذیرفت: بی‌فیلتر
   if (first.k !== 'ok' && fields) { fields = false; first = await one(1); }      // سایت _fields را نپذیرفت
   if (first.k === 'bad') throw new Error('ساختار ناشناخته');
   if (first.k === 'fail') throw new Error(first.s ? 'HTTP ' + first.s : (first.b || 'اینترنت وصل نیست'));
@@ -1697,7 +1703,7 @@ async function wooSource(base, net, rep, mode) {
   var szN = 0;
   if (!fields) szN = await fillSizes(base, out, net);
   var dn = (!fields && diag.total) ? ' · قیمت‌دار ' + diag.priced + ' از ' + diag.total + ' · اندازه از عنوان ' + diag.sizeTitle + '، از توضیحات ' + diag.sizeSpec + '، بدون اندازه ' + diag.noSize + (diag.sample ? ' (نمونه: ' + diag.sample + ')' : '') : '';
-  return { items: out, complete: ended && !failed, note: (failed ? 'ناقص: ' + failed + ' صفحه' : '') + dn + (szN ? ' · اندازه از صفحه‌ی محصول ' + szN : '') + (vN ? ' · اندازه‌های محصولِ چنداندازه‌ای ' + vN : ''), diag: diag };
+  return { items: out, complete: ended && !failed ? (stk ? 'soft' : true) : false, note: (failed ? 'ناقص: ' + failed + ' صفحه' : '') + (!ended && !failed ? 'ناقص: به سقفِ ۹۰ صفحه رسید' : '') + dn + (szN ? ' · اندازه از صفحه‌ی محصول ' + szN : '') + (vN ? ' · اندازه‌های محصولِ چنداندازه‌ای ' + vN : ''), diag: diag };
 }
 
 var DK_URLS = [
@@ -2122,13 +2128,17 @@ async function liveSearch(text, net, srcIds, tools) {
 }
 
 /* ---------- خبرهای سایت‌ها (مجله/وبلاگِ همان فروشگاه‌ها) ----------
-   هر سایت اول با رابطِ وردپرس (wp-json) و اگر نشد با خوراکِ RSS خوانده می‌شود. فقط آدرس‌های همان چهار سایتِ برنامه.
+   هر سایت اول با رابطِ وردپرس (wp-json) و اگر نشد با خوراکِ RSS خوانده می‌شود. فقط سایت‌های همین فهرست.
    خروجی: { items: [{s, sn, t, d(ms), u, x, img}], notes: {شناسه: 'ok'|'none'|'fail'} } */
 var NEWS_SRC = [
   { id: 'liliome', name: 'لیلیوم', base: 'https://liliome.com', filter: false },
-  { id: 'safir', name: 'سفیر', base: 'https://www.safirstores.com', filter: false },
-  { id: 'hiland', name: 'هایلند', base: 'https://hilandbeauty.com', filter: false },
-  { id: 'digikala', name: 'مجله‌ی دیجی‌کالا', base: 'https://www.digikala.com/mag', filter: true, search: 'عطر' }
+  { id: 'safir', name: 'سفیر', base: 'https://www.safirstores.com', alt: ['/mag'], filter: false },
+  { id: 'hiland', name: 'هایلند', base: 'https://hilandbeauty.com', alt: ['/mag', '/blog'], filter: false },
+  { id: 'digikala', name: 'مجله‌ی دیجی‌کالا', base: 'https://www.digikala.com/mag', filter: true, search: 'عطر' },
+  { id: 'hes', name: 'حس پرفیوم', base: 'https://hesperfume.ir', alt: ['/mag'], filter: true },
+  { id: 'flower', name: 'فلاور پرفیوم', base: 'https://flower-perfume.com', alt: ['/blog'], filter: true },
+  { id: 'khalife', name: 'خلیفه‌چی', base: 'https://khalifechi.com', filter: true, search: 'عطر' },
+  { id: 'redmag', name: 'ردمگ', base: 'https://redmag.ir', filter: true, search: 'عطر' }
 ];
 var NEWS_RE = /عطر|ادکلن|ادکلون|پرفیوم|پارفوم|رایحه|بوی |ادو ?تویلت|ادو ?پرفیوم|fragrance|perfume|parfum/i;
 function newsText(h, n) {      // برای نمایش است نه جستجو: نیم‌فاصله و رقمِ فارسی دست‌نخورده می‌ماند؛ فقط برچسب‌ها برداشته و «ي/ك» عربی درست می‌شود
@@ -2195,28 +2205,87 @@ function newsFromRss(xml, src) {
   });
   return out;
 }
-async function newsOne(src, net) {
-  var gotAny = false, items = [];
-  var u1 = src.base + '/wp-json/wp/v2/posts?per_page=10&_embed=1' + (src.search ? '&search=' + encodeURIComponent(src.search) : '');
-  var r = await getR(net, u1, { Accept: 'application/json' }, 2), a = r.status === 200 ? parseJson(r.body) : undefined;
-  if (Array.isArray(a)) { gotAny = true; items = newsFromWp(a, src); }
-  if (!items.length) {
-    var r2 = await getR(net, src.base + '/feed/' + (src.search ? '?s=' + encodeURIComponent(src.search) : ''), { Accept: 'application/rss+xml, application/xml, text/xml' }, 2);
-    if (r2.status === 200 && /<(rss|feed)[\s>]/i.test(String(r2.body).slice(0, 600))) { gotAny = true; items = newsFromRss(r2.body, src); }
+var NEWS_PER = 10, NEWS_MAXPAGE = 12, NEWS_OKBASE = {};
+/* یک صفحه (۱۰ نوشته) از یک سایت. سایتی که وردپرسش در پوشه‌ی /mag یا /blog است، چند نشانی امتحان می‌شود و اولینی که جواب داد در همین اجرا یادش می‌ماند.
+   خروجی: {items, note, raw: تعداد نوشته‌ی صفحه پیش از پالایش، end: صفحه‌ی بعدی ندارد} */
+async function newsOne(src, net, page) {
+  page = page || 1;
+  var root = src.base.replace(/^(https?:\/\/[^\/]+).*$/, '$1'), bases = [src.base].concat((src.alt || []).map(function (a) { return root + a; }));
+  if (NEWS_OKBASE[src.id]) bases = [NEWS_OKBASE[src.id]].concat(bases.filter(function (b) { return b !== NEWS_OKBASE[src.id]; }));
+  var gotAny = false;
+  for (var bi = 0; bi < bases.length; bi++) {
+    var base = bases[bi], items = [], raw = 0, got = false, endHint = false, restArr = false, down = false;
+    var u1 = base + '/wp-json/wp/v2/posts?per_page=' + NEWS_PER + '&_embed=1' + (page > 1 ? '&page=' + page : '') + (src.search ? '&search=' + encodeURIComponent(src.search) : '');
+    var r = await getR(net, u1, { Accept: 'application/json' }, 2), a = r.status === 200 ? parseJson(r.body) : undefined;
+    down = r.status === 0 || r.status >= 500;      // سایت خاموش/خراب است: نشانی‌های دیگرش را امتحان نکن
+    if (Array.isArray(a)) { got = restArr = true; raw = a.length; items = newsFromWp(a, src); }
+    else if (page > 1 && r.status === 400 && /page_number/i.test(String(r.body || ''))) { got = true; endHint = true; }      // «rest_post_invalid_page_number»: بیش از این نوشته‌ای نیست
+    if (!items.length && !endHint && (page === 1 || !restArr && !got)) {
+      var q = []; if (src.search) q.push('s=' + encodeURIComponent(src.search)); if (page > 1) q.push('paged=' + page);
+      var r2 = await getR(net, base + '/feed/' + (q.length ? '?' + q.join('&') : ''), { Accept: 'application/rss+xml, application/xml, text/xml' }, 2);
+      down = down && (r2.status === 0 || r2.status >= 500);
+      if (r2.status === 200 && /<(rss|feed)[\s>]/i.test(String(r2.body).slice(0, 600))) { got = true; items = newsFromRss(r2.body, src); raw = items.length; }
+    }
+    if (src.filter) items = items.filter(function (x) { return NEWS_RE.test(x.t + ' ' + x.x); });
+    gotAny = gotAny || got;
+    if (items.length || raw > 0 || (page > 1 && got)) {
+      NEWS_OKBASE[src.id] = base;
+      return { items: items, note: items.length ? 'ok' : 'none', raw: raw, end: endHint || raw < NEWS_PER || page >= NEWS_MAXPAGE };
+    }
+    if (down && !got) break;
   }
-  if (src.filter) items = items.filter(function (x) { return NEWS_RE.test(x.t + ' ' + x.x); });
-  return { items: items, note: items.length ? 'ok' : (gotAny ? 'none' : 'fail') };
+  return { items: [], note: gotAny ? 'none' : 'fail', raw: 0, end: true };
 }
+function newsGuard(src, net, page) {      // هر سایت حداکثر ۲۵ ثانیه؛ خطا = «نشد»، نه افتادنِ همه
+  var tm;
+  return Promise.race([newsOne(src, net, page).catch(function () { return { items: [], note: 'fail', raw: 0, end: true }; }), new Promise(function (res) { tm = setTimeout(function () { res({ items: [], note: 'fail', raw: 0, end: true }); }, 25000); })]).then(function (r) { clearTimeout(tm); return r; });
+}
+function newsByDate(a, b) { return b.d - a.d; }
+/* خبرهای تازه. st = وضعیتِ «خبرهای قدیمی‌تر» برای newsMore: از هر سایت، آنچه دیده نشد (pend)، آخرین صفحه‌ای که خوانده شد و اینکه سایت تمام شد */
 async function fetchNews(net, srcIds) {
-  var notes = {}, all = [];
-  var jobs = NEWS_SRC.filter(function (s) { return !srcIds || srcIds.indexOf(s.id) >= 0; }).map(function (src) {
-    var tm, pr = Promise.race([newsOne(src, net).catch(function () { return { items: [], note: 'fail' }; }), new Promise(function (res) { tm = setTimeout(function () { res({ items: [], note: 'fail' }); }, 25000); })]).then(function (r) { clearTimeout(tm); return r; });
-    return pr.then(function (r) { notes[src.id] = r.note; return r.items.sort(function (a, b) { return b.d - a.d; }).slice(0, 6); });      // از هر سایت حداکثر شش خبرِ تازه؛ یک سایت همه‌جا را نگیرد
+  var notes = {}, all = [], st = {};
+  var srcs = NEWS_SRC.filter(function (s) { return !srcIds || srcIds.indexOf(s.id) >= 0; });
+  var jobs = srcs.map(function (src) {
+    return newsGuard(src, net, 1).then(function (r) {
+      notes[src.id] = r.note;
+      var its = r.items.sort(newsByDate);
+      st[src.id] = { pend: its.slice(6), page: 1, end: !!r.end };      // از هر سایت حداکثر شش خبرِ تازه؛ یک سایتِ پرنوشته همه‌جا را نگیرد؛ بقیه برای «خبرهای قدیمی‌تر»
+      return its.slice(0, 6);
+    });
   });
   (await Promise.all(jobs)).forEach(function (a) { all = all.concat(a); });
-  all.sort(function (a, b) { return b.d - a.d; });
+  all.sort(newsByDate);
   var seen = {}; all = all.filter(function (x) { var k = x.u; if (seen[k]) return false; seen[k] = 1; return true; });
-  return { items: all.slice(0, 24), notes: notes };
+  all.slice(24).forEach(function (x) { if (st[x.s]) st[x.s].pend.push(x); });      // از سقفِ ۲۴ بیرون ماند: برای پایین‌تر
+  Object.keys(st).forEach(function (k) { st[k].pend.sort(newsByDate); });
+  return { items: all.slice(0, 24), notes: notes, st: st };
+}
+/* خبرهای قدیمی‌تر (وقتی کاربر به پایین صفحه رسید): از هر سایتی که هنوز نوشته دارد تا شش خبر، به ترتیب تاریخ.
+   have = {آدرس: 1} خبرهایی که همین حالا هست. st (از fetchNews یا null) تغییر می‌کند. done = هیچ سایتی چیزی ندارد */
+async function newsMore(net, st, have) {
+  st = st || {}; have = have || {};
+  var srcs = NEWS_SRC.filter(function (s) { return !st[s.id] || !st[s.id].end || st[s.id].pend.length; });
+  var tried = 0, fails = 0;
+  var jobs = srcs.map(async function (src) {
+    var e = st[src.id] = st[src.id] || { pend: [], page: 0, end: false };
+    e.failed = false; tried++;
+    function fresh() { e.pend = e.pend.filter(function (x) { return !have[x.u]; }); }
+    fresh();
+    for (var tries = 0; e.pend.length < 6 && !e.end && tries < 3; tries++) {      // تا شش خبرِ تازه برای این سایت؛ صفحه‌ی پر از تکراری حساب نمی‌شود
+      var r = await newsGuard(src, net, e.page + 1);
+      if (r.note === 'fail' && !r.raw) { e.failed = true; e.nf = (e.nf | 0) + 1; fails++; if (e.nf >= 2) e.end = true; break; }      // نشد: دفعه‌ی بعد دوباره؛ دو بار پشتِ هم نشد = این سایت تمام
+      e.nf = 0; e.page++; e.end = !!r.end; e.pend = e.pend.concat(r.items); fresh();
+    }
+    e.pend.sort(newsByDate);
+    return e.pend.splice(0, 6);
+  });
+  var got = []; (await Promise.all(jobs)).forEach(function (a) { got = got.concat(a); });
+  var offline = tried > 0 && fails === tried;
+  if (offline) srcs.forEach(function (src) { st[src.id].end = false; st[src.id].nf = 0; });      // همه با هم نشدند = اینترنت قطع است، نه سایتِ خراب؛ دکمه‌ی «دوباره» باید کار کند
+  var seen = {}; got = got.filter(function (x) { if (seen[x.u] || have[x.u]) return false; seen[x.u] = 1; return true; });
+  got.sort(newsByDate);
+  var done = NEWS_SRC.every(function (s) { return st[s.id] && st[s.id].end && !st[s.id].pend.length; });
+  return { items: got, st: st, done: done, failed: offline };
 }
 
 /* ---------- تاریخچه‌ی قیمت و موجودی (برای «گزارش بازار») ----------
@@ -2730,7 +2799,7 @@ function searchRank(idx, alts, tools, opts) {
   return out;
 }
 
-root.Core = { fetchNews: fetchNews, newsFromWp: newsFromWp, newsFromRss: newsFromRss, newsPickImg: newsPickImg, newsExcerpt: newsExcerpt, NEWS_SRC: NEWS_SRC, liveSearch: liveSearch, liveTerms: liveTerms, liveHit: liveHit, wooLivePrice: wooLivePrice, searchIndex: searchIndex, searchRank: searchRank, searchSimilar: searchSimilar, simWord: simWord, simFold: simFold, srn: srn, fzKey: fzKey, explainTitle: explainTitle, useSz: useSz, sizeFromPage: sizeFromPage, nextDataCards: nextDataCards, RAWC: RAWC, stripPriceTail: stripPriceTail, marketStats: marketStats, marketView: marketView, histNew: histNew, histFix: histFix, histSnap: histSnap, histReport: histReport, purgeStored: purgeStored, setBlock: setBlock, REJ: REJ, vetReason: vetReason, reconcile: reconcile, CLEANSE: CLEANSE, cleanseText: cleanseText, cleanBrandName: cleanBrandName, itemUrl: itemUrl, STALE_MIN: STALE_MIN, fa2en: fa2en, en2fa: en2fa, enTokens: enTokens, titleEn: titleEn, tree: tree, brandOf: brandOf, specInfo: specInfo, enrichTitle: enrichTitle, genderOf: genderOf, nameCmp: nameCmp, CFG: CFG, newDb: newDb, dbIndex: dbIndex, ingest: ingest, ingestAsync: ingestAsync, buildList: buildList, normFa: normFa, parseTitle: parseTitle, aggregate: aggregate, SOURCES: SOURCES, extractCards: extractCards,
+root.Core = { fetchNews: fetchNews, newsMore: newsMore, newsFromWp: newsFromWp, newsFromRss: newsFromRss, newsPickImg: newsPickImg, newsExcerpt: newsExcerpt, NEWS_SRC: NEWS_SRC, liveSearch: liveSearch, liveTerms: liveTerms, liveHit: liveHit, wooLivePrice: wooLivePrice, searchIndex: searchIndex, searchRank: searchRank, searchSimilar: searchSimilar, simWord: simWord, simFold: simFold, srn: srn, fzKey: fzKey, explainTitle: explainTitle, useSz: useSz, sizeFromPage: sizeFromPage, nextDataCards: nextDataCards, RAWC: RAWC, stripPriceTail: stripPriceTail, marketStats: marketStats, marketView: marketView, histNew: histNew, histFix: histFix, histSnap: histSnap, histReport: histReport, purgeStored: purgeStored, setBlock: setBlock, REJ: REJ, vetReason: vetReason, reconcile: reconcile, CLEANSE: CLEANSE, cleanseText: cleanseText, cleanBrandName: cleanBrandName, itemUrl: itemUrl, STALE_MIN: STALE_MIN, fa2en: fa2en, en2fa: en2fa, enTokens: enTokens, titleEn: titleEn, tree: tree, brandOf: brandOf, specInfo: specInfo, enrichTitle: enrichTitle, genderOf: genderOf, nameCmp: nameCmp, CFG: CFG, newDb: newDb, dbIndex: dbIndex, ingest: ingest, ingestAsync: ingestAsync, buildList: buildList, normFa: normFa, parseTitle: parseTitle, aggregate: aggregate, SOURCES: SOURCES, extractCards: extractCards,
   wooSource: wooSource, digikalaSource: digikalaSource, htmlSource: htmlSource, letterOf: letterOf, median: median, priceFromText: priceFromText, similar: similar };
 if (typeof module !== 'undefined') module.exports = root.Core;
 })(typeof window !== 'undefined' ? window : globalThis);

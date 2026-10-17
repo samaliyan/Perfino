@@ -69,7 +69,7 @@ public class MainActivity extends Activity {
     }
     private static final int REQ_VOICE = 7411;
     private static final int MAX_BYTES = 12 * 1024 * 1024;
-    private static final String[] ALLOW_HOSTS = {"liliome.com", "digikala.com", "safirstores.com", "hilandbeauty.com"};
+    private static final String[] ALLOW_HOSTS = {"liliome.com", "digikala.com", "safirstores.com", "hilandbeauty.com", "hesperfume.ir", "flower-perfume.com", "khalifechi.com", "redmag.ir"};
 
     /** فقط سایت‌های خودِ برنامه (و زیردامنه‌هایشان) */
     private static boolean allowedHost(String h) {
@@ -196,7 +196,7 @@ public class MainActivity extends Activity {
                             Iterator<String> it = h.keys();
                             while (it.hasNext()) { String k = it.next(); hm.put(k, h.getString(k)); }
                         } catch (Exception ignore) { }
-                        // تغییر مسیر فقط به همان چهار سایت؛ هدرها در هر مرحله دوباره گذاشته می‌شوند؛ پاسخِ بزرگ‌تر از حد، «موفق» حساب نمی‌شود
+                        // تغییر مسیر فقط به سایت‌های فهرست (ALLOW_HOSTS)؛ هدرها در هر مرحله دوباره گذاشته می‌شوند؛ پاسخِ بزرگ‌تر از حد، «موفق» حساب نمی‌شود
                         Http.Result r = Http.fetch(url, hm, Http.sitesOnly(ALLOW_HOSTS), MAX_BYTES);
                         if (r.truncated) throw new java.io.IOException("response too large (> " + MAX_BYTES + " bytes)");
                         status = r.status;

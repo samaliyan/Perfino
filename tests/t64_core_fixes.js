@@ -187,7 +187,7 @@ var meta = function (g) { return { b: 'brand-' + g.id, m: 'model-' + g.id }; };
   chk(rr.complete === false, 'a server error on the variations makes the list incomplete (so nothing is deleted because of it): complete=' + rr.complete);
   var net404 = wooNet(VAR); var g0 = net404.get; net404.get = async function (u) { if (u.indexOf('type=variation') >= 0) return { status: 404, body: '' }; return g0(u); };
   rr = await LIL.run(net404, function () { }, 'full');
-  chk(rr.complete === true, 'a 404 on type=variation (site does not support it) does not make the list incomplete forever');
+  chk(rr.complete === 'soft', 'a 404 on type=variation (site does not support it) does not make the list incomplete forever');
   calls2.length = 0; rr = await LIL.run(wooNet(VAR), function () { }, 'price');
   var ids3 = {}; rr.items.forEach(function (x) { ids3[x.id] = x; });
   chk(ids3[vid(901)] && ids3[vid(901)].price === 3000000 && ids3[vid(903)] && ids3[vid(903)].price === 0, 'price-only refresh returns the same ids as the full fetch');

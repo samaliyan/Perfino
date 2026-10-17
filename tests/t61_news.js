@@ -44,10 +44,10 @@ function mkNet(map) { var calls = []; return { calls: calls, get: function (u) {
   r = await C.fetchNews(net, ['liliome', 'hiland']);
   chk(r.items.length === 0, 'garbage responses give no items and no crash');
   console.log('dom:', HAS_DOM);
-  // ۷) درخواست‌ها فقط به آدرس‌های همان چهار سایت
+  // ۷) درخواست‌ها فقط به سایت‌های فهرستِ خبر
   var allCalls = []; net = { get: function (u) { allCalls.push(u); return Promise.resolve({ status: 404, body: '' }); } };
   await C.fetchNews(net);
-  chk(allCalls.length >= 4 && allCalls.every(function (u) { return /^https:\/\/(liliome\.com|www\.safirstores\.com|hilandbeauty\.com|www\.digikala\.com)\//.test(u); }), 'only the four sites are asked: ' + allCalls.length);
+  chk(allCalls.length >= 4 && allCalls.every(function (u) { return /^https:\/\/(liliome\.com|www\.safirstores\.com|hilandbeauty\.com|www\.digikala\.com|hesperfume\.ir|flower-perfume\.com|khalifechi\.com|redmag\.ir)\//.test(u); }), 'only the news sites are asked: ' + allCalls.length);
 
   // ۸) عکسِ داخلِ متن وقتی عکسِ شاخص نیست؛ اندازه‌ی میانی از srcset؛ آیکون/لوگو/ایموجی/عکسِ کوچک رد می‌شود
   var P = C.newsPickImg;
