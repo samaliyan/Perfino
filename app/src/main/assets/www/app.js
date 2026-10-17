@@ -368,6 +368,7 @@ function ModelFocus(kind, host, data, anchor) {
     var p = L[i]; if (!p) return;
     var pi = PAL[p.k % 8], dark = themeNow() !== 'light';
     el.style.setProperty('--ac', z ? (dark ? pi.liq : pi.liq2) : pi.liq);
+    if (z || dark) el.style.setProperty('--act', z ? (dark ? pi.liq : pi.liq2) : pi.liq); else el.style.removeProperty('--act');
     if (!z) {
       el.style.backgroundColor = dark ? pi.liq2 : mix(pi.liq, .5);
       el.style.setProperty('--hov', dark ? 'radial-gradient(120% 60% at 80% 0%,rgba(255,255,255,.3),transparent 60%),linear-gradient(180deg,rgba(0,0,0,.04),rgba(0,0,0,.42))' : 'radial-gradient(120% 60% at 80% 0%,rgba(255,255,255,.55),transparent 60%),linear-gradient(180deg,rgba(255,255,255,.1),rgba(255,255,255,.4))');
@@ -594,7 +595,7 @@ function overlay() {
   if (!db.ready) {                       // قفل ورود: تا پایان دانلود اولیه وارد برنامه نمی‌شویم
     var N = actv().length, sd = srcDone(), il = imgLeft(), phase = busy ? 'src' : il > 0 ? 'img' : 'fail';
     var ps = photoStat(), sf = phase === 'src' ? (pct() == null ? 0 : pct()) : 1, imf = ps.need ? ps.have / ps.need : (phase === 'img' ? 0 : 1);
-    var all = phase === 'src' ? sf * .75 : phase === 'img' ? .75 + .25 * imf : .75 + .25 * imf;
+    var all = phase === 'src' ? sf * .75 : phase === 'img' ? .75 + .25 * imf : phase === 'fail' && !ps.have ? .75 * (N ? sd / N : 0) : .75 + .25 * imf;      // شکست: نوار پر نشان داده نشود
     if (!o._g) {                         // اسکلت فقط یک‌بار ساخته می‌شود؛ بعد فقط متن‌ها عوض می‌شوند (تا چرخش دایره از اول شروع نشود)
       o._h = ''; o._g = 1; o._bk = '';
       o.innerHTML = '<div class="gt"><div class="sp" id="gsp"></div><b id="gtt"></b><span id="gts"></span><div class="pb"><i id="gpb"></i></div><div class="st">'
@@ -605,7 +606,7 @@ function overlay() {
     $('gts').textContent = phase === 'fail' ? 'هیچ سایتی جواب نداد. اینترنت را بررسی کنید؛ برنامه خودش دوباره تلاش می‌کند.' : 'بار اول چند دقیقه طول می‌کشد. لطفاً صبر کنید و برنامه را نبندید.';
     $('gpb').style.width = Math.round(all * 100) + '%';
     $('gr1').className = phase !== 'src' && sd > 0 ? 'ok' : '';
-    $('gv1').innerHTML = '<bdi>' + fa(sd) + '</bdi> از <bdi>' + fa(N) + '</bdi> سایت' + (phase === 'src' && total() ? ' · <bdi>' + fa(total()) + '</bdi> محصول' : '');
+    $('gv1').innerHTML = '<bdi>' + fa(sd) + '</bdi> از <bdi>' + fa(N) + '</bdi> سایت' + (phase === 'src' && total() ? ' — <bdi>' + fa(total()) + '</bdi> محصول' : '');
     $('gr2').className = ps.need && il === 0 && ps.have >= ps.need ? 'ok' : '';
     $('gv2').innerHTML = ps.need ? '<bdi>' + fa(ps.have) + '</bdi> از <bdi>' + fa(ps.need) + '</bdi>' + (il > 0 && ps.have > 0 ? ' · <bdi>' + fa(il) + '</bdi> مانده' : '') : phase === 'src' ? 'بعد از فهرست' : '—';
     var bk = phase === 'fail' ? (list.length ? 'f2' : 'f1') : (list.length && sd >= 1 && Date.now() - gateT0 > 30000 ? 'f3' : '');      // بعد از ۳۰ ثانیه، اگر فهرست آماده است، راهِ ورود هست (اینترنتِ کند راه را نبندد)
@@ -621,9 +622,14 @@ function overlay() {
   o._h = ''; o._g = 0; o.innerHTML = '<div><b>قیمتی دریافت نشد</b>اینترنت را بررسی کنید و دوباره تلاش کنید.<br><button id="retry">تلاش دوباره</button></div>';
   var b2 = $('retry'); if (b2) b2.onclick = function () { refresh(true); };
 }
-function toast(msg, ms) {
-  var t = $('toast'); t.textContent = msg; t.classList.add('on');
-  clearTimeout(toast._t); toast._t = setTimeout(function () { t.classList.remove('on'); }, ms || 3200);
+function toast(msg, ms, undo) {      // undo: تابعی که با زدنِ «بازگردانی» اجرا می‌شود (اشتباهِ انگشت قابل جبران باشد)
+  var t = $('toast'); t.textContent = msg; t.classList.add('on'); t.classList.toggle('act', !!undo);
+  if (undo) {
+    var b = document.createElement('button'); b.type = 'button'; b.className = 'tundo'; b.textContent = 'بازگردانی';
+    b.onclick = function () { t.classList.remove('on', 'act'); clearTimeout(toast._t); try { undo(); } catch (e) { } };
+    t.appendChild(b);
+  }
+  clearTimeout(toast._t); toast._t = setTimeout(function () { t.classList.remove('on', 'act'); }, ms || 3200);
 }
 var tickT = 0;
 function tick() {   // نمایش زنده‌ی پیشرفت
@@ -1062,7 +1068,7 @@ function renderDetail() {
   }).join('');
   var keep = $('dtc').scrollTop;
   $('dtc').innerHTML = '<div class="dtop"><div class="dpic" data-vw="1">' + tile({ loc: im.loc, img: im.img, k: im.k }) + '<em>بزرگ‌نمایی</em></div><div class="dti"><div class="dbn">' + esc(BR_BY[m.brandId].name) + '</div><div class="dnm">' + esc(m.name) + '</div></div></div>' + dact(dtId) + vs
-    + '<div class="dnote">روی هر اندازه بزنید تا قیمتِ هر سایت و دکمه‌ی دیدن در سایت بیاید. سبز یعنی ارزان‌ترین سایت. نقطه‌ی کوچک یعنی فقط یک سایت آن را داشته.</div>';
+    + '<div class="dnote">عددِ درشتِ هر اندازه، قیمتِ میانه‌ی بازار است (میانگینِ سایت‌ها)، نه قیمتِ یک مغازه. روی هر اندازه بزنید تا قیمتِ هر سایت و دکمه‌ی دیدن در سایت بیاید. سبز یعنی ارزان‌ترین سایت. نقطه‌ی کوچک یعنی فقط یک سایت آن را داشته.</div>';
   var nm = $('dtc').querySelector('.dnm'); fitLines(nm, 3, 16);
   $('dtc').scrollTop = keep;
   if (dtEl.classList.contains('on')) fitPz($('dtc'));
@@ -1119,7 +1125,7 @@ function vwClamp() {
 }
 function vwCaption() {
   var im = entryImg(vwId), n = vwSeq.length;
-  $('vwc').textContent = (im ? im.name : '') + (n > 1 ? '  ·  ' + fa(vwIx + 1) + ' از ' + fa(n) : '');
+  $('vwc').textContent = (im ? im.name : '') + (n > 1 ? '  —  ' + fa(vwIx + 1) + ' از ' + fa(n) : '');
   $('vwn').style.display = n > 1 && vwIx < n - 1 ? '' : 'none'; $('vwp').style.display = n > 1 && vwIx > 0 ? '' : 'none';
 }
 function viewImg(id, seq, from) {
@@ -1301,7 +1307,7 @@ async function refresh(manual) {
   busy = false; lastTried = Date.now(); lastTry = lastTried; ls.set('pp.try', lastTry); saveDb(); updPill(); overlay(); refBtn(); renderSheet();
   queueImgs(); checkReady();
   if (manual) {
-    if (!ok) toast('اینترنت یا سایت‌ها جواب ندادند؛ دوباره امتحان کنید', 4200);
+    if (!ok) toast('اینترنت یا سایت‌ها جواب ندادند؛ دوباره امتحان کنید', 7000);
     else if (bad) toast('بروزرسانی شد، ولی ' + fa(bad) + ' سایت جواب نداد' + (ch > 0 ? ' · ' + fa(ch) + ' قیمت تغییر کرد' : ''), 4200);
     else toast(ch > 0 ? 'بروزرسانی شد · ' + fa(ch) + ' قیمت تغییر کرد' : ch < 0 ? 'بروزرسانی شد · فهرست عطرها تازه شد' : 'بروزرسانی شد · قیمت‌ها تغییری نکرده بود', 3600);
   }
@@ -1867,7 +1873,11 @@ $('dkF').onclick = openFav; $('fvx').onclick = closeFav;
 $('fvr').addEventListener('click', function (e) {
   if (ghosted()) return;
   var f = e.target.closest('.pfv');
-  if (f) { layerMark(); delete set.fav[f.dataset.f]; ls.set('pp.set', set); var sc = $('fvr').scrollTop; favRender(); $('fvr').scrollTop = sc; toast('از لیست مغازه برداشته شد', 2200); return; }
+  if (f) {
+    layerMark(); var fid = f.dataset.f, fval = set.fav[fid]; delete set.fav[fid]; ls.set('pp.set', set); var sc = $('fvr').scrollTop; favRender(); $('fvr').scrollTop = sc;
+    toast('از لیست مغازه برداشته شد', 5000, function () { set.fav[fid] = fval; ls.set('pp.set', set); var s2 = $('fvr').scrollTop; favRender(); $('fvr').scrollTop = s2; });
+    return;
+  }
   var b = e.target.closest('button.pc'); if (b && b.dataset.id) { if (MD_BY[b.dataset.id]) openDetail(b.dataset.id); else toast('این عطر دیگر در فهرست نیست', 2500); }
 });
 /* ---------- گفتنِ نام عطر ---------- */

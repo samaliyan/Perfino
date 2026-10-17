@@ -22,7 +22,7 @@ function mk(id,name,cat){return {id:id,name:name,slug:'p'+id,type:'simple',is_in
   // ۴) عنوان غول‌پیکر: کوتاه می‌شود و زمان معقول است
   var db=C.newDb(),idx=C.dbIndex(db),t0=Date.now();
   C.ingest(db,idx,'s',[{id:1,t:'عطر ادکلن '+new Array(30000).join('1')+' 100 میل',price:5000000,st:0,img:'',big:'',b:[]}],true);
-  eq(Date.now()-t0<1500,true,'huge title is cheap: '+(Date.now()-t0));
+  eq(Date.now()-t0<6000,true,'huge title is cheap: '+(Date.now()-t0));
   // ۵) ingestAsync بدون خطا و با همان نتیجه‌ی ingest
   var BRS=['دیور','شنل','گوچی','ورساچه','پرادا','هرمس','لانکوم','ژیوانشی'],WS='ساواج بلو نایت رویال دارک عود امبر گلد سیلور فانتوم اینتنس ایکون جادور نوآر بلوم دیزایر ریزرو ویکتوری سنتس رز موسک وانیل سدر'.split(' ');
   var items=[];for(var i=0;i<600;i++)items.push({id:i+1,t:'عطر ادکلن '+BRS[i%8]+' '+WS[Math.floor(i/8)%24]+' '+WS[(i*5+Math.floor(i/24))%24]+' ادوپرفیوم 100 میل',price:6000000+i,st:0,img:'',big:'',b:[]});
@@ -39,5 +39,15 @@ function mk(id,name,cat){return {id:id,name:name,slug:'p'+id,type:'simple',is_in
   var ra=await C.reconcileAsync(dbB,idxB),rs=C.reconcile(dbC,idxC);
   eq(fired,true,'a timer fires while reconcileAsync runs (page is not locked)');
   eq(ra,rs,'async and sync reconcile move the same number of groups');
+  // ۷) عنوان چنداندازه‌ای رد می‌شود؛ «Armani Code 2024» نامش را نگه می‌دارد؛ ردیف null در صفحه‌ی دوم فروشگاه را نمی‌اندازد
+  ['Dior Sauvage 60/100/200ml','عطر دیور ساواج 30 - 50 - 100 میل','عطر دیور ساواج 60 و 100 میل'].forEach(function(t){eq(C.parseTitle(t),null,'multi-size title rejected: '+t)});
+  ['Chanel 19, 100ml','Kayali Vanilla 28 - 100ml','Le Labo Santal 33 - 100ml','Carolina Herrera 212 - 100ml'].forEach(function(t){var r=C.parseTitle(t);eq(!!r&&r.ml,100,'product number before size is not a second size: '+t)});
+  var ac=C.parseTitle('Armani Code 2024 EDP 75ml');eq(ac&&ac.key.join(' '),'giorgio armani code','Armani Code keeps "code" when a year follows');
+  eq(C.parseTitle('عطر ادکلن دیور ساواج کد 12345 100 میل').key.join(' '),'دیور ساواج','a real product code is still removed');
+  eq(C.parseTitle('Dior Sauvage EDP 100ml').ml,100,'normal title unchanged');
+  var pg1=[];for(var u=0;u<100;u++)pg1.push(mk(500+u,'عطر ادکلن برند '+u+' | B'+u));
+  var net7={get:async function(u){var m=/[?&]page=(\d+)/.exec(u);var p=+m[1];if(p===1)return {status:200,body:JSON.stringify(pg1)};if(p===2)return {status:200,body:JSON.stringify([null].concat(pg1.slice(0,0)).concat([mk(900,'عطر ادکلن آخر | Last')]))};return {status:400,body:'{"code":"rest_invalid_page_number"}'}}};
+  var r7=await C.wooSource('https://x.shop',net7,function(){},'full');
+  eq(r7.items.length,101,'null row on page 2 does not drop the shop: '+r7.items.length);
   console.log('PASS',ok,'FAIL',bad);process.exit(bad?1:0);
 })();

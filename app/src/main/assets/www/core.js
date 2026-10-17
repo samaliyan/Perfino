@@ -122,7 +122,10 @@ function cleanToks(toks) {
 var YEAR_RE = /^(?:20(?:1[89]|2\d|30)|139[5-9]|140\d)$/;
 function cleanseText(k, st) {
   var before = k;
-  k = k.replace(/(?:^| )(?:کد|code|sku|batch|ref|id|شناسه|بچ|سریال|serial)\s*:?\s*(?:[a-z]{1,4}\s+)?[a-z0-9\-]*\d[a-z0-9\-]*/g, ' ');       // «کد 12345»
+  k = k.replace(/(?:^| )(کد|code|sku|batch|ref|id|شناسه|بچ|سریال|serial)\s*:?\s*(?:[a-z]{1,4}\s+)?([a-z0-9\-]*\d[a-z0-9\-]*)/g, function (all, kw, id) {
+    if (kw === 'code' && (YEAR_RE.test(id) || /^\d{1,2}$/.test(id))) return all;      // «Armani Code 2024» نامِ عطر است، نه کدِ کالا (سال را مرحله‌ی بعد برمی‌دارد)
+    return ' ';
+  });       // «کد 12345»
   k = k.replace(/(?:^| )(?:[a-z]{1,4}\d{4,}|\d{4,}[a-z]{1,4})(?= |$)/g, ' ');                                              // AB12345
   var toks = k.split(/\s+/).filter(Boolean), out = [];
   toks.forEach(function (w) {
@@ -198,6 +201,7 @@ function parseTitle(raw) {
   var vr = vetReason(t); if (vr) { REJ.n++; REJ.by[vr] = (REJ.by[vr] || 0) + 1; if (REJ.ex.length < 40 && vr !== 'clone') REJ.ex.push([vr, String(raw).slice(0, 90)]); return null; }
   var tailG = ''; t = t.replace(/(\d\s*(?:ml|میل))\s+([wmu])\s*$/i, function (_, a, g) { tailG = g.toLowerCase(); return a; });      // «... 100ml W» (هایلند): حرفِ آخر جنسیت است
   t = stripDesc(t);
+  if (/(?:^|[^\d.])(?:25|30|35|40|45|50|60|75|80|90|100|110|120|125|150|175|200|250|300)\s*(?:ml|cc|میل|میلی)?\s*(?:[\/\-–|,،]|\s+و\s+|\s+and\s+)\s*\d{2,3}\s*(?:ml|cc|میل|میلی)/i.test(t)) return null;      // «60/100/200ml»، «۳۰ - ۵۰ - ۱۰۰ میل»: چند اندازه در یک عنوان؛ آخری را اندازه‌ی کالا نگیر
   var m, sizes = [];
   RE_SIZE.lastIndex = 0;
   while ((m = RE_SIZE.exec(t))) sizes.push(+m[1]);
@@ -1714,7 +1718,7 @@ async function wooSource(base, net, rep, mode) {
   var wIds = {};
   var pgN = 0, badN = 0;
   function eat(r) { pgN++; r.a.forEach(function (it) { if (!it || typeof it !== 'object' || wIds[it.id]) return; wIds[it.id] = 1; try { out.push(conv(it)); } catch (e) { badN++; } }); }      // یک ردیفِ خراب کلِ فروشگاه را نمی‌اندازد      // فهرستِ زنده وسط کار جابه‌جا می‌شود: یک محصول دو بار نیاید
-  function isDup(r) { return r.a.length > 0 && r.a.every(function (it) { return wIds[it.id]; }); }
+  function isDup(r) { return r.a.length > 0 && r.a.every(function (it) { return !it || typeof it !== 'object' || wIds[it.id]; }); }
   eat(first); rep(out.length);
   /* صفحه‌ی خراب بلافاصله شکست حساب نمی‌شود: فشار کم می‌شود (هم‌زمانی کمتر + مکث) و بعد از پایانِ کار، صفحه‌های خراب آرام‌تر دوباره
      خوانده می‌شوند. (گزارش واقعی: ۳۶ صفحه از ۹۰ صفحه‌ی لیلیوم خطا داده بود و عطرهای قدیمی‌تر، مثل کلینیک، هرگز وارد حافظه نشدند.) */
@@ -1855,7 +1859,7 @@ async function digikalaSource(net, rep, mode) {
   }
   failed += dbad.length + unreq;
   if (!out.length) throw new Error('محصولی پیدا نشد');
-  var capped = !(d1.pager && d1.pager.total_pages > 0) || d1.pager.total_pages > 100;
+  var capped = !(d1.pager && d1.pager.total_pages > 0) || d1.pager.total_pages >= 100;      // ۱۰۰ = شاید سقفِ خودِ API است
   return { items: out, complete: !failed && total > 0 && !capped, note: failed ? 'ناقص: ' + failed + ' صفحه' : (capped ? 'ناقص: تعداد صفحه‌ها معلوم نیست یا بیش از ۱۰۰ است' : '') };
 }
 

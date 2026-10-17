@@ -540,8 +540,10 @@ public class MainActivity extends Activity {
         public void copy(final String text) {
             runOnUiThread(new Runnable() {
                 @Override public void run() {
-                    ClipboardManager cm = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
-                    if (cm != null) cm.setPrimaryClip(ClipData.newPlainText("report", text));
+                    try {      // متنِ خیلی بزرگ یا خطای سیستم نباید برنامه را بیندازد
+                        ClipboardManager cm = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
+                        if (cm != null && text != null) cm.setPrimaryClip(ClipData.newPlainText("report", text.length() > 400000 ? text.substring(0, 400000) : text));
+                    } catch (Throwable ignore) { }
                 }
             });
         }
