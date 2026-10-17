@@ -63,5 +63,22 @@ function server(mode){var calls=[];return {calls:calls,get:async function(u){
   var r6=await C.wooSource('https://big.shop',s6,function(){},'full');
   eq(r6.items.length,1,'empty filtered page → retried without filter');
   eq(r6.complete,true,'unfiltered read keeps strict completion');
+  // ---- ارتقا از ۱.۳۷: حافظه‌ی قدیمی (فقط ۹۰۰۰ تای اول، با ناموجودها) + اولین بروزرسانیِ «قیمت» با فیلتر ----
+  var sOld=server('reject');C.useSz({});var rOld=await C.wooSource('https://big.shop',sOld,function(){},'full');
+  var dbU=C.newDb(),idxU=C.dbIndex(dbU);C.ingest(dbU,idxU,'big',rOld.items,rOld.complete);dbU.t.big=Date.now();
+  eq(C.buildList(dbU,['big'],{},0).some(function(g){return /کلینیک/.test(g.name)}),false,'before the upgrade Clinique is missing (the bug)');
+  var sNew=server('ok');var rNew=await C.wooSource('https://big.shop',sNew,function(){},'price');
+  var stU=C.ingest(dbU,idxU,'big',rNew.items,rNew.complete);
+  eq(C.buildList(dbU,['big'],{},0).some(function(g){return /کلینیک/.test(g.name)&&g.sizes[0].price===13440000}),true,'first price update after the upgrade adds the old in-stock perfume: '+JSON.stringify(stU));
+  // ---- جستجوی زنده: عطرِ موجودِ قدیمی در میان ده‌ها ناموجودِ تازه‌تر ----
+  var SR=[];for(var z=0;z<30;z++){var inS=(z===25);SR.push({id:1000-z,name:'عطر ادکلن کلینیک هپی مدل '+z+' | Clinique Happy '+z,permalink:'https://liliome.com/shop/c'+z+'/',images:[],categories:[{name:'Clinique'}],type:'simple',is_in_stock:inS,is_purchasable:inS,is_on_backorder:false,prices:pr(inS?13440000:0)})}
+  function searchNet(filterMode){return {calls:[],get:async function(u){this.calls.push(u);var l=SR;if(/stock_status=instock/.test(u)){if(filterMode==='reject')return {status:400,body:'{"code":"rest_invalid_param"}'};if(filterMode!=='ignore')l=SR.filter(function(x){return x.is_in_stock})}return {status:200,body:JSON.stringify(l.slice(0,12))}}}}
+  var sn1=searchNet('ok'),lv=(await C.liveSearch('کلینیک هپی',sn1,['liliome'],{}));
+  eq(lv.items.length>0&&lv.items[0].price===13440000&&/Happy 25/.test(lv.items[0].t),true,'live search: the old in-stock perfume comes first, not lost behind 12 newer sold-out ones: '+JSON.stringify(lv.items.slice(0,2).map(function(x){return [x.t,x.price]})));
+  eq(lv.items.length,13,'sold-out ones are still shown after it (12 + 1): '+lv.items.length);
+  var sn2=searchNet('reject'),lv2=(await C.liveSearch('کلینیک هپی',sn2,['liliome'],{}));
+  eq(lv2.items.length,12,'site rejecting the stock filter: plain search still works: '+lv2.items.length);
+  var sn3=searchNet('ignore'),lv3=(await C.liveSearch('کلینیک هپی',sn3,['liliome'],{}));
+  eq(lv3.items.length,12,'site ignoring the stock filter: no duplicates: '+lv3.items.length);
   console.log(ok,'ok',bad,'bad');process.exit(bad?1:0);
 })();

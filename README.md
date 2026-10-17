@@ -262,6 +262,7 @@ python3 tests/t67_news_feed.py   # خبرها به شکلِ فیدِ اسکرو�
 python3 tests/t70_news_scroll.py  # خبرهای قدیمی‌تر با اسکرول (خودکار، بی‌تکرار، خطا، سقف)
 node tests/t69_news_more.js     # منطقِ صفحه‌به‌صفحه‌ی خبر
 node tests/t68_stock_filter.js  # فروشگاهِ بزرگ: فقط موجودها خوانده می‌شود (کلینیکِ لیلیوم)
+python3 tests/t71_diag_report.py  # گزارش کامل تشخیص برای سازنده (پرسش زنده + حافظه)
 python3 tests/t55_voice.py     # گفتن نام عطر، نوار پایین، آخرین‌ها
 python3 tests/t3_flow.py       # روند کامل بروزرسانی
 python3 tests/t56_search_real.py   # جستجو روی ۱۲ هزار عطر واقعی (نیاز به /tmp/w/realdb.json)

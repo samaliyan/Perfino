@@ -1,7 +1,7 @@
 (function () {
 'use strict';
 var RM = !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
-var VERSION = '1.38';
+var VERSION = '1.39';
 var myCode = (function () { var m = /\/b(\d{1,10})\/index\.html$/.exec(String(location.pathname || '')); return m ? m[1] : '0'; })();      // نسخه‌ی این صفحه از روی آدرسش؛ در گزارش‌ها به جاوا فرستاده می‌شود تا صفحه‌ی کهنه نتواند نسخه‌ی تازه را «سالم» اعلام کند
 function otaCall(n) { try { if (window.Native && typeof window.Native[n] === 'function') window.Native[n](myCode); } catch (e) { } }
 otaCall('otaBoot');      // «جاوااسکریپتِ این صفحه شروع شد»: برنامه به صفحه‌ی بی‌نصب مهلتِ بیشتری برای ساختن فهرست می‌دهد
@@ -1552,6 +1552,72 @@ function whyCover() {
   });
   $('whyCov').innerHTML = h || '<div class="hint2">هنوز چیزی دریافت نشده.</div>';
 }
+/* ---- «گزارش کامل برای سازنده»: وضعیت هر فروشگاه + هرچه از آن عطر در حافظه هست + پرسشِ زنده از خودِ سایت و نتیجه‌ی همان خط لوله ---- */
+var dgBusy = false;
+async function dgRun() {
+  if (dgBusy) return; dgBusy = true;
+  var btn = $('dgGo'), L = [], q = ($('dgIn').value || '').trim();
+  btn.disabled = true; btn.textContent = 'در حال ساخت گزارش…';
+  var ago = function (t) { return t ? Math.round((Date.now() - t) / 60000) + ' دقیقه پیش' : '—'; };
+  try {
+    L.push('=== گزارش تشخیص ' + VERSION + ' · ' + new Date().toISOString() + ' ===');
+    L.push('Native: ' + (window.Native ? 'yes' : 'no') + ' appCode=' + (function () { try { return window.Native.appCode(); } catch (e) { return '?'; } })() + ' online=' + navigator.onLine + ' UA=' + String(navigator.userAgent).slice(0, 110));
+    L.push('خاموش‌شده‌ها: سایت=' + Object.keys(set.soff || {}).join(',') + ' برند=' + Object.keys(set.off || {}).length + ' پنهان=' + Object.keys(set.hide || {}).length + ' واژه‌ی ممنوع=' + ((set.block || []).length || 0));
+    L.push('در فهرست: ' + list.length + ' عطر · مبهم: ' + hiddenN);
+    var shown = {}; FLAT.forEach(function (g) { shown[g.id] = g; });
+    L.push('\n--- فروشگاه‌ها ---');
+    Core.SOURCES.forEach(function (sc) {
+      var x = stt[sc.id] || {}, m = db.it[sc.id] || {}, tot = 0, pr = 0, oos = 0, rej = 0, stale = 0, why = {};
+      var lim = Math.floor(Date.now() / 60000) - Core.STALE_MIN;
+      Object.keys(m).forEach(function (pid) {
+        var e = m[pid]; tot++;
+        if (e[2] && e[1] > 0) { pr++; if (!(e[4] > lim)) stale++; } else if (e[2]) oos++;
+        else if (e[0]) { rej++; var w = Core.explainTitle(e[0]); var k = w.ok ? 'بدون قیمت' : w.why; why[k] = (why[k] || 0) + 1; }
+      });
+      L.push(sc.id + ' (' + sc.name + '): ' + (x.ok ? 'ok' : 'FAIL ' + (x.raw || x.err || '')) + ' · حالت=' + (x.mode || '?') + ' · n=' + (x.n || 0) + ' · ' + ago(x.t) + ' · آخرین کامل=' + ago(db.full[sc.id]) + ' · note=' + (x.note || ''));
+      L.push('   حافظه: کل=' + tot + ' قیمت‌دار=' + pr + ' (کهنه‌شده ' + stale + ') ناموجود=' + oos + ' ردشده/بی‌قیمت=' + rej + ' · ' + Object.keys(why).sort(function (a, b) { return why[b] - why[a]; }).slice(0, 5).map(function (k) { return why[k] + '×' + k; }).join(' | '));
+    });
+    var terms = q ? Core.normFa(q, true).split(/\s+/).filter(function (w) { return w.length >= 2; }) : ['کلینیک', 'clinique', 'کیلینیک'];
+    L.push('\n--- آنچه در حافظه‌ی برنامه با «' + (q || 'کلینیک / clinique / کیلینیک') + '» هست ---');
+    var rows = [];
+    Object.keys(db.it || {}).forEach(function (sr) {
+      var m = db.it[sr] || {};
+      Object.keys(m).forEach(function (pid) {
+        var e = m[pid]; if (!e[0]) return; var n = Core.normFa(e[0], true);
+        var hit = q ? terms.every(function (w) { return n.indexOf(w) >= 0; }) : terms.some(function (w) { return n.indexOf(w) >= 0; });
+        if (hit) rows.push([sr, pid, e]);
+      });
+    });
+    L.push(rows.length + ' مورد' + (rows.length > 80 ? ' (۸۰ تای اول)' : ''));
+    rows.slice(0, 80).forEach(function (r) {
+      var e = r[2], g = e[2] ? shown[e[2]] : null, st;
+      if (e[2] && e[1] > 0 && g) st = 'IN-LIST'; else if (e[2] && e[1] > 0) st = 'priced-but-not-shown'; else if (e[2]) st = 'out-of-stock(price0)'; else { var w = Core.explainTitle(e[0]); st = w.ok ? 'no-price' : 'REJECTED: ' + w.why; }
+      L.push(r[0] + ' #' + r[1] + ' | ' + e[0].slice(0, 90) + ' | price=' + e[1] + ' ml=' + e[3] + ' | seen ' + Math.round((Date.now() / 60000 - e[4])) + 'min ago | ' + st);
+    });
+    var probe = q || 'clinique';
+    L.push('\n--- پرسش زنده از خودِ سایت‌ها: «' + probe + '» ---');
+    var bases = { liliome: 'https://liliome.com', safir: 'https://www.safirstores.com', hiland: 'https://hilandbeauty.com' };
+    for (var id in bases) {
+      if (!srcOn(id)) { L.push(id + ': خاموش'); continue; }
+      btn.textContent = 'پرسیدن از ' + id + '…';
+      var P; try { P = await Core.probeShop(net, bases[id], probe); } catch (e) { L.push(id + ': خطا ' + (e && e.message || e)); continue; }
+      L.push(id + ' · ' + P.calls.join(' · ') + (P.err ? ' · pipeline-error: ' + P.err : '') + ' · ' + P.rows.length + ' محصول');
+      P.rows.forEach(function (r) {
+        var st = (db.it[id] || {})[String(r.id)];
+        L.push('  #' + r.id + ' ' + r.name + ' | ' + r.type + ' stock=' + r.stock + ' buy=' + r.buy + ' backorder=' + r.back + ' price=' + r.price + ' ' + r.cur + (r.range ? ' RANGE' : '') + ' | cats=' + r.cats + ' | in-instock-list=' + r.inInstock + ' | size: spec=' + r.spec + ' name=' + r.nameSize);
+        L.push('     برنامه: st=' + r.appSt + ' price=' + r.appPrice + ' «' + r.appT + '» ' + (r.appOk === true ? 'نام قابل‌قبول' : r.appOk === false ? 'REJECT: ' + r.appWhy : '') + ' | در حافظه: ' + (st ? 'بله price=' + st[1] + ' gid=' + (st[2] ? 'yes' : 'no') + ' ml=' + st[3] + ' ' + (st[2] && shown[st[2]] ? 'IN-LIST' : '') : 'خیر'));
+      });
+    }
+    L.push('\n--- خطاهای شبکه ---');
+    netBad.concat(netLog).slice(-8).forEach(function (l) { L.push(l.s + ' ' + l.u + ' ' + String(l.b).slice(0, 160)); });
+  } catch (e) { L.push('خطا در ساخت گزارش: ' + (e && e.stack || e)); }
+  var t = L.join('\n'), ta = $('dgOut');
+  ta.value = t; ta.style.display = '';
+  var copied = false; try { if (window.Native && window.Native.copy) { window.Native.copy(t); copied = true; } else if (navigator.clipboard) { navigator.clipboard.writeText(t).catch(function () { }); copied = true; } } catch (e) { }
+  btn.disabled = false; btn.textContent = copied ? 'کپی شد؛ در پیام برای سازنده بچسبانید (دوباره: بزنید)' : 'گزارش پایین است؛ متن را نگه دارید و کپی کنید';
+  dgBusy = false;
+}
+$('dgGo').onclick = dgRun;
 $('whyGo').onclick = whyRun;
 $('whyIn').addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); whyRun(); } });
 $('whyCovB').onclick = whyCover;

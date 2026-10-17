@@ -1684,7 +1684,8 @@ async function wooSource(base, net, rep, mode) {
   if (first.k === 'fail') throw new Error(first.s ? 'HTTP ' + first.s : (first.b || 'اینترنت وصل نیست'));
   var res = [first], page = 2, ended = first.a.length === 0;            // صفحه‌ی کوتاه = پایان نیست (سایت ممکن است per_page را کم کرده باشد)
   var wIds = {};
-  function eat(r) { r.a.forEach(function (it) { wIds[it.id] = 1; out.push(conv(it)); }); }
+  var pgN = 0;
+  function eat(r) { pgN++; r.a.forEach(function (it) { wIds[it.id] = 1; out.push(conv(it)); }); }
   function isDup(r) { return r.a.length > 0 && r.a.every(function (it) { return wIds[it.id]; }); }
   eat(first); rep(out.length);
   while (!ended && page <= 90) {
@@ -1703,7 +1704,43 @@ async function wooSource(base, net, rep, mode) {
   var szN = 0;
   if (!fields) szN = await fillSizes(base, out, net);
   var dn = (!fields && diag.total) ? ' · قیمت‌دار ' + diag.priced + ' از ' + diag.total + ' · اندازه از عنوان ' + diag.sizeTitle + '، از توضیحات ' + diag.sizeSpec + '، بدون اندازه ' + diag.noSize + (diag.sample ? ' (نمونه: ' + diag.sample + ')' : '') : '';
-  return { items: out, complete: ended && !failed ? (stk ? 'soft' : true) : false, note: (failed ? 'ناقص: ' + failed + ' صفحه' : '') + (!ended && !failed ? 'ناقص: به سقفِ ۹۰ صفحه رسید' : '') + dn + (szN ? ' · اندازه از صفحه‌ی محصول ' + szN : '') + (vN ? ' · اندازه‌های محصولِ چنداندازه‌ای ' + vN : ''), diag: diag };
+  return { items: out, complete: ended && !failed ? (stk ? 'soft' : true) : false, note: (failed ? 'ناقص: ' + failed + ' صفحه' : '') + (!ended && !failed ? 'ناقص: به سقفِ ۹۰ صفحه رسید' : '') + ' · ' + pgN + ' صفحه' + (stk ? ' فقط موجود' : ' بی‌فیلتر') + dn + (szN ? ' · اندازه از صفحه‌ی محصول ' + szN : '') + (vN ? ' · اندازه‌های محصولِ چنداندازه‌ای ' + vN : ''), diag: diag };
+}
+
+/* ---------- بررسی زنده‌ی یک فروشگاه برای گزارش تشخیص ----------
+   همان محصولاتِ سایت را با جستجو می‌گیرد (هم با فیلتر موجودی هم بدونش) و عیناً از همان خط لوله‌ی برنامه (wooSource) می‌گذراند؛
+   خروجی برای هر محصول: داده‌ی خامِ سایت + نتیجه‌ی برنامه. چیزی حدس زده نمی‌شود. */
+async function probeShop(net, base, q) {
+  var out = { base: base, q: q, calls: [], rows: [], err: '' };
+  async function lst(stock) {
+    var u = base + '/wp-json/wc/store/v1/products?per_page=40&search=' + encodeURIComponent(q) + (stock ? '&stock_status=instock' : '');
+    var r = await getR(net, u, { Accept: 'application/json' }, 2), a = r.status === 200 ? parseJson(r.body) : undefined;
+    out.calls.push((stock ? 'فقط موجود' : 'همه') + ': HTTP ' + r.status + (Array.isArray(a) ? ' · ' + a.length + ' محصول' : ' · ' + String(r.body || '').slice(0, 80).replace(/\s+/g, ' ')));
+    return Array.isArray(a) ? a : [];
+  }
+  var all = await lst(false), inst = await lst(true), by = {}, order = [];
+  inst.concat(all).forEach(function (it) { if (it && it.id != null && !by[it.id]) { by[it.id] = it; order.push(it.id); } });
+  var instIds = {}; inst.forEach(function (it) { instIds[it.id] = 1; });
+  if (!order.length) return out;
+  var recs = order.map(function (id) { return by[id]; });
+  var fake = { get: async function (u, h) {
+    var m = /type=variation/.test(u) ? null : /wc\/store\/v1\/products\?.*[?&]page=(\d+)/.exec(u);
+    if (m) return +m[1] === 1 ? { status: 200, body: JSON.stringify(recs) } : { status: 400, body: '{"code":"rest_invalid_page_number"}' };
+    return net.get(u, h);
+  } };
+  var res = null;
+  try { res = await wooSource(base, fake, function () { }, 'full'); } catch (e) { out.err = String(e && e.message || e).slice(0, 120); }
+  var conv = {}; if (res) res.items.forEach(function (x) { conv[x.id] = x; });
+  recs.forEach(function (it) {
+    var pr = it.prices || {}, c = conv[it.id], x = c && c.st === 0 && c.price > 0 ? explainTitle(c.t) : null;
+    out.rows.push({
+      id: it.id, name: String(it.name || '').slice(0, 100), type: it.type, stock: it.is_in_stock, buy: it.is_purchasable, back: it.is_on_backorder, price: pr.price, range: !!(pr.price_range && pr.price_range.min_amount !== pr.price_range.max_amount),
+      cur: pr.currency_code, cats: (it.categories || []).map(function (k) { return k.name; }).slice(0, 3).join('/'), inInstock: !!instIds[it.id],
+      spec: specInfo(it.short_description || it.description || '').ml, nameSize: hasSizeWord(normFa(it.name || '', true)),
+      appT: c ? String(c.t).slice(0, 110) : '', appSt: c ? c.st : -1, appPrice: c ? c.price : 0, appOk: x ? x.ok : null, appWhy: x && !x.ok ? x.why : ''
+    });
+  });
+  return out;
 }
 
 var DK_URLS = [
@@ -2061,9 +2098,17 @@ async function wooLive(srcId, base, terms, net, tools) {
   for (var qi = 0; qi < qs.length; qi++) {
     var a;
     if (!apiDead) {
-      var url = base + '/wp-json/wc/store/v1/products?per_page=12&search=' + encodeURIComponent(qs[qi]) + '&_fields=id,name,permalink,images,prices,is_in_stock,is_purchasable,is_on_backorder,price_html,categories,type';
-      var r = await getR(net, url, { Accept: 'application/json' }, 2); a = r.status === 200 ? parseJson(r.body) : undefined;
-      if (!Array.isArray(a)) apiDead = true;
+      /* نتیجه‌ها «تازه‌ترین اول» می‌آیند و فقط ۱۲ تا؛ در فروشگاهی که از یک برند ده‌ها محصولِ ناموجود/تستر دارد، عطرِ موجودِ قدیمی (مثل کلینیک هپی مردانه) از ۱۲ تا بیرون می‌ماند.
+         پس دو پرسش هم‌زمان: «فقط موجودها» (اول می‌آیند) و «همه» (برای نشان‌دادنِ ناموجودها)؛ بدونِ تکرار ادغام می‌شوند. سایتی که فیلترِ موجودی را نمی‌پذیرد فقط از پرسشِ دوم جواب می‌گیرد. */
+      var url = base + '/wp-json/wc/store/v1/products?per_page=12&search=' + encodeURIComponent(qs[qi]), flds = '&_fields=id,name,permalink,images,prices,is_in_stock,is_purchasable,is_on_backorder,price_html,categories,type';
+      var r1 = await getR(net, url + '&stock_status=instock' + flds, { Accept: 'application/json' }, 2), aIn = r1.status === 200 ? parseJson(r1.body) : undefined, aAll;
+      if (Array.isArray(aIn) || r1.status === 400) {      // رابطِ ووکامرس هست (۴۰۰ = فیلتر را نپذیرفت)؛ سایتی که رابط ندارد فقط یک پرسش می‌خورد
+        var r2 = await getR(net, url + flds, { Accept: 'application/json' }, 2); aAll = r2.status === 200 ? parseJson(r2.body) : undefined;
+      }
+      if (Array.isArray(aIn) || Array.isArray(aAll)) {
+        var sn = {}; a = [];
+        (Array.isArray(aIn) ? aIn : []).concat(Array.isArray(aAll) ? aAll : []).forEach(function (it) { var k = it && typeof it === 'object' ? (it.id != null ? 'i' + it.id : 'p' + it.permalink) : ''; if (!k || sn[k]) return; sn[k] = 1; a.push(it); });
+      } else apiDead = true;
     }
     if (apiDead) {      // رابطِ ووکامرس بسته است: صفحه‌ی جستجوی خودِ سایت (هر سایت آدرسِ خودش را دارد)
       if (qi >= 2) break;
@@ -2799,7 +2844,7 @@ function searchRank(idx, alts, tools, opts) {
   return out;
 }
 
-root.Core = { fetchNews: fetchNews, newsMore: newsMore, newsFromWp: newsFromWp, newsFromRss: newsFromRss, newsPickImg: newsPickImg, newsExcerpt: newsExcerpt, NEWS_SRC: NEWS_SRC, liveSearch: liveSearch, liveTerms: liveTerms, liveHit: liveHit, wooLivePrice: wooLivePrice, searchIndex: searchIndex, searchRank: searchRank, searchSimilar: searchSimilar, simWord: simWord, simFold: simFold, srn: srn, fzKey: fzKey, explainTitle: explainTitle, useSz: useSz, sizeFromPage: sizeFromPage, nextDataCards: nextDataCards, RAWC: RAWC, stripPriceTail: stripPriceTail, marketStats: marketStats, marketView: marketView, histNew: histNew, histFix: histFix, histSnap: histSnap, histReport: histReport, purgeStored: purgeStored, setBlock: setBlock, REJ: REJ, vetReason: vetReason, reconcile: reconcile, CLEANSE: CLEANSE, cleanseText: cleanseText, cleanBrandName: cleanBrandName, itemUrl: itemUrl, STALE_MIN: STALE_MIN, fa2en: fa2en, en2fa: en2fa, enTokens: enTokens, titleEn: titleEn, tree: tree, brandOf: brandOf, specInfo: specInfo, enrichTitle: enrichTitle, genderOf: genderOf, nameCmp: nameCmp, CFG: CFG, newDb: newDb, dbIndex: dbIndex, ingest: ingest, ingestAsync: ingestAsync, buildList: buildList, normFa: normFa, parseTitle: parseTitle, aggregate: aggregate, SOURCES: SOURCES, extractCards: extractCards,
+root.Core = { probeShop: probeShop, fetchNews: fetchNews, newsMore: newsMore, newsFromWp: newsFromWp, newsFromRss: newsFromRss, newsPickImg: newsPickImg, newsExcerpt: newsExcerpt, NEWS_SRC: NEWS_SRC, liveSearch: liveSearch, liveTerms: liveTerms, liveHit: liveHit, wooLivePrice: wooLivePrice, searchIndex: searchIndex, searchRank: searchRank, searchSimilar: searchSimilar, simWord: simWord, simFold: simFold, srn: srn, fzKey: fzKey, explainTitle: explainTitle, useSz: useSz, sizeFromPage: sizeFromPage, nextDataCards: nextDataCards, RAWC: RAWC, stripPriceTail: stripPriceTail, marketStats: marketStats, marketView: marketView, histNew: histNew, histFix: histFix, histSnap: histSnap, histReport: histReport, purgeStored: purgeStored, setBlock: setBlock, REJ: REJ, vetReason: vetReason, reconcile: reconcile, CLEANSE: CLEANSE, cleanseText: cleanseText, cleanBrandName: cleanBrandName, itemUrl: itemUrl, STALE_MIN: STALE_MIN, fa2en: fa2en, en2fa: en2fa, enTokens: enTokens, titleEn: titleEn, tree: tree, brandOf: brandOf, specInfo: specInfo, enrichTitle: enrichTitle, genderOf: genderOf, nameCmp: nameCmp, CFG: CFG, newDb: newDb, dbIndex: dbIndex, ingest: ingest, ingestAsync: ingestAsync, buildList: buildList, normFa: normFa, parseTitle: parseTitle, aggregate: aggregate, SOURCES: SOURCES, extractCards: extractCards,
   wooSource: wooSource, digikalaSource: digikalaSource, htmlSource: htmlSource, letterOf: letterOf, median: median, priceFromText: priceFromText, similar: similar };
 if (typeof module !== 'undefined') module.exports = root.Core;
 })(typeof window !== 'undefined' ? window : globalThis);
