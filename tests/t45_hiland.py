@@ -24,6 +24,22 @@ async def main():
         chk('marked complete',r['complete']==True,r['note'])
         chk('no cart junk',r['junk']==0)
         chk('last request was page 216 (not beyond)','pagenumber=216' in r['last'],r['last'])
+        # صفحه‌ی ۱۶ دو بار خطا می‌دهد و بعد درست می‌شود؛ و حالتی که صفحه‌ی ۱۶ همیشه خراب است (گزارشِ واقعی: «۱۵ صفحه؛ صفحه ۱۶ نشد»)
+        for mode in ('flaky','dead'):
+            r2=await pg.evaluate("""async (a)=>{var h=a[0],mode=a[1];Core.CFG&&(Core.CFG.retryMs=5);
+              var tries=0;
+              var net={get:async function(u){
+                if(u.indexOf('wp-json')>=0||u.indexOf('/wc/')>=0) return {status:404,body:''};
+                var m=/pagenumber=(\\d+)/.exec(u);var n=m?+m[1]:1; if(n>216) return {status:404,body:''};
+                if(n===16){tries++; if(mode==='dead'||tries<=2) return {status:503,body:''};}
+                return {status:200,body:h.replace(/href=(\\/fa\\/)/g,'href=$1p'+n+'-').replace(/href="(https:\\/\\/hilandbeauty.com\\/fa\\/)/g,'href="$1p'+n+'-')};}};
+              var src=Core.SOURCES.filter(function(s){return s.id==='hiland'})[0];
+              var res=await src.run(net,function(){},'full');
+              return {n:res.items.length,complete:res.complete,note:res.note}}""",[html,mode])
+            if mode=='flaky':
+                chk('a page that fails twice is retried and the whole list is read',r2['n']>=216*30 and r2['complete']==True,r2)
+            else:
+                chk('a dead page is skipped: the other 215 pages are still read, list marked incomplete',r2['n']>=215*30 and r2['complete']==False and 'ناقص' in r2['note'],r2)
         chk('no js errors',not errs,errs)
         await b.close()
     print(len(OK),'pass',len(BAD),'fail')

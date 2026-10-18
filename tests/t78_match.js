@@ -57,4 +57,14 @@ chk(find(V4, /مابوسین|Mauboussin/i).every(function (v) { return v.s.index
 // ۶) واژه‌ای مثل constructor برنامه را نمی‌اندازد؛ ch = ش (Cherie = شری)
 try { build({ liliome: [['عطر ادکلن دیور constructor 100 میل', 5e6]], hiland: [['ادوپرفیوم مردانه دیور konstruktor 100 میل', 5e6]] }); chk(true); } catch (e) { chk(false, 'constructor word crashes matching', e && e.message); }
 one(build({ digikala: [['ادو پرفیوم زنانه رولینگ مدل Cherie Blossom حجم 100 میلی لیتر', 3e6]], liliome: [['عطر ادکلن رولینگ شری بلاسم 100 میل', 3.1e6]] }), /رولینگ/, 'digikala+liliome', 'Cherie = شری');
+// ۷) از خروجیِ واقعیِ گوشی: «پرفیوم دو مارلی» = «مارلی» = «پارفومز د مارلی»؛ یونیسکسِ لیلیوم با «مردانه»ی دیجی‌کالا؛ ولی Layton ≠ Haltane
+one(build({ digikala: [['ادو پرفیوم مردانه پرفیوم دو مارلی مدل Percival حجم 125 میلی لیتر', 5e6]], hiland: [['ادوپرفیوم پرفیومز دو مارلی پرسیوال 125 میل', 5.1e6]],
+  liliome: [['عطر ادکلن مارلی پرسیوال | Parfums de Marly Percival 125 میل یونیسکس ادوپرفیوم', 5.2e6]] }), /پرسیوال|percival/i, 'digikala+hiland+liliome', 'Percival from 3 shops is one product');
+var V7 = build({ digikala: [['ادو پرفیوم مردانه پرفیوم دو مارلی مدل Haltane با رایحه گرم حجم 125 میلی لیتر', 9e6]], liliome: [['عطر ادکلن مارلی لیتون | Parfums de Marly Layton 125 میل یونیسکس ادوپرفیوم', 9.1e6]] });
+chk(V7.length === 2, 'Layton and Haltane stay apart', JSON.stringify(V7));
+// ۸) یونیسکس فقط یک جنسیت را می‌گیرد؛ Eros ≠ Rose
+var V8 = build({ liliome: [['عطر ادکلن تام فورد بلک ارکید ادو پرفیوم یونیسکس 100 میل', 9e6]], digikala: [['ادو پرفیوم مردانه تام فورد مدل Black Orchid حجم 100 میلی لیتر', 9.1e6], ['ادو پرفیوم زنانه تام فورد مدل Black Orchid حجم 100 میلی لیتر', 9.2e6]] });
+chk(!V8.some(function (v) { return /digikala/.test(v.s) && v.s.split('+').length === 3; }) && V8.length >= 2, 'one unisex group does not swallow both the men and the women listing', JSON.stringify(V8));
+var V9 = build({ liliome: [['عطر ادکلن ورساچه اروس ادو تویلت مردانه 100 میل', 5e6]], digikala: [['ادو تویلت مردانه ورساچه مدل Rose حجم 100 میلی لیتر', 5.1e6]] });
+chk(V9.length === 2, 'Eros and Rose stay apart', JSON.stringify(V9));
 console.log(ok + ' pass ' + bad + ' fail'); process.exit(bad ? 1 : 0);
