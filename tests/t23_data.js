@@ -28,11 +28,15 @@ C.ingest(db,idx,'liliome',[
 ],true);
 var gs=Object.keys(db.g).length;T(gs===8||gs===9,'similar-but-different not merged',gs);
 T(gs===9,'9 distinct groups',gs);
-// ۶) املای متفاوت بدون غلظت/جنسیت با شباهت قیمت ادغام نمی‌شود
+// ۶) املای متفاوت بدون غلظت/جنسیت: فقط با قیمتِ هم‌اندازه‌ی خیلی نزدیک (±۱۲٪) و یک نامزدِ یگانه یکی می‌شود؛ با قیمتِ دور نه (نسخه‌ی ۱.۴۲: قبلاً هرگز یکی نمی‌شد)
 var db2=C.newDb(),i2=C.dbIndex(db2);
 C.ingest(db2,i2,'liliome',[it('عطر ادکلن دیور ایلوژن ادو تویلت مردانه 100 میل',5000000,{id:1})],true);
 C.ingest(db2,i2,'digikala',[it('عطر دیور ایلوزن 100 میل',5000000,{id:'9'})],true);
-T(Object.keys(db2.g).length===2,'fuzzy w/o conc not merged by price',Object.keys(db2.g).length);
+T(Object.keys(db2.g).length===1,'fuzzy w/o conc merged when same-size price is within 12%',Object.keys(db2.g).length);
+var db3=C.newDb(),i3=C.dbIndex(db3);
+C.ingest(db3,i3,'liliome',[it('عطر ادکلن دیور ایلوژن ادو تویلت مردانه 100 میل',5000000,{id:1})],true);
+C.ingest(db3,i3,'digikala',[it('عطر دیور ایلوزن 100 میل',7000000,{id:'9'})],true);
+T(Object.keys(db3.g).length===2,'fuzzy w/o conc NOT merged when prices are far apart',Object.keys(db3.g).length);
 // ۷) مدل تک‌حرفی Y
 var db3=C.newDb(),i3=C.dbIndex(db3);
 C.ingest(db3,i3,'liliome',[it('عطر ادکلن ایو سن لوران وای ادو پرفیوم مردانه 100 میل',6000000,{id:1,b:['Yves Saint Laurent']}),it('YSL Y EDP men 100ml',6100000,{id:2})],true);

@@ -415,7 +415,11 @@ function xTokEq(x, y) {
   if (tokEq(x, y)) return true;
   if (/^\d+$/.test(x) || /^\d+$/.test(y)) return false;
   var sx = skel(x), sy = skel(y);
-  return sx.length >= 2 && sx === sy && x.charAt(0) === y.charAt(0) || (sx.length >= 3 && sx === sy);
+  if (sx.length >= 2 && sx === sy && x.charAt(0) === y.charAt(0) || (sx.length >= 3 && sx === sy)) return true;
+  /* «و» فارسی گاهی صدادار است و گاهی v («آکوا» / Aqva، «درایون» / Driven، «هوس» / Hawas)؛ برای مقایسه‌ی فارسی با لاتین v را کنار می‌گذاریم، به شرط هم‌حرفِ اول و طولِ نزدیک */
+  if (x.charAt(0) !== y.charAt(0) || !/[a-z]/.test(x + y)) return false;
+  var tx = sx.replace(/v/g, ''), ty = sy.replace(/v/g, ''), dl = Math.abs(x.length - y.length), ml = Math.min(x.length, y.length);
+  return tx === ty && ((tx.length >= 2 && dl <= 2) || (tx.length === 1 && ml >= 4 && dl <= 1));
 }
 function xSimilar(A, B) { if (A.length !== B.length) return false; for (var i = 0; i < A.length; i++) if (!xTokEq(A[i], B[i])) return false; return true; }
 function nameCmp(A, B) {
@@ -429,6 +433,39 @@ function nameCmp(A, B) {
   for (var i = 0; i < a.length; i++) { if (a[i] !== b[i]) { same = false; break; } }
   return same ? 2 : (similar(a, b) || sameLine(a, b)) ? 1 : 0;
 }
+/* شباهتِ «صدایی» کل نام (برای یکی‌کردنِ دو آگهیِ یک عطر که املا یا فاصله‌گذاری‌شان فرق دارد: «تو بی کینگ» / «توبی کینگ»، «حلوا» / «هالوا»):
+   عددها باید دقیقاً یکی باشند؛ بقیه‌ی نام لاتین می‌شود، به اسکلتِ همخوان‌ها (بدون v، و d=t) برمی‌گردد و با هم مقایسه می‌شود. فقط برای تطبیقِ «ضعیف» است و قیمتِ خیلی نزدیک هم می‌خواهد */
+function levD(a, b) {
+  var p = [], i, j; for (j = 0; j <= b.length; j++) p[j] = j;
+  for (i = 1; i <= a.length; i++) { var c = [i]; for (j = 1; j <= b.length; j++) c[j] = Math.min(p[j] + 1, c[j - 1] + 1, p[j - 1] + (a.charAt(i - 1) === b.charAt(j - 1) ? 0 : 1)); p = c; }
+  return p[b.length];
+}
+function phCol(x) { return x.replace(/h/g, '').replace(/[aeiouy]+/g, 'a').replace(/(.)\1+/g, '$1'); }
+function phTok(x, y) {      // دو واژه‌ی لاتین (یا فارسیِ لاتین‌شده) یک صدا دارند؟ همخوان‌ها یکی و صدادارها دور نباشند
+  if (x === y) return true;
+  if (/\d/.test(x) || /\d/.test(y)) return false;
+  if (skel(x).replace(/v/g, '') !== skel(y).replace(/v/g, '')) return false;
+  var cx = phCol(x), cy = phCol(y);
+  return levD(cx, cy) <= (Math.max(cx.length, cy.length) >= 7 ? 2 : 1);
+}
+function phAlign(A, B, i, j) {      // واژه‌به‌واژه، با اجازه‌ی چسبیدن/جداشدنِ دو واژه‌ی کنارِ هم («تو بی» = «توبی»)
+  if (i === A.length && j === B.length) return true;
+  if (i >= A.length || j >= B.length) return false;
+  if (phTok(A[i], B[j]) && phAlign(A, B, i + 1, j + 1)) return true;
+  if (i + 1 < A.length && phTok(A[i] + A[i + 1], B[j]) && phAlign(A, B, i + 2, j + 1)) return true;
+  if (j + 1 < B.length && phTok(A[i], B[j] + B[j + 1]) && phAlign(A, B, i + 1, j + 2)) return true;
+  return false;
+}
+function latToks(r) {
+  if (r._lt) return r._lt;
+  return (r._lt = (isFaArr(r) ? enOf(r) : r.map(function (w) { return String(w).toLowerCase().replace(/'/g, ''); })).filter(Boolean));
+}
+function looseName(A, B) {
+  if (A._b !== B._b) return false;
+  var a = latToks(restOf(A)), b = latToks(restOf(B));
+  if (a.length > 9 || b.length > 9 || Math.abs(a.length - b.length) > 2 || skel(a.join('')).length < 4) return false;
+  return phAlign(a, b, 0, 0);
+}
 function concCmp(a, b) { return a === b ? 2 : (!a || !b) ? 1 : 0; }
 function genCmp(a, b) { return a === b ? 2 : (!a || !b || a === 'u' || b === 'u') ? 1 : 0; }   // مردانه با زنانه هرگز یکی نمی‌شود
 function priceOK(r, lo, hi) { return r >= lo && r <= hi; }
@@ -441,6 +478,11 @@ function corrob(prices, ml, vars) {
   prices.forEach(function (x) { if (!best || Math.abs(Math.log(ml / x.ml)) < Math.abs(Math.log(ml / best.ml))) best = x; });
   var q = best.p * Math.pow(ml / best.ml, .8);
   return vars.some(function (p) { return priceOK(p / q, .65, 1.55); });
+}
+/* قیمتِ هم‌اندازه با اختلافِ کم (برای تطبیقِ ضعیف‌تر: املای متفاوت و غلظتِ نامشخص) */
+function corrobTight(prices, ml, p) {
+  if (!prices || !ml) return false;
+  return prices.some(function (x) { return x.ml === ml && priceOK(p / x.p, .88, 1.14); });
 }
 function scaleVars(db, src, price) {
   var sc = db.sc && db.sc[src];
@@ -1371,9 +1413,11 @@ function* reconcileGen(db, idx) {      // مولّد: هر چند گروه یک�
   function step1(hid) {
     var H = G[hid]; if (!H || !(H.conc === '' || H.gn === '')) return;
     var hp = byG[hid]; if (!hp || !hp.length) return;
+    var loose = {};
     var sib = idx.cands(H.key, true).filter(function (id) {
       var S = G[id]; if (!S || id === hid) return false;
-      var nmc = nameCmp(H.key, S.key); if (!nmc || (nmc === 1 && !((H.conc !== '' && H.conc === S.conc) || (H.gn !== '' && H.gn === S.gn)))) return false;
+      var nmc = nameCmp(H.key, S.key); if (!nmc) { if (!looseName(H.key, S.key)) return false; nmc = 1; loose[id] = 1; }
+      if (nmc === 1 && !((H.conc !== '' && H.conc === S.conc) || (H.gn !== '' && H.gn === S.gn))) loose[id] = 1;      // املای متفاوتِ نام و غلظت/جنسیتِ ناروشن: فقط با قیمتِ خیلی نزدیک (پایین)
       if (!concCmp(H.conc, S.conc) || !genCmp(H.gn, S.gn)) return false;
       return (H.conc === '' || S.conc !== '') && (H.gn === '' || S.gn !== '') && (S.conc !== '' || S.gn !== '');
     });
@@ -1382,8 +1426,8 @@ function* reconcileGen(db, idx) {      // مولّد: هر چند گروه یک�
       var o = SM[id] || {}; for (var q in mine) if (o[q]) return false;
       return true;
     });
-    var cor = sib.filter(function (id) { return hp.some(function (x) { return corrob(byG[id], x.ml, [x.p]); }); });
-    if (cor.length === 1) { var tt = SM[cor[0]] = SM[cor[0]] || {}; for (var q2 in mine) tt[q2] = 1; moveGroup(db, hid, cor[0]); delete G[hid]; moved++; }
+    var cor = sib.filter(function (id) { return hp.some(function (x) { return loose[id] ? corrobTight(byG[id], x.ml, x.p) : corrob(byG[id], x.ml, [x.p]); }); });
+    if (cor.length === 1 && (!loose[cor[0]] || sib.length === 1)) { var tt = SM[cor[0]] = SM[cor[0]] || {}; for (var q2 in mine) tt[q2] = 1; moveGroup(db, hid, cor[0]); delete G[hid]; moved++; }
   }
   var K1 = Object.keys(G); for (var i1 = 0; i1 < K1.length; i1++) { step1(K1[i1]); if (i1 % 100 === 99) yield; }
   /* مرحله‌ی ۲: دو گروهِ کاملاً مشخص (غلظت و جنسیت یکی) که فقط خط یا املای نامشان فرق دارد («ورساچه اروس» / Versace Eros) */
@@ -1391,14 +1435,14 @@ function* reconcileGen(db, idx) {      // مولّد: هر چند گروه یک�
   function step2(hid) {
     var H = G[hid]; if (!H || H.conc === '' || H.gn === '') return;
     var hp = byG[hid]; if (!hp || !hp.length) return;
-    var mine = SM[hid] || {};
+    var mine = SM[hid] || {}, loose2 = {};
     var sib = idx.cands(H.key, true).filter(function (id) {
       var S = G[id]; if (!S || id === hid || S.conc !== H.conc || S.gn !== H.gn) return false;
-      if (!nameCmp(H.key, S.key)) return false;
+      if (!nameCmp(H.key, S.key)) { if (!looseName(H.key, S.key)) return false; loose2[id] = 1; }
       var o = SM[id] || {}; for (var q in mine) if (o[q]) return false;       // همان سایت و همان اندازه در هر دو = دو کالای جدا
       return true;
     });
-    var cor = sib.filter(function (id) { return hp.some(function (x) { return corrob(byG[id], x.ml, [x.p]); }); });
+    var cor = sib.filter(function (id) { return hp.some(function (x) { return loose2[id] ? corrobTight(byG[id], x.ml, x.p) : corrob(byG[id], x.ml, [x.p]); }); });
     if (cor.length === 1) {
       var to = cor[0], from = hid;
       if (isFaArr(restOf(H.key)) && !isFaArr(restOf(G[to].key))) { from = cor[0]; to = hid; }     // گروهِ دارای نامِ فارسی می‌ماند (نامِ نمایشی از آن می‌آید)
@@ -1535,7 +1579,7 @@ function purgeStored(db) {      // بیرون‌بردنِ کالاهای ذخی
   if (rk) db.full = {};                       // بروزرسانیِ بعدی «کامل» باشد تا عنوانِ پاک‌شده‌ها دوباره تحلیل شود
   return n;
 }
-var DEDUPE_V = 8;
+var DEDUPE_V = 9;
 function ingestEnd0(C, complete) {
   if (complete) {                                      // فهرستِ ناگهان خیلی کوچک‌تر شده (صفحه‌ی خطا/کپچا): پاک‌سازی نکن
     var live = Object.keys(C.M).filter(function (pid) { return C.M[pid][1] > 0; }), seenN = live.filter(function (pid) { return C.seen[pid]; }).length;      // فقط کالاهای قیمت‌دار شمرده می‌شوند: فروشگاهی که فقط موجودها را می‌دهد، ناموجودِ قبلی را «ندیده» حساب نکند
