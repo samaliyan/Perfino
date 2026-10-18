@@ -1,7 +1,7 @@
 (function () {
 'use strict';
 var RM = !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
-var VERSION = '1.45';
+var VERSION = '1.46';
 var myCode = (function () { var m = /\/b(\d{1,10})\/index\.html$/.exec(String(location.pathname || '')); return m ? m[1] : '0'; })();      // نسخه‌ی این صفحه از روی آدرسش؛ در گزارش‌ها به جاوا فرستاده می‌شود تا صفحه‌ی کهنه نتواند نسخه‌ی تازه را «سالم» اعلام کند
 function otaCall(n) { try { if (window.Native && typeof window.Native[n] === 'function') window.Native[n](myCode); } catch (e) { } }
 otaCall('otaBoot');      // «جاوااسکریپتِ این صفحه شروع شد»: برنامه به صفحه‌ی بی‌نصب مهلتِ بیشتری برای ساختن فهرست می‌دهد
@@ -1378,7 +1378,7 @@ function renderSheet() {
   renderMine();
   renderReport();
   $('sCopy').style.display = bad || adv ? '' : 'none'; $('sFull').style.display = bad || adv ? '' : 'none';
-  $('sVer').textContent = 'نسخه ' + VERSION; updStatus();
+  $('sVer').textContent = 'پرفینو · نسخه ' + VERSION; updStatus();
   renderBrands();
   [].forEach.call(document.querySelectorAll('#sLang button'), function (b) { b.classList.toggle('on', b.dataset.l === (set.lang === 'en' ? 'en' : 'fa')); });
 }
@@ -1558,7 +1558,7 @@ $('sAuto').onclick = function (e) { var b = e.target.closest('button'); if (!b |
 $('sRef').onclick = function () { if (busy) { toast('همین حالا در حال بروزرسانی است…', 2200); return; } refresh(true); };
 $('sFull').onclick = function () { if (busy) return; db.full = {}; db.fa = {}; saveDb(); refresh(true); };
 $('sCopy').onclick = function () {
-  var t = 'گزارش قیمت عطر ' + VERSION + '\n' + Core.SOURCES.map(function (s) { var x = stt[s.id] || {}; return s.name + ': ' + (x.ok ? 'ok ' + x.n + (x.mode ? ' (' + x.mode + ')' : '') + (x.note ? ' ' + x.note : '') + (x.added ? ' +' + x.added : '') : (x.raw || x.err || 'نامشخص')); }).join('\n')
+  var t = 'گزارش پرفینو ' + VERSION + '\n' + Core.SOURCES.map(function (s) { var x = stt[s.id] || {}; return s.name + ': ' + (x.ok ? 'ok ' + x.n + (x.mode ? ' (' + x.mode + ')' : '') + (x.note ? ' ' + x.note : '') + (x.added ? ' +' + x.added : '') : (x.raw || x.err || 'نامشخص')); }).join('\n')
     + '\nعطر در حافظه: ' + Object.keys(db.g).length + ' ؛ برند: ' + TREE.length + ' ؛ عکس: ' + imgOk + ' نشد: ' + imgBad + ' ؛ نمایش: ' + list.length + ' ؛ مبهم‌ (نشان داده نشد): ' + hiddenN + ' ؛ عکس ذخیره‌شده: ' + Object.keys(imgLoc).length
     + '\n\nخطاها:\n' + netBad.concat(netLog).map(function (l) { return l.s + ' ' + l.u + '\n' + l.b; }).join('\n---\n');
   if (window.Native && window.Native.copy) window.Native.copy(t); else if (navigator.clipboard) navigator.clipboard.writeText(t).catch(function () {});
@@ -1646,14 +1646,15 @@ async function dgRun() {
       L.push(sc.id + ' (' + sc.name + '): ' + (x.ok ? 'ok' : 'FAIL ' + (x.raw || x.err || '')) + ' · حالت=' + (x.mode || '?') + ' · n=' + (x.n || 0) + ' · ' + ago(x.t) + ' · آخرین کامل=' + ago(db.full[sc.id]) + ' · note=' + (x.note || ''));
       L.push('   حافظه: کل=' + tot + ' قیمت‌دار=' + pr + ' (کهنه‌شده ' + stale + ') ناموجود=' + oos + ' ردشده/بی‌قیمت=' + rej + ' · ' + Object.keys(why).sort(function (a, b) { return why[b] - why[a]; }).slice(0, 5).map(function (k) { return why[k] + '×' + k; }).join(' | '));
     });
-    var terms = q ? Core.normFa(q, true).split(/\s+/).filter(function (w) { return w.length >= 2; }) : ['کلینیک', 'clinique', 'کیلینیک'];
-    L.push('\n--- آنچه در حافظه‌ی برنامه با «' + (q || 'کلینیک / clinique / کیلینیک') + '» هست ---');
+    if (q) {      // فقط وقتی نامی نوشته شده: جستجو در حافظه و پرسشِ زنده از سایت
+    var terms = Core.normFa(q, true).split(/\s+/).filter(function (w) { return w.length >= 2; });
+    L.push('\n--- آنچه در حافظه‌ی برنامه با «' + q + '» هست ---');
     var rows = [];
     Object.keys(db.it || {}).forEach(function (sr) {
       var m = db.it[sr] || {};
       Object.keys(m).forEach(function (pid) {
         var e = m[pid]; if (!e[0]) return; var n = Core.normFa(e[0], true);
-        var hit = q ? terms.every(function (w) { return n.indexOf(w) >= 0; }) : terms.some(function (w) { return n.indexOf(w) >= 0; });
+        var hit = terms.every(function (w) { return n.indexOf(w) >= 0; });
         if (hit) rows.push([sr, pid, e]);
       });
     });
@@ -1663,9 +1664,9 @@ async function dgRun() {
       if (e[2] && e[1] > 0 && g) st = 'IN-LIST'; else if (e[2] && e[1] > 0) st = 'priced-but-not-shown'; else if (e[2]) st = 'out-of-stock(price0)'; else { var w = Core.explainTitle(e[0]); st = w.ok ? 'no-price' : 'REJECTED: ' + w.why; }
       L.push(r[0] + ' #' + r[1] + ' | ' + e[0].slice(0, 90) + ' | price=' + e[1] + ' ml=' + e[3] + ' | seen ' + Math.round((Date.now() / 60000 - e[4])) + 'min ago | ' + st);
     });
-    var probe = q || 'clinique';
+    var probe = q;
     L.push('\n--- پرسش زنده از خودِ سایت‌ها: «' + probe + '» ---');
-    var bases = { liliome: 'https://liliome.com', safir: 'https://www.safirstores.com', hiland: 'https://hilandbeauty.com' };
+    var bases = { liliome: 'https://liliome.com' };      // سفیر و هایلند API ووکامرس ندارند (همیشه ۴۰۴ بود)
     for (var id in bases) {
       if (!srcOn(id)) { L.push(id + ': خاموش'); continue; }
       btn.textContent = 'پرسیدن از ' + id + '…';
@@ -1677,20 +1678,28 @@ async function dgRun() {
         L.push('     برنامه: st=' + r.appSt + ' price=' + r.appPrice + ' «' + r.appT + '» ' + (r.appOk === true ? 'نام قابل‌قبول' : r.appOk === false ? 'REJECT: ' + r.appWhy : '') + ' | در حافظه: ' + (st ? 'بله price=' + st[1] + ' gid=' + (st[2] ? 'yes' : 'no') + ' ml=' + st[3] + ' ' + (st[2] && shown[st[2]] ? 'IN-LIST' : '') : 'خیر'));
       });
     }
+    }
     L.push('\n--- خطاهای شبکه ---');
     netBad.concat(netLog).slice(-8).forEach(function (l) { L.push(l.s + ' ' + l.u + ' ' + String(l.b).slice(0, 160)); });
   } catch (e) { L.push('خطا در ساخت گزارش: ' + (e && e.stack || e)); }
-  var t = L.join('\n'), ta = $('dgOut');
-  ta.value = t; ta.style.display = '';
-  var copied = false; try { if (window.Native && window.Native.copy) { window.Native.copy(t); copied = true; } else if (navigator.clipboard) { navigator.clipboard.writeText(t).catch(function () { }); copied = true; } } catch (e) { }
-  btn.disabled = false; btn.textContent = copied ? 'کپی شد؛ در پیام برای سازنده بچسبانید (دوباره: بزنید)' : 'گزارش پایین است؛ متن را نگه دارید و کپی کنید';
+  var t = L.join('\n');
+  try { t += '\n\n\n=== همه‌ی عنوان‌ها ===\n' + titlesText(); } catch (e) { t += '\n(فهرستِ عنوان‌ها ساخته نشد: ' + (e && e.message) + ')'; }
+  window.__samp = t;
+  /* گزارش بلند در کلیپ‌بورد جا نمی‌شود و چسباندنش در پیام سخت است: یک فایل ساخته می‌شود و همان لحظه برگه‌ی «ارسال» باز می‌شود */
+  var d = new Date(), pad = function (n) { return (n < 10 ? '0' : '') + n; };
+  var fn = 'perfino-report-' + d.getFullYear() + pad(d.getMonth() + 1) + pad(d.getDate()) + '-' + pad(d.getHours()) + pad(d.getMinutes()) + '.txt', where = '', sent = false;
+  try { if (window.Native && window.Native.saveText) where = window.Native.saveText(fn, t) || ''; } catch (e) { where = ''; }
+  if (where) { try { sent = !!(window.Native.shareBackup && window.Native.shareBackup()); } catch (e) { sent = false; } }
+  btn.disabled = false;
+  if (where) { btn.textContent = 'ساخت گزارش و ارسال'; toast(sent ? 'فایلِ گزارش ساخته شد؛ برنامه‌ای را برای فرستادن انتخاب کنید (مثلاً تلگرام)' : 'فایلِ گزارش در پوشه‌ی «دانلود» ذخیره شد: ' + fn, 5000); }
+  else { try { if (window.Native && window.Native.copy) window.Native.copy(t); else if (navigator.clipboard) navigator.clipboard.writeText(t).catch(function () { }); } catch (e) { } btn.textContent = 'ساخت گزارش و ارسال'; toast('ساختِ فایل نشد؛ گزارش کپی شد', 4000); }
   dgBusy = false;
 }
 $('dgGo').onclick = dgRun;
 $('whyGo').onclick = whyRun;
 $('whyIn').addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); whyRun(); } });
 $('whyCovB').onclick = whyCover;
-$('sSamp').onclick = function () {
+function titlesText() {      // همه‌ی عنوان‌های هر فروشگاه با نامِ ساخته‌شده، میل، قیمت و گروه (برای پیدا کردنِ عطرهایی که باید یکی می‌شدند)
   var srcN = {}; Core.SOURCES.forEach(function (x) { srcN[x.id] = x.name; });
   var bad = [], rej = [], okk = [], SUS = /(^| )(با|مناسب|ویژه|مخصوص|فصل|رایحه|ساختار|همراه|دارای)( |$)/;
   Object.keys(db.it || {}).forEach(function (sr) { var m = db.it[sr] || {}; Object.keys(m).forEach(function (pid) {
@@ -1708,18 +1717,9 @@ $('sSamp').onclick = function () {
   var szs = ''; try { szs = '\nحجم داده‌ی ذخیره‌شده (نویسه): فهرست ' + JSON.stringify(db).length + ' ؛ تاریخچه ' + JSON.stringify(hist).length + ' ؛ ذخیره در فایل: ' + (fileOk() ? 'بله' : 'نه') + ' ؛ عطر: ' + Object.keys(db.g).length; } catch (e) { }
   t += hdr + szs;
   var raw = Object.keys(Core.RAWC || {}).map(function (h) { return '\n\n===== نمونهٔ خام صفحه: ' + h + ' =====\n' + Core.RAWC[h]; }).join('');
-  t += raw; window.__samp = t;
-  var d = new Date(), pad = function (n) { return (n < 10 ? '0' : '') + n; };
-  var fn = 'perfume-titles-' + d.getFullYear() + pad(d.getMonth() + 1) + pad(d.getDate()) + '-' + pad(d.getHours()) + pad(d.getMinutes()) + '.txt', where = '';
-  try { if (window.Native && window.Native.saveText) where = window.Native.saveText(fn, t) || ''; } catch (e) { where = ''; }
-  if (where) { $('sSamp').textContent = 'پشتیبان ذخیره شد: ' + fn; $('sSend').disabled = false; toast('پشتیبان در پوشهٔ دانلود ذخیره شد', 3500); return; }
-  if (window.Native && window.Native.copy) window.Native.copy(t); else if (navigator.clipboard) navigator.clipboard.writeText(t).catch(function () {});
-  toast('ذخیرهٔ فایل نشد؛ متن کپی شد', 3500);
-};
-$('sSend').onclick = function () {
-  var ok = false; try { ok = !!(window.Native && window.Native.shareBackup && window.Native.shareBackup()); } catch (e) { ok = false; }
-  if (!ok) toast('اول پشتیبان را ذخیره کنید', 2500);
-};
+  t += raw;
+  return t;
+}
 window.__back = function () {
   if ($('updBox').classList.contains('on')) { updDismiss(); return true; }
   if (vwId) { closeViewer(); return true; }

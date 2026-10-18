@@ -70,10 +70,14 @@ chk('نام‌های تکراری با حروف بزرگ/کوچک → رد',r.re
 import re as _re
 m=_re.search(r'grep -q "([^"\n]*GITHUB_RUN_NUMBER[^"\n]*)" ',wf)
 chk('CI همخوانی versionCode (RUN_NUMBER + 100) با build.gradle را می‌سنجد و برای build.gradle واقعی درست است',m is not None and m.group(1) in gr,(m.group(1) if m else None))
-cl=[l for l in wf.splitlines() if 'gh release create' in l]; ul=[l for l in wf.splitlines() if 'gh release upload latest' in l]
-ua=[l for l in ul if 'ota.json' in l]; ub=[l for l in ul if 'ota.json' not in l]
-chk('CI: ota.json بعد از ساخت/به‌روزرسانیِ Release و www.zip بارگذاری می‌شود (گوشی نیمه‌کاره نمی‌بیند)',len(cl)==1 and len(ua)==1 and len(ub)==1 and 'ota.json' not in cl[0] and 'www.zip' in cl[0] and 'www.zip' in ub[0] and wf.index(cl[0])<wf.index(ua[0]) and wf.index(ub[0])<wf.index(ua[0]),(cl,ul))
-chk('CI: release قبلی پاک نمی‌شود (اگر ساخت خراب شد، همان می‌ماند) و ota.json قدیمی پیش از www.zip تازه برداشته می‌شود',('gh release delete latest' not in wf) and ('delete-asset latest ota.json' in wf) and wf.index('delete-asset latest ota.json')<wf.index(ub[0]) and wf.index(ub[0])<wf.index('gh release edit latest'),None)
+W2=wf.splitlines()
+def L1(f): return [l for l in W2 if f(l)]
+cl=L1(lambda l:'gh release create "$TAG"' in l)
+va=L1(lambda l:l.strip().startswith('up "$TAG"') and 'ota.json' in l); vb=L1(lambda l:l.strip().startswith('up "$TAG"') and 'www.zip' in l)
+la=L1(lambda l:l.strip().startswith('up latest') and 'ota.json' in l); lb=L1(lambda l:l.strip().startswith('up latest') and 'www.zip' in l)
+chk('CI: نسخه‌ی رسمی («Perfino X» با برچسبِ vX) ساخته می‌شود و ota.json بعد از APK و www.zip می‌آید',len(cl)==1 and 'www.zip' in cl[0] and 'Perfino.apk' in cl[0] and 'ota.json' not in cl[0] and len(va)==1 and len(vb)==1 and wf.index(cl[0])<wf.index(va[0]) and wf.index(vb[0])<wf.index(va[0]) and '--latest' in cl[0],(cl,va,vb))
+chk('CI: یادداشتِ نسخه از CHANGELOG و خطِ code= در آن',('notes.md' in wf) and ('code=%s' in wf) and ('CHANGELOG.md' in wf),None)
+chk('CI: کانالِ قدیمیِ «latest» (برای برنامه‌های تا ۱.۴۵) هم بروز می‌شود: ota.json قدیمی اول برداشته و تازه‌اش آخر گذاشته می‌شود؛ release پاک نمی‌شود',('gh release delete ' not in wf) and len(la)==1 and len(lb)==1 and 'PerfumePrice.apk' in lb[0] and wf.index('delete-asset latest ota.json')<wf.index(lb[0])<wf.index(la[0]) and '--prerelease' in wf,(la,lb))
 chk('CI آزمایش جاوا را روی بسته‌ی ساخته‌شده اجرا می‌کند',('OtaTest' in wf) and ('javac' in wf) and wf.index('make-ota.sh')<wf.index('OtaTest')<wf.index('gh release create'),'')
 J=R+'/app/src/main/java/ir/perfume/price/'; T=R+'/tests/java/ir/perfume/price/'
 c=subprocess.run(['javac','-encoding','UTF-8','-d',jo,J+'Ota.java',J+'OtaGuard.java',T+'OtaTest.java',T+'GuardTest.java'],capture_output=True,text=True)

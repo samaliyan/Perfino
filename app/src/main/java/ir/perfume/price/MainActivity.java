@@ -454,7 +454,7 @@ public class MainActivity extends Activity {
                         send.setType("text/plain");
                         if (u != null) { send.putExtra(Intent.EXTRA_STREAM, u); send.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION); }
                         else send.putExtra(Intent.EXTRA_TEXT, tx);
-                        startActivity(Intent.createChooser(send, "ارسال پشتیبان"));
+                        startActivity(Intent.createChooser(send, "ارسال گزارش"));
                     } catch (Exception ignore) { }
                 }
             });

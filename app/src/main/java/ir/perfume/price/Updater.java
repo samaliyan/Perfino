@@ -32,8 +32,8 @@ import java.util.regex.Pattern;
 class Updater {
     interface Js { void run(String script); }
 
-    private static final String API = "https://api.github.com/repos/samaliyan/PerfumePrice/releases/tags/latest";
-    private static final String APK_URL = "https://github.com/samaliyan/PerfumePrice/releases/download/latest/PerfumePrice.apk";
+    private static final String API = "https://api.github.com/repos/samaliyan/PerfumePrice/releases/latest";      // آخرین نسخه‌ی رسمی (مثلاً «Perfino 1.46»)
+    private static final String APK_URL = "https://github.com/samaliyan/PerfumePrice/releases/latest/download/Perfino.apk";
     private static final String ACTION = "ir.perfume.price.UPDATE_RESULT";
     private static final int MAX_APK = 25 * 1024 * 1024;
 
@@ -75,7 +75,7 @@ class Updater {
             c.setConnectTimeout(timeoutMs);
             c.setReadTimeout(timeoutMs);
             c.setInstanceFollowRedirects(false);
-            c.setRequestProperty("User-Agent", "PerfumePrice-updater");
+            c.setRequestProperty("User-Agent", "Perfino-updater");
             c.setRequestProperty("Accept", "application/vnd.github+json, application/octet-stream, */*");
             int st = c.getResponseCode();
             if (st >= 300 && st < 400) {

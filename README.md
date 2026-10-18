@@ -1,12 +1,12 @@
 <div align="center">
 
-# PerfumePrice · قیمت عطر
+# Perfino · پرفینو
 
 **A lightweight Android price list for perfume shops — one clean, alphabetical price per perfume, collected automatically from Iranian online stores.**
 
 **برنامهٔ اندروید سبک برای عطرفروشی‌ها؛ فهرست الفبایی عطرها با یک قیمت روز، جمع‌آوری‌شده خودکار از فروشگاه‌های اینترنتی ایران.**
 
-[English](#english) · [فارسی](#فارسی) · [Changelog](CHANGELOG.md) · [Download APK](https://github.com/samaliyan/PerfumePrice/releases/download/latest/PerfumePrice.apk)
+[English](#english) · [فارسی](#فارسی) · [Changelog](CHANGELOG.md) · [Download APK](https://github.com/samaliyan/PerfumePrice/releases/latest/download/Perfino.apk)
 
 </div>
 
@@ -18,7 +18,7 @@
 
 ## What it is
 
-PerfumePrice is a single-purpose Android app built for a perfume shop owner who needs to know "what is this perfume selling for today?" without opening four websites. It reads public product listings from several online stores, cleans and merges them, and shows a **single price per perfume and size**, organized **brand → perfume → variant → size** in alphabetical order.
+Perfino (formerly PerfumePrice) is a single-purpose Android app built for a perfume shop owner who needs to know "what is this perfume selling for today?" without opening four websites. It reads public product listings from several online stores, cleans and merges them, and shows a **single price per perfume and size**, organized **brand → perfume → variant → size** in alphabetical order.
 
 There is **no server and no account**. Everything — fetching, cleaning, matching, storage and the interface — runs on the phone inside a WebView, using the files in `app/src/main/assets/www`.
 
@@ -72,7 +72,7 @@ Online-shop titles are messy. A multi-stage pipeline keeps the list clean:
 1. On the phone, open this link:
 
    ```
-   https://github.com/samaliyan/PerfumePrice/releases/download/latest/PerfumePrice.apk
+   https://github.com/samaliyan/PerfumePrice/releases/latest/download/Perfino.apk
    ```
 2. Download the file and open it.
 3. If Android asks, allow installing apps from this source.
@@ -145,7 +145,7 @@ Python tests need Playwright with Chromium. `Ota.java`, `OtaGuard.java` and `Htt
 
 ## این برنامه چیست؟
 
-«قیمت عطر» یک برنامهٔ اندروید با یک کار مشخص است: عطرفروش بدون باز کردن چند سایت بفهمد **امروز هر عطر چند می‌فروشد**. برنامه فهرست محصولات چند فروشگاه اینترنتی را می‌خواند، پالایش و یکی می‌کند و برای هر عطر و هر اندازه **فقط یک قیمت** نشان می‌دهد؛ به ترتیب الفبا و به شکل **برند، عطر، نسخه، اندازه**.
+«پرفینو» (نام قبلی: «قیمت عطر») یک برنامهٔ اندروید با یک کار مشخص است: عطرفروش بدون باز کردن چند سایت بفهمد **امروز هر عطر چند می‌فروشد**. برنامه فهرست محصولات چند فروشگاه اینترنتی را می‌خواند، پالایش و یکی می‌کند و برای هر عطر و هر اندازه **فقط یک قیمت** نشان می‌دهد؛ به ترتیب الفبا و به شکل **برند، عطر، نسخه، اندازه**.
 
 برنامه **سرور و حساب کاربری ندارد**. دریافت اطلاعات، پالایش نام‌ها، ذخیره‌سازی و ظاهر برنامه، همه روی خود گوشی و داخل WebView انجام می‌شود.
 
@@ -206,7 +206,7 @@ Python tests need Playwright with Chromium. `Ota.java`, `OtaGuard.java` and `Htt
 1. روی گوشی این نشانی را باز کنید:
 
    ```
-   https://github.com/samaliyan/PerfumePrice/releases/download/latest/PerfumePrice.apk
+   https://github.com/samaliyan/PerfumePrice/releases/latest/download/Perfino.apk
    ```
 2. فایل را دانلود و باز کنید.
 3. اگر اندروید پرسید، نصب برنامه از این منبع را اجازه بدهید.

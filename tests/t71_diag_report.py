@@ -1,4 +1,4 @@
-# «گزارش کامل برای سازنده»: از خودِ سایت می‌پرسد، حافظه را می‌خواند، دلیلِ هر محصول را می‌نویسد، کپی می‌کند
+# «ارسالِ گزارش برای سازنده»: از خودِ سایت می‌پرسد، حافظه را می‌خواند، دلیلِ هر محصول را می‌نویسد، فایل می‌سازد
 import asyncio,sys,json
 sys.path.insert(0,'/home/claude/PerfumePrice/tests')
 from harness import *
@@ -32,9 +32,9 @@ async def main():
         await ev("document.getElementById('gear').click()"); await pg.wait_for_timeout(500)
         await ev("document.getElementById('sAdvBtn').click()"); await pg.wait_for_timeout(300)
         chk('button and input exist in advanced settings',await ev("!!document.getElementById('dgGo')&&!!document.getElementById('dgIn')"))
-        await ev("document.getElementById('dgGo').click()"); await pg.wait_for_timeout(6000)
-        t=await ev("document.getElementById('dgOut').value")
-        chk('report is shown in a text box (also copied)',len(t)>500 and await ev("document.getElementById('dgOut').style.display")=='',len(t))
+        await ev("document.getElementById('dgIn').value='کلینیک';document.getElementById('dgGo').click()"); await pg.wait_for_timeout(6000)
+        t=await ev("window.__samp||''")
+        chk('report is built as one file text',len(t)>500,len(t))
         chk('header has version and the sources',('گزارش تشخیص' in t) and 'liliome' in t and 'حافظه: کل=' in t)
         chk('stored Clinique entries are listed with a clear state',('عطر ادکلن کلینیک قدیمی' in t and 'REJECTED' in t) and ('out-of-stock(price0)' in t or 'priced-but-not-shown' in t),t[t.find('در حافظه‌ی برنامه'):][:500])
         chk('live probe asked the site with and without the stock filter',any('stock_status=instock' in u for u in await ev("window.__PROBE")) and any('stock_status' not in u for u in await ev("window.__PROBE")))
@@ -45,7 +45,7 @@ async def main():
         chk('not-in-memory is stated plainly','در حافظه: خیر' in t)
         # با نام خاص
         await ev("document.getElementById('dgIn').value='کلینیک هپی';document.getElementById('dgGo').click()"); await pg.wait_for_timeout(6000)
-        t2=await ev("document.getElementById('dgOut').value")
+        t2=await ev("window.__samp||''")
         chk('typed name is used for the memory search and the probe',('«کلینیک هپی»' in t2) and any('search=%DA%A9' in u for u in await ev("window.__PROBE")))
         chk('no page errors',not [e for e in errs if 'Failed to load' not in e],errs[:3])
         await b.close()

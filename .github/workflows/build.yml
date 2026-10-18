@@ -1,4 +1,4 @@
-name: Build APK
+name: Build Perfino
 on:
   push:
     branches: [main, master, update-1.3]     # فقط شاخه‌های اصلی نسخه‌ی «latest» را عوض می‌کنند؛ شاخه‌ی آزمایشی برنامه‌ی نصب‌شده را خراب نکند
@@ -55,7 +55,9 @@ jobs:
           A=$(ls -d "$ANDROID_HOME"/build-tools/*/ | sort -V | tail -n1)
           "${A}apksigner" verify --print-certs "${{ steps.p.outputs.dir }}/app/build/outputs/apk/release/app-release.apk" | grep -i "SHA-256" || echo "could not read the certificate (not important)"
       - name: Copy APK
-        run: cp "${{ steps.p.outputs.dir }}/app/build/outputs/apk/release/app-release.apk" "$RUNNER_TEMP/PerfumePrice.apk"
+        run: |
+          cp "${{ steps.p.outputs.dir }}/app/build/outputs/apk/release/app-release.apk" "$RUNNER_TEMP/Perfino.apk"
+          cp "$RUNNER_TEMP/Perfino.apk" "$RUNNER_TEMP/PerfumePrice.apk"      # نامِ قدیمی فقط برای برنامه‌های نصب‌شده‌ی تا ۱.۴۵
       - name: Build web bundle (update without install)
         run: |
           # شماره‌ی بسته باید همان versionCode ی باشد که build.gradle به APK می‌دهد (برنامه آن‌ها را با هم مقایسه می‌کند)
@@ -73,9 +75,9 @@ jobs:
         run: bash tests/run_node.sh
       - uses: actions/upload-artifact@v4
         with:
-          name: PerfumePrice-apk
+          name: Perfino
           path: |
-            ${{ runner.temp }}/PerfumePrice.apk
+            ${{ runner.temp }}/Perfino.apk
             ${{ runner.temp }}/ota/www.zip
             ${{ runner.temp }}/ota/ota.json
       - name: Publish release
@@ -83,25 +85,33 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           CODE=$((GITHUB_RUN_NUMBER + 100))
-          # release قبلی پاک نمی‌شود (اگر ساختنِ تازه وسط کار خراب شود، برنامه‌ی نصب‌شده هنوز یک release سالم دارد):
-          # فایل‌ها جای فایل‌های قبلی می‌نشینند و «code=» آخر از همه عوض می‌شود تا گوشی‌ای که نسخه‌ی تازه را دید، APKِ تازه را هم پیدا کند
-          if gh api "repos/$GITHUB_REPOSITORY/releases/tags/latest" > /dev/null 2>&1; then
-            gh release delete-asset latest ota.json --yes || true      # ota.json قدیمی با www.zip تازه جور نیست؛ تا ota.json تازه نیامده، بروزرسانیِ بی‌نصب فقط «نیست» دیده می‌شود
-            up=0
-            for i in 1 2 3; do
-              if gh release upload latest "$RUNNER_TEMP/PerfumePrice.apk" "$RUNNER_TEMP/ota/www.zip" --clobber; then up=1; break; fi
-              sleep 5
-            done
-            [ "$up" = 1 ] || { echo "APK upload failed (the previous release is untouched)"; exit 1; }
-            gh release edit latest --title "PerfumePrice (latest)" --notes "code=$CODE"
-            git tag -f latest "$GITHUB_SHA" && git push -f origin refs/tags/latest || echo "could not move the tag (not important)"
+          V=$(sed -n 's/.*"v":"\([0-9.]*\)".*/\1/p' "${{ steps.p.outputs.dir }}/app/src/main/assets/www/version.json")
+          [ -n "$V" ] || { echo "version.json has no version"; exit 1; }
+          TAG="v$V"
+          # یادداشتِ نسخه = همان بخشِ CHANGELOG؛ خطِ آخر (code=) را برنامه برای فهمیدنِ «نسخه‌ی تازه هست؟» می‌خواند
+          awk -v v="($V)" 'index($0,"## ")==1{if(f)exit; if(index($0,v))f=1} f' CHANGELOG.md > "$RUNNER_TEMP/notes.md"
+          [ -s "$RUNNER_TEMP/notes.md" ] || { echo "CHANGELOG.md has no section for $V"; exit 1; }
+          printf '\n\ncode=%s\n' "$CODE" >> "$RUNNER_TEMP/notes.md"
+          up() {      # فایل‌ها با سه بار تلاش؛ ota.json همیشه آخر (گوشی‌ای که آن را دید، بقیه را هم پیدا می‌کند)
+            for i in 1 2 3; do gh release upload "$@" --clobber && return 0; sleep 5; done; return 1
+          }
+          # ۱) نسخه‌ی رسمی: «Perfino 1.46» با برچسبِ v1.46. برنامه‌های تازه (از ۱.۴۶) از «آخرین نسخه‌ی رسمی» بروز می‌شوند.
+          if gh api "repos/$GITHUB_REPOSITORY/releases/tags/$TAG" > /dev/null 2>&1; then
+            gh release delete-asset "$TAG" ota.json --yes || true
+            up "$TAG" "$RUNNER_TEMP/Perfino.apk" "$RUNNER_TEMP/ota/www.zip" || { echo "upload failed"; exit 1; }
+            git tag -f "$TAG" "$GITHUB_SHA" && git push -f origin "refs/tags/$TAG" || echo "could not move the tag (not important)"
+            gh release edit "$TAG" --title "Perfino $V" --notes-file "$RUNNER_TEMP/notes.md" --prerelease=false --latest
           else
-            gh release create latest "$RUNNER_TEMP/PerfumePrice.apk" "$RUNNER_TEMP/ota/www.zip" --target "$GITHUB_SHA" --title "PerfumePrice (latest)" --notes "code=$CODE"
+            gh release create "$TAG" "$RUNNER_TEMP/Perfino.apk" "$RUNNER_TEMP/ota/www.zip" --target "$GITHUB_SHA" --title "Perfino $V" --notes-file "$RUNNER_TEMP/notes.md" --latest
           fi
-          # ota.json آخر بارگذاری می‌شود: گوشی‌ای که آن را دید، www.zip را هم حتماً پیدا می‌کند
-          up=0
-          for i in 1 2 3; do
-            if gh release upload latest "$RUNNER_TEMP/ota/ota.json" --clobber; then up=1; break; fi
-            sleep 5
-          done
-          [ "$up" = 1 ] || { echo "ota.json upload failed"; exit 1; }
+          up "$TAG" "$RUNNER_TEMP/ota/ota.json" || { echo "ota.json upload failed"; exit 1; }
+          # ۲) کانالِ قدیمی (برچسبِ «latest»): فقط برای برنامه‌هایی که تا نسخه‌ی ۱.۴۵ نصب شده‌اند و از این آدرس بروز می‌شوند.
+          #    «پیش‌انتشار» علامت می‌خورد تا در گیت‌هاب «آخرین نسخه» همان نسخه‌ی رسمی باشد. بعد از نصبِ APKِ ۱.۴۶ دیگر لازم نیست.
+          if gh api "repos/$GITHUB_REPOSITORY/releases/tags/latest" > /dev/null 2>&1; then
+            gh release delete-asset latest ota.json --yes || true
+            up latest "$RUNNER_TEMP/PerfumePrice.apk" "$RUNNER_TEMP/ota/www.zip" || { echo "legacy upload failed"; exit 1; }
+            printf 'برای برنامه‌هایی که تا نسخه‌ی ۱.۴۵ نصب شده‌اند. نسخه‌ی اصلی: %s\n\ncode=%s\n' "$TAG" "$CODE" > "$RUNNER_TEMP/legacy.md"
+            gh release edit latest --title "کانالِ بروزرسانیِ نسخه‌های قدیمی (Perfino $V)" --notes-file "$RUNNER_TEMP/legacy.md" --prerelease
+            git tag -f latest "$GITHUB_SHA" && git push -f origin refs/tags/latest || echo "could not move the tag (not important)"
+            up latest "$RUNNER_TEMP/ota/ota.json" || { echo "legacy ota.json upload failed"; exit 1; }
+          fi
