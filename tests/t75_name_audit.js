@@ -45,6 +45,27 @@ function chk(c, m, i) { if (c) ok++; else { bad++; console.log('FAIL', m, i === 
   T.forEach(function (b) { b.models.forEach(function (m) { n.push(m.name); }); });
   chk(n.indexOf('هوگو باس') < 0, 'self-named perfume uses the standard brand spelling', n);
 })();
+// ۲ب) عنوانِ سالم که «غ/ق» دارد («عشق»، «قرمز») با متنِ تبلیغیِ لاتین خراب نمی‌شود؛ نامِ لاتینِ بی‌برند برندِ فارسی را نگه می‌دارد
+(function () {
+  var db = C.newDb(), ix = C.dbIndex(db);
+  C.ingest(db, ix, 'hiland', [{ id: 'a1', t: 'عطر دیور ساواج ادو پرفیوم مردانه 100 میل عشق', e: 'Free Shipping Today', hd: 1, price: 5e6 },
+    { id: 'a2', t: 'ادوپرفیوم زنانه ورساچه کریستال نواق 90 میل', e: 'Crystal Noir Edp 90ml W', hd: 1, price: 5e6 }], true);
+  var keys = Object.keys(db.g).map(function (id) { return db.g[id].k.join(' '); });
+  chk(keys.some(function (k) { return /^دیور ساواج/.test(k); }) && !keys.some(function (k) { return /free|shipping/.test(k); }), 'promo English text does not rename a sound Persian title', keys);
+  var T = C.tree(C.buildList(db, ['hiland'], {}, 0), 'fa', db.wd), vb = T.filter(function (b) { return b.name === 'ورساچه'; })[0];
+  chk(vb && vb.models.length === 1 && !/نواق/.test(vb.models[0].name) && keys.some(function (k) { return /crystal noir/.test(k); }), 'brandless English name stays under the Persian brand', JSON.stringify(T.map(function (b) { return b.name + ':' + b.models.map(function (m) { return m.name; }); })));
+})();
+// ۲ج) متنِ تبلیغیِ لاتین که «Edp» هم دارد نامِ عطر نمی‌شود؛ کالایی که ۱.۴۲ با چنین متنی ساخته بود یک بار دوباره سنجیده می‌شود
+(function () {
+  var db = C.newDb(), ix = C.dbIndex(db), t = 'عطر دیور ساواج ادو پرفیوم مردانه 100 میل عشق';
+  C.ingest(db, ix, 'hiland', [{ id: 'p1', t: t, e: 'Free Shipping Edp Today', hd: 1, price: 5e6 }], true);
+  var k1 = Object.keys(db.g).map(function (id) { return db.g[id].k.join(' '); });
+  chk(!k1.some(function (k) { return /free|today/.test(k); }), 'promo text with Edp is not used as the name', k1);
+  db.it.hiland.p1[5] = 1; var g0 = db.it.hiland.p1[2]; db.g[g0].k = ['free', 'today'];      // حالتِ ذخیره‌شده‌ی قدیمی
+  C.ingest(db, ix, 'hiland', [{ id: 'p1', t: t, e: 'Free Shipping Edp Today', hd: 1, price: 5e6 }], true);
+  var e = db.it.hiland.p1, k2 = db.g[e[2]] ? db.g[e[2]].k.join(' ') : '';
+  chk(e[5] === 2 && /ساواج/.test(k2), 'old flag-1 item is re-checked once', [e[5], k2]);
+})();
 // ۳) عنوانِ فارسیِ خراب‌شده (ر/ژ ← غ/ق) با نامِ لاتینِ درستِ همان کارت ترمیم می‌شود؛ کالای قدیمیِ ثبت‌شده هم یک‌بار ترمیم می‌شود
 (function () {
   var db = C.newDb(), ix = C.dbIndex(db), bad1 = 'ادوپرفیوم مردانه نوید محمدزاده سواق 100 میل', en = 'NAVID MOHAMMADZADEH Soir For Him Edp 100ml M';
@@ -54,10 +75,10 @@ function chk(c, m, i) { if (c) ok++; else { bad++; console.log('FAIL', m, i === 
   C.ingest(db, ix, 'hiland', [{ id: 'u1', t: bad1, e: en, hd: 1, price: 4e6 }], true);
   var L1 = C.buildList(db, ['hiland'], {}, 0);
   chk(L1.length === 1 && !/[غق]/.test(L1[0].name) && /soir/i.test(L1[0].key.join(' ')), 'known item is re-read once with the English name', L1.map(function (g) { return g.name + '/' + g.key.join(' '); }));
-  chk(db.it.hiland.u1[5] === 1, 'the item is marked as repaired');
+  chk(db.it.hiland.u1[5] === 3, 'the item is marked as repaired');
   C.ingest(db, ix, 'hiland', [{ id: 'u1', t: bad1, e: en, hd: 1, price: 4.2e6 }], true);
   var L2 = C.buildList(db, ['hiland'], {}, 0);
-  chk(L2.length === 1 && L2[0].sizes[0].price === 4200000 && db.it.hiland.u1[5] === 1, 'next update only changes the price', L2.map(function (g) { return JSON.stringify(g.sizes); }));
+  chk(L2.length === 1 && L2[0].sizes[0].price === 4200000 && db.it.hiland.u1[5] === 3, 'next update only changes the price', L2.map(function (g) { return JSON.stringify(g.sizes); }));
   // توضیحِ لاتین بدون واحد («... Edp 100») و حرفِ جنسیتِ آخر: کلید عددِ اضافه ندارد و نامِ انگلیسی «M/W» ندارد
   var db3 = C.newDb(), ix3 = C.dbIndex(db3);
   C.ingest(db3, ix3, 'hiland', [{ id: 'a', t: bad1, e: 'NAVID MOHAMMADZADEH Soir For Him Edp 100', hd: 1, price: 4e6 }, { id: 'b', t: 'ادوپرفیوم زنانه مارکو سروسی لیدی اینتنس قابل شارژ 90 میل', e: 'MARCO SERUSSI The Lady Intense Edp 90ml W', hd: 1, price: 4e6 }], true);

@@ -20,6 +20,23 @@ async def main():
         chk('old star moved to the new model id',pick[2] in got and got[pick[2]]==pick[0]+' | '+pick[1],got)
         chk('old id is gone',  'bogus.111' not in got)
         chk('a really missing perfume stays as it was','bogus.222' in got,got)
+        # پنهان کردنِ عطرِ ستاره‌دار ستاره را به عطرِ دیگری (با نامِ کوتاه‌ترِ هم‌پایان) نمی‌برد
+        pair=await pg.evaluate("(function(){var t=__pp.tree;for(var i=0;i<t.length;i++){var b=t[i],ms=b.models;for(var j=0;j<ms.length;j++)for(var k=0;k<ms.length;k++){var a=ms[j].name,c=ms[k].name;if(j!==k&&a.length>c.length&&a.slice(-c.length-1)===' '+c&&a.split(' ').length<=3)return [b.name,ms[j].id,a,ms[k].id,c]}}return null})()")
+        chk('found a long/short model pair',bool(pair),pair)
+        if pair:
+            await pg.evaluate("(function(f){var s=JSON.parse(localStorage.getItem('pp.set')||'{}');s.fav=f;s.favOld={};localStorage.setItem('pp.set',JSON.stringify(s))})(%s)"%json.dumps({pair[1]:pair[0]+' | '+pair[2]},ensure_ascii=False))
+            await pg.reload()
+            await pg.wait_for_function("window.__pp && window.__pp.gate.ready && window.__pp.list.length>0 && !window.__pp.state.busy",timeout=120000)
+            await pg.evaluate("__pp.setHide(%s,true)"%json.dumps(pair[1]))
+            await pg.wait_for_timeout(400)
+            got=await pg.evaluate("JSON.parse(localStorage.getItem('pp.set')).fav")
+            chk('hiding a starred perfume keeps its star where it was',pair[1] in got and pair[3] not in got,got)
+            # اگر ستاره اشتباهی منتقل شده بود و عطرِ قدیمی برگشت، ستاره برمی‌گردد
+            await pg.evaluate("(function(a,b,la,lb){var s=JSON.parse(localStorage.getItem('pp.set')||'{}');s.hide={};s.fav={};s.fav[b]=lb;s.favOld={};s.favOld[a]={lab:la,to:b,auto:1,t:Date.now()};localStorage.setItem('pp.set',JSON.stringify(s))})(%s,%s,%s,%s)"%(json.dumps(pair[1]),json.dumps(pair[3]),json.dumps(pair[0]+' | '+pair[2],ensure_ascii=False),json.dumps(pair[0]+' | '+pair[4],ensure_ascii=False)))
+            await pg.reload()
+            await pg.wait_for_function("window.__pp && window.__pp.gate.ready && window.__pp.list.length>0 && !window.__pp.state.busy",timeout=120000)
+            got=await pg.evaluate("JSON.parse(localStorage.getItem('pp.set'))")
+            chk('star returns to the old perfume when it is back',pair[1] in got['fav'] and pair[3] not in got['fav'] and not got.get('favOld'),got.get('fav'))
         errs=[e for e in errs if 'ERR_TUNNEL' not in e and 'Failed to load resource' not in e]
         chk('no js errors',not errs,errs)
         await b.close()

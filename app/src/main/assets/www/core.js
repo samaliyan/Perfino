@@ -355,12 +355,12 @@ function letterOf(name, lang) {
 /* ---------- یکی‌کردن نام‌ها ---------- */
 function dels(w) { var o = [w]; for (var i = 0; i < w.length; i++) o.push(w.slice(0, i) + w.slice(i + 1)); return o; }   // همسایگیِ «حذف یک حرف» برای یافتنِ سریعِ واژه‌های یک‌ویرایشی
 function Index() { this.m = {}; this.fz = {}; this.xm = {}; }
-var XK = {}, XK_N = 0, CAND_MAX = 150;
+var XK = Object.create(null), XK_N = 0, CAND_MAX = 150;
 function xk(w) {      // کلیدِ مستقل از خط (فارسی/لاتین): اسکلتِ همخوان‌ها
   var h = XK[w]; if (h !== undefined) return h;
   var k = null;
   if (!/\d/.test(w) && w.length >= 3) { var l = HAS_FA.test(w) ? fa2en([w], LEX).toLowerCase().replace(/[^a-z']/g, '') : w; k = skel(l) || null; if (k && k.length < 2) k = null; }
-  if (++XK_N > 40000) { XK = {}; XK_N = 0; }
+  if (++XK_N > 40000) { XK = Object.create(null); XK_N = 0; }
   return (XK[w] = k);
 }
 Index.prototype.add = function (g) {
@@ -400,13 +400,21 @@ function restOf(k) {          // نامِ بدونِ برند + شناسه‌ی 
    املای تقریبی با «اسکلتِ همخوان‌ها» سنجیده می‌شود. نتیجه فقط «شبیه» (۱) است، پس بدون هم‌خوانیِ غلظت/جنسیت و قیمت یکی نمی‌شود. */
 var LEX = null;
 var REVC = null;
-function setLex(l) { LEX = l || null; REVC = null; }
+var LEXV = 0;
+function setLex(l) { LEX = l || null; REVC = null; LEXV++; }      // واژه‌های یادگرفته‌شده عوض شده‌اند: لاتینِ کش‌شده‌ی کلیدها از نو
 function isFaArr(r) { if (r._fa === undefined) r._fa = HAS_FA.test(r.join(' ')); return r._fa; }
 function enOf(r) {
+  if (!r._en || r._enV !== LEXV) { r._enV = LEXV; r._en = null; }
   if (!r._en) r._en = fa2en(r, LEX).toLowerCase().replace(/[^a-z0-9' ]/g, ' ').split(/\s+/).filter(Boolean);
   return r._en;
 }
+var SKC = Object.create(null), SKN = 0;      // بدون نمونه‌ی اولیه: «constructor» و مانندش کلیدِ عادی‌اند
 function skel(w) {
+  var h = SKC[w]; if (h !== undefined) return h;
+  if (++SKN > 60000) { SKC = Object.create(null); SKN = 0; }
+  return (SKC[w] = skel0(w));
+}
+function skel0(w) {
   var t = w.replace(/'/g, '').replace(/ph/g, 'f').replace(/ch/g, 'x').replace(/sh/g, 'x').replace(/kh/g, 'k').replace(/th/g, 't').replace(/gh/g, 'g').replace(/ck/g, 'k')
     .replace(/[cq]/g, 'k').replace(/z/g, 's').replace(/w/g, 'v').replace(/g/g, 'j').replace(/[aeiouyh]/g, '').replace(/(.)\1+/g, '$1');
   return t;
@@ -418,8 +426,16 @@ function xTokEq(x, y) {
   if (sx.length >= 2 && sx === sy && x.charAt(0) === y.charAt(0) || (sx.length >= 3 && sx === sy)) return true;
   /* «و» فارسی گاهی صدادار است و گاهی v («آکوا» / Aqva، «درایون» / Driven، «هوس» / Hawas)؛ برای مقایسه‌ی فارسی با لاتین v را کنار می‌گذاریم، به شرط هم‌حرفِ اول و طولِ نزدیک */
   if (x.charAt(0) !== y.charAt(0) || !/[a-z]/.test(x + y)) return false;
-  var tx = sx.replace(/v/g, ''), ty = sy.replace(/v/g, ''), dl = Math.abs(x.length - y.length), ml = Math.min(x.length, y.length);
-  return tx === ty && ((tx.length >= 2 && dl <= 2) || (tx.length === 1 && ml >= 4 && dl <= 1));
+  return vEq(x, y);
+}
+/* v ↔ u: «و» یا صدادار است یا v. هر دو طرف v را u می‌کنیم و بعد همخوان‌ها باید یکی باشند و صدادارها نزدیک
+   (Aqva = آکوا، Driven = درایون؛ ولی Love ≠ لولا، Nova ≠ نینا) */
+var VNC = Object.create(null), VNN = 0;
+function vNorm(s) { var h = VNC[s]; if (h !== undefined) return h; if (++VNN > 60000) { VNC = Object.create(null); VNN = 0; } return (VNC[s] = s.replace(/[cq]/g, 'k').replace(/w/g, 'v').replace(/v/g, 'u')); }
+function vEq(x, y) {
+  var a = vNorm(x), b = vNorm(y), ka = skel(a); if (ka !== skel(b) || !ka) return false;
+  var ca = phCol(a), cb = phCol(b);
+  return levD(ca, cb) <= (Math.max(ca.length, cb.length) >= 7 ? 2 : 1);
 }
 function xSimilar(A, B) { if (A.length !== B.length) return false; for (var i = 0; i < A.length; i++) if (!xTokEq(A[i], B[i])) return false; return true; }
 function nameCmp(A, B) {
@@ -444,26 +460,34 @@ function phCol(x) { return x.replace(/h/g, '').replace(/[aeiouy]+/g, 'a').replac
 function phTok(x, y) {      // دو واژه‌ی لاتین (یا فارسیِ لاتین‌شده) یک صدا دارند؟ همخوان‌ها یکی و صدادارها دور نباشند
   if (x === y) return true;
   if (/\d/.test(x) || /\d/.test(y)) return false;
-  if (skel(x).replace(/v/g, '') !== skel(y).replace(/v/g, '')) return false;
+  if (skel(x) !== skel(y)) return vEq(x, y);
   var cx = phCol(x), cy = phCol(y);
   return levD(cx, cy) <= (Math.max(cx.length, cy.length) >= 7 ? 2 : 1);
+}
+function joinOK(a, b) {      // چسباندنِ دو واژه («تو بی» = «توبی») فقط وقتی که واژه‌ی دوم چیزی به صدای اولی اضافه کند؛ Bottled Oud ≠ Bottled
+  var j = skel(a + b).length; return j > skel(a).length && j > skel(b).length;
 }
 function phAlign(A, B, i, j) {      // واژه‌به‌واژه، با اجازه‌ی چسبیدن/جداشدنِ دو واژه‌ی کنارِ هم («تو بی» = «توبی»)
   if (i === A.length && j === B.length) return true;
   if (i >= A.length || j >= B.length) return false;
   if (phTok(A[i], B[j]) && phAlign(A, B, i + 1, j + 1)) return true;
-  if (i + 1 < A.length && phTok(A[i] + A[i + 1], B[j]) && phAlign(A, B, i + 2, j + 1)) return true;
-  if (j + 1 < B.length && phTok(A[i], B[j] + B[j + 1]) && phAlign(A, B, i + 1, j + 2)) return true;
+  if (i + 1 < A.length && joinOK(A[i], A[i + 1]) && phTok(A[i] + A[i + 1], B[j]) && phAlign(A, B, i + 2, j + 1)) return true;
+  if (j + 1 < B.length && joinOK(B[j], B[j + 1]) && phTok(A[i], B[j] + B[j + 1]) && phAlign(A, B, i + 1, j + 2)) return true;
   return false;
 }
 function latToks(r) {
-  if (r._lt) return r._lt;
+  if (r._lt && r._ltV === LEXV) return r._lt;
+  r._ltV = LEXV;
   return (r._lt = (isFaArr(r) ? enOf(r) : r.map(function (w) { return String(w).toLowerCase().replace(/'/g, ''); })).filter(Boolean));
 }
+function looseSg(a) { return skel(vNorm(a.join(''))).replace(/x/g, 'k').replace(/(.)\1+/g, '$1'); }      // sh/ch (ش) و k یکی: Cherie = شری
 function looseName(A, B) {
-  if (A._b !== B._b) return false;
-  var a = latToks(restOf(A)), b = latToks(restOf(B));
+  var ra = restOf(A), rb = restOf(B); if (A._b !== B._b) return false;
+  var a = latToks(ra), b = latToks(rb);
   if (a.length > 9 || b.length > 9 || Math.abs(a.length - b.length) > 2 || skel(a.join('')).length < 4) return false;
+  if (a._sg === undefined) a._sg = looseSg(a);      // پیش‌صافی ارزان: اسکلتِ کلِ نام باید یکی باشد (وگرنه هم‌ترازیِ واژه‌به‌واژه هم شکست می‌خورد)
+  if (b._sg === undefined) b._sg = looseSg(b);
+  if (a._sg !== b._sg) return false;
   return phAlign(a, b, 0, 0);
 }
 function concCmp(a, b) { return a === b ? 2 : (!a || !b) ? 1 : 0; }
@@ -1443,14 +1467,15 @@ function* reconcileGen(db, idx) {      // مولّد: هر چند گروه یک�
       return true;
     });
     var cor = sib.filter(function (id) { return hp.some(function (x) { return loose2[id] ? corrobTight(byG[id], x.ml, x.p) : corrob(byG[id], x.ml, [x.p]); }); });
-    if (cor.length === 1) {
+    if (cor.length === 1 && (!loose2[cor[0]] || sib.length === 1)) {
       var to = cor[0], from = hid;
       if (isFaArr(restOf(H.key)) && !isFaArr(restOf(G[to].key))) { from = cor[0]; to = hid; }     // گروهِ دارای نامِ فارسی می‌ماند (نامِ نمایشی از آن می‌آید)
       var tt2 = SM[to] = SM[to] || {}, fm = SM[from] || {}; for (var q3 in fm) tt2[q3] = 1;
       moveGroup(db, from, to); delete G[from]; moved++;
     }
   }
-  var K2 = Object.keys(G).sort(function (x, y) { return +x - +y; }); for (var i2 = 0; i2 < K2.length; i2++) { step2(K2[i2]); if (i2 % 100 === 99) yield; }
+  var K2 = Object.keys(G).sort(function (x, y) { return x < y ? -1 : x > y ? 1 : 0; });      // ترتیبِ ثابت (شناسه‌ها متنی‌اند؛ تفریقِ عددی NaN می‌داد)
+  for (var i2 = 0; i2 < K2.length; i2++) { step2(K2[i2]); if (i2 % 100 === 99) yield; }
   return moved;
 }
 function reconcile(db, idx) { var g = reconcileGen(db, idx), r; while (!(r = g.next()).done); return r.value; }
@@ -1510,7 +1535,7 @@ function engDesc(card) {
 /* هایلند و چند سایتِ دیگر در عنوانِ فارسی گاهی «ر» و «ژ» را با «غ» و «ق» عوض می‌کنند («پغفم» = پرفیوم، «نواق» = نوآر، «سواق» = سویر)؛ نامِ لاتینیِ همان کالا درست است */
 var GQ = /[غق]/;
 function engName(e) {      // نامِ لاتین برای یادگرفتنِ نام: بدون حرفِ جنسیتِ آخر و بدون اندازه
-  return String(e || '').replace(/\s+(w-m|m-w|w\/m|m\/w|u|w|m)\s*$/i, '').replace(/\s+\d{2,3}(\.\d+)?\s*(ml)?\s*$/i, '').trim();
+  return String(e || '').replace(/\s+(w-m|m-w|w\/m|m\/w|u|w|m)\s*$/i, '').replace(/\s+\d{2,3}(\.\d+)?\s*ml\s*$/i, '').replace(/(\b(?:edp|edt|edc|parfum|cologne|extrait))\s+\d{2,3}\s*$/i, '$1').trim();      // فقط «۱۰۰ml» یا «Edp 100»؛ «212» و «Torino 22» نامِ عطرند
 }
 function engTitle(x) {
   var e = String(x.e || '').replace(/\s+/g, ' ').trim(); if (!e) return '';
@@ -1518,10 +1543,34 @@ function engTitle(x) {
   e = e.replace(/\s+(w-m|m-w|w\/m|m\/w|u|w|m)\s*$/i, function (_, k) { k = k.toLowerCase(); g = k === 'w' ? 'زنانه' : k === 'm' ? 'مردانه' : 'یونیسکس'; return ''; });
   var t = String(x.t || '');
   if (!g) { var gm = /(مردانه|زنانه|یونیسکس)/.exec(t); if (gm) g = gm[1]; }
-  var bare = /\s(\d{2,3})\s*$/.exec(e), bareN = '';      // «... Edp 100» بدون واحد
-  if (bare && !/\d\s*ml/i.test(e)) { bareN = bare[1]; e = e.slice(0, bare.index); }
-  if (!/\d\s*ml/i.test(e)) { var sm = /(\d{2,3})\s*(?:میل|ml)/i.exec(normFa(t)); e += ' ' + ((sm && sm[1]) || bareN) + (sm || bareN ? 'ml' : ''); }
+  var bare = /\s(\d{2,3})\s*$/.exec(e), bareN = '', sm = /(\d{2,3})\s*(?:میل|ml)/i.exec(normFa(t));      // «... Edp 100» بدون واحد
+  if (bare && !/\d\s*ml/i.test(e) && (!sm || sm[1] === bare[1])) { bareN = bare[1]; e = e.slice(0, bare.index); }      // عددِ آخر فقط وقتی اندازه است که عنوانِ فارسی اندازه‌ی دیگری نگفته باشد («Torino 22» با «100 میل» = شماره‌ی عطر)
+  if (!/\d\s*ml/i.test(e)) { e += ' ' + ((sm && sm[1]) || bareN) + (sm || bareN ? 'ml' : ''); }
   return e + (g ? ' ' + g : '');
+}
+/* آیا نامِ لاتینِ زیرِ کارت به‌جای عنوانِ فارسیِ (احتمالاً خراب) به کار برود؟ فقط وقتی شبیهِ نامِ کالاست (غلظت یا میل دارد)،
+   برندش با برندِ عنوانِ فارسی نمی‌جنگد، و اگر برند ندارد برندِ فارسی به آن اضافه می‌شود. «عشق» یا «قرمز» در عنوانِ سالم + متنِ
+   تبلیغیِ لاتین (Free Shipping) دیگر نامِ کالا را خراب نمی‌کند. */
+var RE_ENGP = /\b(edp|edt|edc|parfum|perfume|extrait|cologne|eau|intense)\b|\d{2,3}\s*ml/i;
+function gqParse(x) {
+  if (!RE_ENGP.test(x.e)) return null;
+  var et = engTitle(x); if (!et) return null;
+  var p0 = parseTitle(x.t), pe = parseTitle(et); if (!pe) return null;
+  var b0 = p0 ? brandOf(p0.key, []).id : 'other', bE = brandOf(pe.key, []).id;
+  if (bE === 'other') {
+    if (b0 === 'other') {      // برندِ ناشناخته در هر دو: واژه‌ی اولِ هر دو (معمولاً برند) باید هم‌صدا باشد («نوید» = Navid)
+      if (!p0) return pe;
+      var f0 = enOf(p0.key.slice(0, 1))[0] || '', fe = String(pe.key[0] || '').toLowerCase();
+      return f0 && fe && phTok(f0, fe) ? pe : null;
+    }
+    var rest = restOf(p0.key.slice()), bw = p0.key.filter(function (w) { return rest.indexOf(w) < 0; });
+    if (!bw.length) return null;
+    var fr = enOf(rest.slice()), er = pe.key.map(function (w) { return String(w).toLowerCase(); });      // خرابی فقط چند حرف را عوض می‌کند: دست‌کم یک واژه‌ی نامِ لاتین باید با عنوانِ فارسی هم‌صدا باشد (متنِ تبلیغی نه)
+    if (!fr.some(function (a) { return er.some(function (b) { return a.length >= 3 && phTok(a, b); }); })) return null;
+    var pe2 = parseTitle(bw.join(' ') + ' ' + et);
+    return pe2 && brandOf(pe2.key, []).id === b0 ? pe2 : null;
+  }
+  return b0 === 'other' || b0 === bE ? pe : null;
 }
 function ingestChunk(C, list) {
   var db = C.db, idx = C.idx, src = C.src, M = C.M, G = C.G, seen = C.seen, st = C.st;
@@ -1532,7 +1581,7 @@ function ingestChunk(C, list) {
     var cur = M[pid], nowMin = Math.floor(Date.now() / 60000);
     var price = x.st === 1 || !(x.price > 0) ? 0 : x.price;
     var gq = !!(x.hd && x.e && x.t && GQ.test(x.t));                        // عنوانِ فارسیِ خراب‌شده + نامِ لاتینِ درست
-    if (cur && (x.st === 3 || !x.t || (cur[0] === x.t && !(gq && cur[5] !== 1)))) {          // شناخته‌شده: فقط قیمت
+    if (cur && (x.st === 3 || !x.t || (cur[0] === x.t && !(gq && cur[5] !== 2 && cur[5] !== 3)))) {      // ۱ = ترمیم با قاعده‌ی قدیمیِ ۱.۴۲: یک بار دوباره سنجیده شود          // شناخته‌شده: فقط قیمت
       if (cur[2] !== 0) cur[1] = price;
       cur[4] = nowMin;                                              // آخرین باری که در سایت دیده شد
       if (cur[2] && db.g[cur[2]]) putExtra(db.g[cur[2]], src, x);
@@ -1540,8 +1589,8 @@ function ingestChunk(C, list) {
     }
     if (x.st === 3 || !x.t) { st.unknown++; return; }
     if (x.st === 2) { M[pid] = [x.t || '', 0, 0, 0, nowMin]; return; }
-    var p = null;
-    if (gq) { var et = engTitle(x); p = et ? parseTitle(et) : null; if (p) CLEANSE.gqfix = (CLEANSE.gqfix | 0) + 1; }
+    var p = null, gqU = 0;
+    if (gq) { p = gqParse(x); if (p) { gqU = 1; CLEANSE.gqfix = (CLEANSE.gqfix | 0) + 1; } }
     if (!p) p = parseTitle(x.t);
     if (!p) { M[pid] = [x.t, 0, 0, 0, nowMin]; return; }
     if (x.e && isNameless(p)) {                           // عنوان نامِ عطر نداشت (فقط توضیح بود): از نشانیِ صفحه (slug) که نامِ لاتین دارد کمک می‌گیریم
@@ -1560,7 +1609,7 @@ function ingestChunk(C, list) {
     }
     var gg = db.g[gid]; gg.nm[p.name] = (gg.nm[p.name] || 0) + 1;
     putExtra(gg, src, x); addEn(db, gg, p, x.hd ? Object.assign({}, x, { e: engName(x.e) }) : x);
-    M[pid] = gq ? [x.t, price, gid, p.ml, nowMin, 1] : [x.t, price, gid, p.ml, nowMin];
+    M[pid] = gq ? [x.t, price, gid, p.ml, nowMin, gqU ? 3 : 2] : [x.t, price, gid, p.ml, nowMin];      // ۳ = با نامِ لاتین ساخته شد؛ ۲ = بررسی شد و عنوانِ فارسی ماند
     if (price > 0) (C.byG[gid] = C.byG[gid] || []).push({ ml: p.ml, p: price * ((db.sc && db.sc[src]) || 1) });
   });
 }
@@ -1572,14 +1621,14 @@ function purgeStored(db) {      // بیرون‌بردنِ کالاهای ذخی
     Object.keys(M).forEach(function (pid) {
       var e = M[pid];
       if (e[2] && e[0] && db.g[e[2]] && db.g[e[2]].k.some(function (w) { return STOP[w]; })) { e[0] = ''; rk++; }      // گروهی که با قاعده‌ی قدیمی‌تر ساخته شده و واژه‌ی اضافه (آقایان/بانوان...) در کلیدش مانده: عنوان در دریافتِ کامل بعدی دوباره تحلیل می‌شود
-      if (e[2] && e[0] && e[5] !== 1) { var r0 = REJ.n, c0 = CLEANSE.clone | 0; var pr = parseTitle(e[0]); var isC = !pr && REJ.n > r0; CLEANSE.clone = c0; if (isC) { e[1] = 0; e[2] = 0; e[3] = 0; e[0] = ''; n++; } else if (pr && db.g[e[2]] && pr.key.join(' ') !== db.g[e[2]].k.join(' ')) { e[0] = ''; rk++; } }      // قاعده‌ی نام عوض شده: این کالا با نامِ تازه دوباره ثبت شود      // عنوان پاک می‌شود تا اگر قاعده برداشته شد، دریافتِ کامل دوباره تحلیلش کند
+      if (e[2] && e[0] && e[5] !== 3) { var r0 = REJ.n, c0 = CLEANSE.clone | 0; var pr = parseTitle(e[0]); var isC = !pr && REJ.n > r0; CLEANSE.clone = c0; if (isC) { e[1] = 0; e[2] = 0; e[3] = 0; e[0] = ''; n++; } else if (pr && db.g[e[2]] && pr.key.join(' ') !== db.g[e[2]].k.join(' ')) { e[0] = ''; rk++; } }      // قاعده‌ی نام عوض شده: این کالا با نامِ تازه دوباره ثبت شود      // عنوان پاک می‌شود تا اگر قاعده برداشته شد، دریافتِ کامل دوباره تحلیلش کند
     });
   });
   REJ.n = R0.n; REJ.by = R0.by; REJ.ex.length = R0.ex; CLEANSE.junk = R0.junk;      // بازبینیِ حافظه شمارنده‌های گزارش را باد نکند
-  if (rk) db.full = {};                       // بروزرسانیِ بعدی «کامل» باشد تا عنوانِ پاک‌شده‌ها دوباره تحلیل شود
+  if (rk) { db.full = {}; db.fullGen = (db.fullGen | 0) + 1; }      // شمارنده: منبعی که وسطِ همین کار بود می‌فهمد باید همین حالا کامل بگیرد // «کامل» باشد تا عنوانِ پاک‌شده‌ها دوباره تحلیل شود
   return n;
 }
-var DEDUPE_V = 9;
+var DEDUPE_V = 10;
 function ingestEnd0(C, complete) {
   if (complete) {                                      // فهرستِ ناگهان خیلی کوچک‌تر شده (صفحه‌ی خطا/کپچا): پاک‌سازی نکن
     var live = Object.keys(C.M).filter(function (pid) { return C.M[pid][1] > 0; }), seenN = live.filter(function (pid) { return C.seen[pid]; }).length;      // فقط کالاهای قیمت‌دار شمرده می‌شوند: فروشگاهی که فقط موجودها را می‌دهد، ناموجودِ قبلی را «ندیده» حساب نکند
@@ -1909,15 +1958,19 @@ async function probeShop(net, base, q) {
 }
 
 var DK_URLS = [
-  function (p) { return 'https://api.digikala.com/v1/categories/perfume/search/?page=' + p; },
-  function (p) { return 'https://api.digikala.com/v1/categories/perfume/search?page=' + p; }
+  function (p, q) { return 'https://api.digikala.com/v1/categories/perfume/search/?page=' + p + (q || ''); },
+  function (p, q) { return 'https://api.digikala.com/v1/categories/perfume/search?page=' + p + (q || ''); }
 ];
+/* دیجی‌کالا در هر ترتیب فقط ۱۰۰ صفحه می‌دهد؛ فهرستِ عطرش بیشتر است. بعد از ترتیبِ عادی، دو سرِ فهرست (ارزان‌ترین و گران‌ترین) هم
+   خوانده می‌شود تا کالاهای بیشتری دیده شوند. اگر سایت ترتیبی را نپذیرد یا کالای تازه‌ای نیاورد، همان‌جا رها می‌شود. */
+var DK_SORTS = ['&sort=20', '&sort=21'];      // ارزان‌ترین و گران‌ترین: دو سرِ فهرست که در ترتیبِ عادی دیده نمی‌شوند
 async function digikalaSource(net, rep, mode) {
-  var out = [], failed = 0, total = 1, vi = 0, err = '';
+  var out = [], failed = 0, total = 1, vi = 0, err = '', nNew = 0;
   function small(u) { return u ? u.replace(/h_\d+,w_\d+/, 'h_360,w_360') : ''; }
   function eat(d) {
     d.products.forEach(function (p) {
-      if (!p || typeof p !== 'object') return;
+      if (!p || typeof p !== 'object' || p.id == null || seen[p.id]) return;
+      seen[p.id] = 1; nNew++;
       var dv = p.default_variant, pr = dv && dv.price;     // کالای ناموجود/متوقف‌شده «تنوعِ پیش‌فرض» ندارد؛ قیمتِ قدیمیِ p.price را قبول نمی‌کنیم
       var rial = pr && pr.selling_price;
       var ok = !(p.status && p.status !== 'marketable') && !!dv && rial > 0 && !(dv.status && !/marketable|available/i.test(String(dv.status)));
@@ -1927,8 +1980,9 @@ async function digikalaSource(net, rep, mode) {
       out.push({ id: p.id, t: title, e: p.title_en || '', price: ok ? rial / 10 : 0, img: small(img), big: img ? img.replace(/h_\d+,w_\d+/, 'h_1000,w_1000') : '', b: bh && !BAD_CAT.test(bh) && bh.length <= 40 ? [bh] : [], st: ok ? 0 : 1 });
     });
   }
-  async function one(p, v) {
-    var r = await getR(net, DK_URLS[v](p), { Accept: 'application/json' });
+  var seen = Object.create(null);
+  async function one(p, v, q) {
+    var r = await getR(net, DK_URLS[v](p, q || ''), { Accept: 'application/json' });
     if (r.status !== 200) return { k: 'fail', e: r.status === 0 ? r.body : 'HTTP ' + r.status };
     var j = parseJson(r.body), d = j && j.data;
     if (!d || !Array.isArray(d.products)) return { k: 'fail', e: 'ساختار ناشناخته' };
@@ -1939,6 +1993,7 @@ async function digikalaSource(net, rep, mode) {
   for (vi = 0; vi < DK_URLS.length && !first; vi++) { var r1 = await one(1, vi); if (r1.k === 'ok') { first = r1; break; } err = r1.e; }
   if (!first) throw new Error(err || 'دیجی‌کالا جواب نداد');
   var d1 = first.d; eat(d1); rep(out.length, 0);
+  var cap0 = !(d1.pager && d1.pager.total_pages > 0) || d1.pager.total_pages >= 100, fr = cap0 ? .5 : 1;      // سقف‌دار: نیمی از نوارِ پیشرفت برای ترتیب‌های دیگر
   total = Math.min(100, (d1.pager && d1.pager.total_pages) || 1);
   var done = 1, dbad = [], unreq = 0;
   for (var page = 2; page <= total; page += CFG.conc + 1) {
@@ -1946,7 +2001,7 @@ async function digikalaSource(net, rep, mode) {
     var rr = await Promise.all(ps.map(function (p) { return one(p, vi); }));
     var dn0 = dbad.length;
     rr.forEach(function (r, i) { if (r.k === 'ok') eat(r.d); else dbad.push(ps[i]); });
-    done += ps.length; rep(out.length, done / total);
+    done += ps.length; rep(out.length, done / total * fr);
     if (dbad.length > dn0) await sleep(CFG.retryMs * 2);
     if (dbad.length >= 15) { unreq = Math.max(0, total - (page + ps.length - 1)); break; }      // سایت جواب نمی‌دهد/مسدود کرده؛ بیش از این فشار نیاور (صفحه‌های نخواسته‌شده ناقص حساب می‌شوند)
   }
@@ -1962,7 +2017,24 @@ async function digikalaSource(net, rep, mode) {
   failed += dbad.length + unreq;
   if (!out.length) throw new Error('محصولی پیدا نشد');
   var capped = !(d1.pager && d1.pager.total_pages > 0) || d1.pager.total_pages >= 100;      // ۱۰۰ = شاید سقفِ خودِ API است
-  return { items: out, complete: !failed && total > 0 && !capped, note: failed ? 'ناقص: ' + failed + ' صفحه' : (capped ? 'ناقص: تعداد صفحه‌ها معلوم نیست یا بیش از ۱۰۰ است' : '') };
+  var extra = 0, tX = Date.now();
+  if (capped && failed < 15) {      // چند صفحه‌ی خراب ترتیب‌های دیگر را لغو نمی‌کند؛ فقط وقتی سایت عملاً جواب نمی‌دهد      // در بروزرسانیِ «فقط قیمت» هم (دیجی‌کالا قیمت را فقط با همین فهرست می‌دهد): وگرنه کالاهایی که فقط از این راه دیده شده‌اند چند ساعت بعد «کهنه» می‌شوند
+    for (var si = 0; si < DK_SORTS.length && Date.now() - tX < 360000; si++) {      // سقفِ ۶ دقیقه برای ترتیب‌های اضافه
+      var q = DK_SORTS[si], dry = 0, n0 = nNew, xfail = 0;
+      for (var pg = 1; pg <= 100 && dry < 3 && Date.now() - tX < 360000; pg += CFG.conc + 1) {
+        var xs = []; for (var xi = 0; xi < CFG.conc + 1 && pg + xi <= 100; xi++) xs.push(pg + xi);
+        var before = nNew, xr = await Promise.all(xs.map(function (p) { return one(p, vi, q); })), xbad = 0, xlast = false;
+        xr.forEach(function (r) { if (r.k === 'ok') { eat(r.d); if (r.d.pager && r.d.pager.total_pages && xs[xs.length - 1] >= r.d.pager.total_pages) xlast = true; } else xbad++; });
+        rep(out.length, .5 + .5 * (si + Math.min(1, (pg + xs.length - 1) / 100)) / DK_SORTS.length);
+        if (xbad === xs.length || (xbad && ++xfail >= 2)) break;      // این ترتیب را نمی‌دهد/مسدود شد: رها
+        if (xbad) await sleep(CFG.retryMs * 2);
+        dry = nNew > before ? 0 : dry + 1;  // سه دسته‌ی پشت‌سرهم بدونِ کالای تازه = این ترتیب همان قبلی است
+        if (xlast) break;
+      }
+      extra += nNew - n0;
+    }
+  }
+  return { items: out, complete: !failed && total > 0 && !capped, note: failed ? 'ناقص: ' + failed + ' صفحه' : (capped ? 'ناقص: دیجی‌کالا فقط ۱۰۰ صفحه می‌دهد' + (extra ? '؛ با ترتیب‌های دیگر ' + extra + ' کالای بیشتر خوانده شد' : '') : ''), dkCap: capped };
 }
 
 /* ---- HTML عمومی (برای سایت‌هایی که API ندارند) ---- */

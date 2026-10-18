@@ -337,8 +337,10 @@ body.dk #nw.on{display:flex}
 :root[data-th="light"] .bwm{opacity:.09}
 .hdr .t1{display:flex;align-items:center;gap:6px}
 .hdr .t1.cr,.ma .bn.cr{overflow:visible}
+.ma .bn.cr{display:flex;align-items:center}
+:root[data-th="light"] .crb{background:rgba(42,87,196,.1);border-color:rgba(42,87,196,.35)}
 .crb{position:relative;flex:0 0 auto;font:inherit;font-size:calc(13px*var(--zs,1));font-weight:700;color:var(--act);background:var(--pill);border:1px solid var(--cb);border-radius:14px;padding:3px 11px;cursor:pointer}
-.crb::before{content:"";position:absolute;inset:-10px -8px}
+.crb::before{content:"";position:absolute;inset:-12px -8px -6px}
 .crs{flex:0 0 auto;font-style:normal;font-size:20px;line-height:1;color:var(--mu)}
 .crc{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .mh .crb{color:inherit}

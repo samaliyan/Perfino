@@ -40,4 +40,21 @@ var V4 = build({
 chk(find(V4, /دومینانت|دایموند|الماس/).length === 2, 'Diamond and Dominant are not merged', JSON.stringify(find(V4, /دومینانت|دایموند|الماس/)));
 chk(find(V4, /تورینو/).every(function (v) { return v.s.indexOf('+') < 0; }), 'Torino 22 and 24 are not merged', JSON.stringify(find(V4, /تورینو/)));
 chk(find(V4, /مابوسین|Mauboussin/i).every(function (v) { return v.s.indexOf('+') < 0; }), 'Mauboussin Eau d\'Hiver and Rose are not merged', JSON.stringify(find(V4, /مابوسین|Mauboussin/i)));
+// ۵) محافظ‌های بازبینی: واژه‌ی کوتاهِ آخر (عود، های، لئو) در واژه‌ی قبلی گم نمی‌شود؛ Love ≠ لولا؛ شماره‌ی عطر با اندازه قاطی نمی‌شود
+[[{ liliome: [['عطر ادکلن هوگو باس باتلد 100 میل', 4.0e6]], hiland: [['ادوپرفیوم مردانه هوگو باس باتلد عود 100 میل', 4.2e6]] }, /باتلد/, 'Bottled vs Bottled Oud'],
+ [{ safir: [['ادو تویلت مردانه دیزل اونلی د بریو 125 میلی لیتر', 3.0e6]], hiland: [['ادوتویلت مردانه دیزل اونلی د بریو های 125 میل', 3.1e6]] }, /بریو/, 'Only The Brave vs High'],
+ [{ safir: [['ادو تویلت زنانه بولگاری امنیا کریستال 65 میلی لیتر', 3.0e6]], hiland: [['ادوتویلت زنانه بولگاری امنیا کریستال لیو 65 میل', 3.1e6]] }, /امنیا/, "Omnia Crystalline vs L'Eau"],
+ [{ liliome: [['عطر ادکلن مارک جیکوبز لولا 100 میل', 4.0e6]], digikala: [['ادو پرفیوم زنانه مارک جیکوبز مدل Love حجم 100 میلی لیتر', 4.1e6]] }, /لولا|لاو|love/i, 'Lola vs Love'],
+ [{ hiland: [[ 'ادوپرفیوم زرجوف تورینو 22 100 میل', 9e6, 'Xerjoff Torino 22'], ['ادوپرفیوم زرجوف تورینو 21 100 میل', 9e6, 'Xerjoff Torino 21']] }, /تورینو|torino/i, 'Torino 22 vs 21 (Hiland English name)']
+].forEach(function (c) {
+  var db = C.newDb(), ix = C.dbIndex(db);
+  Object.keys(c[0]).forEach(function (src) { C.ingest(db, ix, src, c[0][src].map(function (a, i) { return { id: i + 1, t: a[0], price: a[1], e: a[2] || '', hd: a[2] ? 1 : 0 }; }), true); });
+  C.reconcile(db, ix);
+  var T = C.tree(C.buildList(db, Object.keys(c[0]), {}, 0), 'fa', db.wd), V = [];
+  T.forEach(function (b) { b.models.forEach(function (m) { m.variants.forEach(function (v) { if (c[1].test(b.name + ' ' + m.name)) V.push(m.name); }); }); });
+  chk(V.length === 2, c[2] + ' stay two perfumes', JSON.stringify(V));
+});
+// ۶) واژه‌ای مثل constructor برنامه را نمی‌اندازد؛ ch = ش (Cherie = شری)
+try { build({ liliome: [['عطر ادکلن دیور constructor 100 میل', 5e6]], hiland: [['ادوپرفیوم مردانه دیور konstruktor 100 میل', 5e6]] }); chk(true); } catch (e) { chk(false, 'constructor word crashes matching', e && e.message); }
+one(build({ digikala: [['ادو پرفیوم زنانه رولینگ مدل Cherie Blossom حجم 100 میلی لیتر', 3e6]], liliome: [['عطر ادکلن رولینگ شری بلاسم 100 میل', 3.1e6]] }), /رولینگ/, 'digikala+liliome', 'Cherie = شری');
 console.log(ok + ' pass ' + bad + ' fail'); process.exit(bad ? 1 : 0);

@@ -1,7 +1,7 @@
 (function () {
 'use strict';
 var RM = !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
-var VERSION = '1.43';
+var VERSION = '1.44';
 var myCode = (function () { var m = /\/b(\d{1,10})\/index\.html$/.exec(String(location.pathname || '')); return m ? m[1] : '0'; })();      // نسخه‌ی این صفحه از روی آدرسش؛ در گزارش‌ها به جاوا فرستاده می‌شود تا صفحه‌ی کهنه نتواند نسخه‌ی تازه را «سالم» اعلام کند
 function otaCall(n) { try { if (window.Native && typeof window.Native[n] === 'function') window.Native[n](myCode); } catch (e) { } }
 otaCall('otaBoot');      // «جاوااسکریپتِ این صفحه شروع شد»: برنامه به صفحه‌ی بی‌نصب مهلتِ بیشتری برای ساختن فهرست می‌دهد
@@ -218,7 +218,7 @@ function decorate(list, title, sub, crumb, wm) {
   return { list: list, LET: LET, FI: FI, title: title || '', sub: sub || '', crumb: crumb || '', wm: wm || '' };
 }
 /* مسیرِ برند («برندها ‹ ورساچه»؛ «برندها» لمس‌پذیر است) و نامِ محوِ برند پشتِ فهرست، تا معلوم باشد در کدام برند هستیم */
-function crumbHtml(name) { return '<button type="button" class="crb">برندها</button><i class="crs" aria-hidden="true">‹</i><span class="crc">' + esc(name) + '</span>'; }
+function crumbHtml(name) { return '<button type="button" class="crb">برندها</button><i class="crs" aria-hidden="true">‹</i><span class="crc" dir="auto">' + esc(name) + '</span>'; }
 function setHead(el, data) {
   var t1 = el.querySelector('.t1'); if (!t1) return;
   t1.classList.toggle('cr', !!data.crumb);
@@ -229,7 +229,8 @@ function addWm(el, data) {
   if (!data.wm) return;
   var w = div('bwm'); w.setAttribute('aria-hidden', 'true'); w.textContent = data.wm;
   var words = String(data.wm).split(/\s+/), L = Math.max.apply(null, words.map(function (x) { return x.length; })) || 1;
-  w.style.fontSize = Math.max(22, Math.min(96, Math.floor((host_w(el) - 28) / (L * .8)))) + 'px';
+  var fs = Math.min(96, Math.floor((host_w(el) - 28) / (L * .9)));
+  w.style.fontSize = Math.max(12, fs) + 'px'; if (fs < 22) w.style.overflowWrap = 'anywhere';      // واژه‌ی خیلی بلند: کوچک‌تر و در صورت نیاز شکسته، نه بریده
   var b = el.querySelector('.blob'); if (b && b.parentNode === el) { var last = el.querySelectorAll('.blob'); last[last.length - 1].insertAdjacentElement('afterend', w); } else el.insertBefore(w, el.firstChild);
 }
 function host_w(el) { return (el.parentNode && el.parentNode.clientWidth) || window.innerWidth || 360; }
@@ -268,7 +269,8 @@ function ModelA(host, data, anchor) {
     var nm = el.querySelector('.nm'); nm.style.fontSize = ''; nm.textContent = p.name;
     var tg = el.querySelector('.tg'); tg.textContent = tagOf(p); tg.style.display = tagOf(p) ? '' : 'none';
     el.querySelector('.pn').dataset.id = p.id;
-    var bn = el.querySelector('.bn'); bn.classList.toggle('cr', !!data.crumb); bn.innerHTML = data.crumb ? crumbHtml(data.crumb) : ''; bn.style.display = data.crumb ? '' : 'none';
+    var bn = el.querySelector('.bn');
+    if (bn._cr !== (data.crumb || '')) { bn._cr = data.crumb || ''; bn.classList.toggle('cr', !!data.crumb); bn.innerHTML = data.crumb ? crumbHtml(data.crumb) : ''; bn.style.display = data.crumb ? '' : 'none'; }      // دکمه هر بار از نو ساخته نشود (لمسِ وسطِ چرخش گم می‌شد)
     var lns = el.querySelector('.lns'), many = p.sizes.length > 2;
     if (!p.sizes.length) { lns.innerHTML = '<div class="hn">' + esc(p.hint || '') + CHEV + '</div>'; fitLines(nm, 3, 14); strip.setOn(data.LET.indexOf(p.L)); return; }
     lns.innerHTML = p.sizes.slice(0, 4).map(function (z) { return '<div class="ln"><span>' + fa(z.ml) + ' میل</span><b style="' + (many ? 'font-size:21px' : '') + '"></b></div>'; }).join('');
@@ -497,6 +499,7 @@ if (!set.soff || typeof set.soff !== 'object' || Array.isArray(set.soff)) set.so
 if (!Array.isArray(set.rec)) set.rec = [];          // آخرین عطرهایی که دیده شد
 if (!set.fav || typeof set.fav !== 'object' || Array.isArray(set.fav)) set.fav = {};          // لیست مغازه
 if (!set.hide || typeof set.hide !== 'object' || Array.isArray(set.hide)) set.hide = {};      // عطرهای پنهان‌شده
+if (!set.favOld || typeof set.favOld !== 'object' || Array.isArray(set.favOld)) set.favOld = {};      // ستاره‌هایی که به نامِ تازه منتقل شدند (برای برگشت)
 if (!Array.isArray(set.block)) set.block = [];                                               // واژه‌های ممنوع
 set.block = set.block.filter(function (x) { return typeof x === 'string' && x.trim().length >= 2; }).slice(0, 60);
 if (!(set.fs >= 0 && set.fs <= 3)) set.fs = 0;
@@ -956,13 +959,23 @@ function treeSave(lang, stamp, tree, l) {
 }
 /* نامِ مدلی که با قاعده‌ی تمیزکاریِ تازه کوتاه‌تر شد («پرفیومز دو پگاسوس» ← «پگاسوس»): ستاره‌ی لیست مغازه به همان مدلِ تازه می‌رسد */
 function migrateFav() {
-  var ch = false;
+  var ch = false, all = {}; set.favOld = set.favOld || {};
+  ALLB.forEach(function (b) { b.models.forEach(function (m) { all[m.id] = b; }); });      // همه‌ی داده (پنهان و خاموش هم)، نه فقط آنچه الان دیده می‌شود
+  /* اگر مدلِ قدیمی دوباره پیدا شد (فقط موقتاً نبود: سایت جواب نداد، ناموجود بود)، ستاره به خودش برمی‌گردد */
+  Object.keys(set.favOld).forEach(function (id) {
+    var o = set.favOld[id]; if (!o || typeof o.lab !== 'string' || !(Date.now() - (o.t || 0) < 60 * 86400e3)) { delete set.favOld[id]; ch = true; return; } if (!all[id]) return;      // بعد از ۶۰ روز فراموش می‌شود
+    if (!o.to || set.fav[o.to]) { if (!set.fav[id]) set.fav[id] = o.lab; if (o.to && o.auto) delete set.fav[o.to]; }      // اگر کاربر ستاره‌ی تازه را خودش برداشته بود، برنمی‌گردانیم
+    delete set.favOld[id]; ch = true;
+  });
   Object.keys(set.fav || {}).forEach(function (id) {
-    if (MD_BY[id]) return;
-    var lab = String(set.fav[id]).split(' | '), bn = lab[0], mn = lab.slice(1).join(' | '), b = bn && TREE.filter(function (x) { return x.name === bn; })[0];
+    if (all[id] || set.hide[id] || !ALLB.length) return;
+    var lab = String(set.fav[id]).split(' | '), bn = lab[0], mn = lab.slice(1).join(' | '), b = bn && ALLB.filter(function (x) { return x.name === bn; })[0];
     if (!b || !mn) return;
     var hit = b.models.filter(function (m) { return mn === m.name || (mn.length > m.name.length && mn.slice(-m.name.length - 1) === ' ' + m.name && mn.slice(0, mn.length - m.name.length - 1).split(' ').length <= 3); });
-    if (hit.length === 1 && !set.fav[hit[0].id]) { set.fav[hit[0].id] = bn + ' | ' + hit[0].name; delete set.fav[id]; ch = true; }
+    if (hit.length === 1 && !set.fav[hit[0].id]) {
+      set.fav[hit[0].id] = bn + ' | ' + hit[0].name;
+      set.favOld[id] = { lab: set.fav[id], to: hit[0].id, auto: 1, t: Date.now() }; delete set.fav[id]; ch = true;      // نسخه‌ی قدیمی نگه داشته می‌شود تا اگر اشتباه بود برگردد
+    }
   });
   if (ch) ls.set('pp.set', set);
 }
@@ -1289,11 +1302,12 @@ function queueImgs() {
 /* ---- بروزرسانی ---- */
 async function doSource(s) {
   var mode = db.full[s.id] && Date.now() - db.full[s.id] < FULL_EVERY ? 'price' : 'full';
-  var known = 0, M = db.it[s.id]; if (M) known = Object.keys(M).length;
+  var known = 0, M = db.it[s.id], G0 = db.fullGen | 0; if (M) known = Object.keys(M).length;
   var P = prog[s.id] = { n: 0, mode: mode, exp: known, done: false };
   function rep(n, p) { P.n = n; if (p != null) P.pct = p; tick(); }
-  var r = await s.run(net, rep, mode), st = await Core.ingestAsync(db, idx, s.id, r.items, r.complete);
-  if (mode === 'price' && st.unknown > 0) {     // محصول تازه‌ای آمده که نامش را نمی‌شناسیم → یک دریافت کامل
+  var r = await s.run(net, rep, mode), Gi = db.fullGen | 0, st = await Core.ingestAsync(db, idx, s.id, r.items, r.complete);
+  if (mode === 'full' && (db.fullGen | 0) !== Gi) st = await Core.ingestAsync(db, idx, s.id, r.items, r.complete);      // قاعده‌ها وسطِ همین کار عوض شد: همان فهرستِ کاملِ دریافت‌شده یک بار دیگر ثبت شود (بدونِ دانلودِ دوباره)
+  else if (mode === 'price' && (st.unknown > 0 || (db.fullGen | 0) !== G0)) {     // محصول تازه‌ای آمده که نامش را نمی‌شناسیم، یا قاعده‌های تازه‌ی برنامه (بعد از به‌روزرسانی) وسطِ کار دریافتِ کامل خواستند → همین حالا یک بار دریافتِ کامل
     mode = P.mode = 'full'; P.pct = null; P.n = 0;
     r = await s.run(net, rep, 'full'); st = await Core.ingestAsync(db, idx, s.id, r.items, r.complete);
   }
@@ -1387,8 +1401,9 @@ function srcState(s) {
   if (!srcOn(s.id)) { o.kind = 'off'; o.say = 'خاموش است (به انتخاب شما)'; o.todo = ''; return o; }
   if (x.err) { o.kind = 'err'; o.say = 'جواب نداد (' + x.err + ')'; o.todo = db.t[s.id] ? 'قیمت‌های قبلی این سایت نگه داشته شد. اگر اینترنت درست است، چند دقیقه بعد دوباره «بروزرسانی» را بزنید.' : 'هنوز هیچ قیمتی از این سایت نیامده؛ اینترنت را بررسی و دوباره بروزرسانی کنید.'; }
   else if (!x.ok && !db.t[s.id]) { o.kind = 'wait'; o.say = 'هنوز چیزی از این سایت نیامده'; o.todo = 'بروزرسانی را بزنید.'; }
-  else if (x.note && /ناقص/.test(x.note)) { o.kind = 'part'; o.say = 'فهرست سایت کامل خوانده نشد'; o.todo = 'آنچه خوانده شد بروز شد و بقیه با قیمتِ قبلی ماند؛ بار بعد خودش دوباره امتحان می‌کند. کاری لازم نیست.'; }
-  else if (!fullT) { o.kind = 'part'; o.say = 'دریافتِ کامل هنوز تمام نشده'; o.todo = 'خودش ادامه می‌دهد. کاری لازم نیست.'; }
+  else if (x.note && /^ناقص: دیجی‌کالا فقط ۱۰۰ صفحه/.test(x.note)) { o.say = 'سالم؛ ' + x.note.replace(/^ناقص: /, '') + ' (سقفِ خودِ سایت است، خطا نیست)'; }
+  else if (x.note && /ناقص/.test(x.note)) { o.kind = 'part'; o.say = 'فهرست سایت کامل خوانده نشد'; o.todo = 'آنچه خوانده شد بروز شد و بقیه با قیمتِ قبلی ماند؛ ' + (autoMs() ? 'بار بعد خودش دوباره امتحان می‌کند. کاری لازم نیست.' : 'دفعه‌ی بعد که «بروزرسانی» را بزنید دوباره امتحان می‌شود.'); }
+  else if (!fullT) { o.kind = 'part'; o.say = 'دریافتِ کامل هنوز تمام نشده'; o.todo = autoMs() ? 'خودش ادامه می‌دهد. کاری لازم نیست.' : 'یک بار دیگر «بروزرسانی» را بزنید تا کامل شود.'; }
   else { o.say = 'سالم و کامل'; }
   return o;
 }
@@ -1681,12 +1696,12 @@ $('sSamp').onclick = function () {
   Object.keys(db.it || {}).forEach(function (sr) { var m = db.it[sr] || {}; Object.keys(m).forEach(function (pid) {
     var e = m[pid]; if (!e || !e[0]) return;
     var g = e[2] && db.g[e[2]], nm = g ? (g.k || []).join(' ') : '';
-    var line = (srcN[sr] || sr) + ' | ' + e[0] + ' | ' + (g ? nm : 'رد شد') + ' | ' + (e[3] || '');
+    var line = (srcN[sr] || sr) + ' | ' + e[0] + ' | ' + (g ? nm : 'رد شد') + ' | ' + (e[3] || '') + ' | ' + (e[1] || 0) + ' | ' + (e[2] || '');
     if (!g) rej.push(line);
     else if (nm.split(' ').length > 5 || nm.split(' ').length < 2 || SUS.test(nm)) bad.push(line);
     else okk.push(line);
   }); });
-  var t = 'نمونه عنوان‌ها ' + VERSION + ' (فروشگاه | عنوان اصلی | نام ساخته‌شده | میل)\n\nمشکوک (' + bad.length + '):\n' + bad.join('\n')
+  var t = 'نمونه عنوان‌ها ' + VERSION + ' (فروشگاه | عنوان اصلی | نام ساخته‌شده | میل | قیمت | گروه)\n\nمشکوک (' + bad.length + '):\n' + bad.join('\n')
     + '\n\nردشده (' + rej.length + '):\n' + rej.join('\n') + '\n\nبقیه (' + okk.length + '):\n' + okk.join('\n');
   var hdr = '\n\nوضعیت هر سایت در آخرین بروزرسانی:\n' + Core.SOURCES.map(function (x) { var q = stt[x.id] || {}; return x.name + ': ' + (q.ok ? 'ok ' + q.n + (q.mode ? ' (' + q.mode + ')' : '') + (q.note ? ' ' + q.note : '') : (q.raw || q.err || 'نامشخص')); }).join('\n')
     + '\nرد شده در آخرین بروزرسانی: ' + ((Core.REJ && Core.REJ.n) || 0) + ' ' + JSON.stringify((Core.REJ && Core.REJ.by) || {}) + '\nنمونهٔ ردشده‌ها:\n' + ((Core.REJ && Core.REJ.ex) || []).slice(0, 40).map(function (e) { return e[0] + ' | ' + e[1]; }).join('\n');
@@ -1964,6 +1979,7 @@ function renderMine() {
 $('sFs').onclick = function (e) { var b = e.target.closest('button'); if (!b || b.dataset.v == null) return; set.fs = +b.dataset.v; ls.set('pp.set', set); applyFs(); renderMine(); if (curModel) mountModel(curModel.getAnchor()); };
 function addBlock() {
   var inp = $('bkIn'), w = inp.value.trim();
+  if (busy) { toast('صبر کنید تا بروزرسانی تمام شود، بعد اضافه کنید', 3000); return; }      // وسطِ دریافت، پاک‌سازیِ حافظه همه‌ی سایت‌ها را دوباره دریافت می‌کرد
   if (w.length < 3) { toast('حداقل سه حرف بنویسید؛ واژه‌ی کوتاه چیزهای زیادی را حذف می‌کند', 3500); return; }
   if (set.block.indexOf(w) >= 0) { inp.value = ''; return; }
   set.block.push(w); ls.set('pp.set', set); inp.value = '';

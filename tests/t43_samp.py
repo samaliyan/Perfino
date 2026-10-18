@@ -16,7 +16,7 @@ async def main():
         t=await pg.evaluate("window.__samp||''")
         chk('text has 3 sections','مشکوک' in t and 'ردشده' in t and 'بقیه' in t,t[:80])
         lines=[l for l in t.split('\n=====')[0].split('\n') if ' | ' in l]
-        chk('has many lines with 4 fields',len(lines)>100 and all(l.count(' | ')==3 for l in lines[1:]),len(lines))
+        chk('has many lines with 6 fields (shop, title, name, ml, price, group)',len(lines)>100 and all(l.count(' | ')==5 for l in lines[1:]),len(lines))
         sv=await pg.evaluate('window.__sv')
         chk('saveText called once with file name .txt',len(sv)==1 and sv[0][0].startswith('perfume-titles-') and sv[0][0].endswith('.txt') and sv[0][1]==len(t),sv)
         chk('ALL titles included (no cap)',len(lines)>1000,len(lines))
