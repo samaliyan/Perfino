@@ -1,7 +1,7 @@
 (function () {
 'use strict';
 var RM = !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
-var VERSION = '1.41';
+var VERSION = '1.42';
 var myCode = (function () { var m = /\/b(\d{1,10})\/index\.html$/.exec(String(location.pathname || '')); return m ? m[1] : '0'; })();      // نسخه‌ی این صفحه از روی آدرسش؛ در گزارش‌ها به جاوا فرستاده می‌شود تا صفحه‌ی کهنه نتواند نسخه‌ی تازه را «سالم» اعلام کند
 function otaCall(n) { try { if (window.Native && typeof window.Native[n] === 'function') window.Native[n](myCode); } catch (e) { } }
 otaCall('otaBoot');      // «جاوااسکریپتِ این صفحه شروع شد»: برنامه به صفحه‌ی بی‌نصب مهلتِ بیشتری برای ساختن فهرست می‌دهد
@@ -212,11 +212,27 @@ function Strip(el, o) {
 }
 
 /* ---------- ساخت داده‌ی نمایش ---------- */
-function decorate(list, title, sub, crumb) {
+function decorate(list, title, sub, crumb, wm) {
   var LET = [], FI = {};
   list.forEach(function (p, i) { p.k = parseInt(String(p.imgId || p.id).replace(/^b/, ''), 36) % 64 || 0; if (FI[p.L] === undefined) { FI[p.L] = i; LET.push(p.L); } });
-  return { list: list, LET: LET, FI: FI, title: title || '', sub: sub || '', crumb: crumb || '' };
+  return { list: list, LET: LET, FI: FI, title: title || '', sub: sub || '', crumb: crumb || '', wm: wm || '' };
 }
+/* مسیرِ برند («برندها ‹ ورساچه»؛ «برندها» لمس‌پذیر است) و نامِ محوِ برند پشتِ فهرست، تا معلوم باشد در کدام برند هستیم */
+function crumbHtml(name) { return '<button type="button" class="crb">برندها</button><i class="crs" aria-hidden="true">‹</i><span class="crc">' + esc(name) + '</span>'; }
+function setHead(el, data) {
+  var t1 = el.querySelector('.t1'); if (!t1) return;
+  t1.classList.toggle('cr', !!data.crumb);
+  if (data.crumb) t1.innerHTML = crumbHtml(data.crumb); else t1.textContent = data.title;
+  el.querySelector('.t2').textContent = data.sub;
+}
+function addWm(el, data) {
+  if (!data.wm) return;
+  var w = div('bwm'); w.setAttribute('aria-hidden', 'true'); w.textContent = data.wm;
+  var words = String(data.wm).split(/\s+/), L = Math.max.apply(null, words.map(function (x) { return x.length; })) || 1;
+  w.style.fontSize = Math.max(22, Math.min(96, Math.floor((host_w(el) - 28) / (L * .8)))) + 'px';
+  var b = el.querySelector('.blob'); if (b && b.parentNode === el) { var last = el.querySelectorAll('.blob'); last[last.length - 1].insertAdjacentElement('afterend', w); } else el.insertBefore(w, el.firstChild);
+}
+function host_w(el) { return (el.parentNode && el.parentNode.clientWidth) || window.innerWidth || 360; }
 function div(cls, html) { var d = document.createElement('div'); d.className = cls; if (html) d.innerHTML = html; return d; }
 function idxOf(list, id) { for (var i = 0; i < list.length; i++) if (list[i].id === id) return i; return 0; }
 var CHEV = '<svg class="chev" width="11" height="18" viewBox="0 0 10 16" aria-hidden="true"><path d="M8 1L2 8l6 7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
@@ -239,7 +255,7 @@ function rowHtml(p, max) {
 /* ================= مدل الف: چرخ نیم‌دایره ================= */
 function ModelA(host, data, anchor) {
   var el = div('mod ma', '<div class="wh"><div class="sel"></div><div class="rs"></div><div class="fs2 ab"></div><div class="bub2"></div></div><div class="pn"><div class="tx"><div class="bn"></div><div class="nm"></div><span class="tg"></span><div class="lns"></div></div><div class="ph"></div></div>');
-  host.appendChild(el);
+  host.appendChild(el); addWm(el, data);
   var wh = el.querySelector('.wh'), L = data.list, rows = [], st = {}, cur = 0, STEP = Math.round(54 * ZS());
   var frag = document.createDocumentFragment();
   L.forEach(function (p, k) { var r = div('wr'); r.dataset.i = k; r.innerHTML = '<span class="wt">' + esc(p.name) + '</span>'; r._f = 0; rows.push(r); frag.appendChild(r); });
@@ -252,7 +268,7 @@ function ModelA(host, data, anchor) {
     var nm = el.querySelector('.nm'); nm.style.fontSize = ''; nm.textContent = p.name;
     var tg = el.querySelector('.tg'); tg.textContent = tagOf(p); tg.style.display = tagOf(p) ? '' : 'none';
     el.querySelector('.pn').dataset.id = p.id;
-    var bn = el.querySelector('.bn'); bn.textContent = data.crumb || ''; bn.style.display = data.crumb ? '' : 'none';
+    var bn = el.querySelector('.bn'); bn.classList.toggle('cr', !!data.crumb); bn.innerHTML = data.crumb ? crumbHtml(data.crumb) : ''; bn.style.display = data.crumb ? '' : 'none';
     var lns = el.querySelector('.lns'), many = p.sizes.length > 2;
     if (!p.sizes.length) { lns.innerHTML = '<div class="hn">' + esc(p.hint || '') + CHEV + '</div>'; fitLines(nm, 3, 14); strip.setOn(data.LET.indexOf(p.L)); return; }
     lns.innerHTML = p.sizes.slice(0, 4).map(function (z) { return '<div class="ln"><span>' + fa(z.ml) + ' میل</span><b style="' + (many ? 'font-size:21px' : '') + '"></b></div>'; }).join('');
@@ -287,7 +303,7 @@ function ModelC(host, data, anchor) {
   var el = div('mod mc', '<div class="blob b1"></div><div class="blob b2"></div><div class="blob b3"></div><div class="hdr"><div><div class="t1">قیمت امروز</div><div class="t2"></div></div><div class="cl"></div></div><div class="scl"></div><div class="fs2"></div><div class="bub2"></div>');
   host.appendChild(el);
   var L = data.list, scl = el.querySelector('.scl'), cl = el.querySelector('.cl'), gi = -1, PADT = 116;
-  el.querySelector('.t1').textContent = data.title; el.querySelector('.t2').textContent = data.sub;
+  setHead(el, data); addWm(el, data);
   /* فهرست آیتم‌ها با ارتفاع ثابت (برای ساخت فقط ردیف‌های نزدیک صفحه) */
   var items = [], top = 0, gtops = [], rowItem = [], zs = ZS(), GH = Math.round(40 * zs), GP = Math.round(9 * Math.sqrt(zs));
   L.forEach(function (p, k) {
@@ -349,7 +365,7 @@ function ModelFocus(kind, host, data, anchor) {
   el.style.setProperty('--rh', RH + 'px'); el.style.setProperty('--gap', GAP + 'px');
   host.appendChild(el);
   var L = data.list, scl = el.querySelector('.scl'), cl = el.querySelector('.cl'), cur = -1, gl = '', rf = 0, CY = 300, force = -1;      // force: عطرِ بالای فهرست که به خط وسط نمی‌رسد ولی عکسش باز است؛ تا اولین اسکرولِ دست، همان «برجسته» می‌ماند
-  el.querySelector('.t1').textContent = data.title; el.querySelector('.t2').textContent = data.sub;
+  setHead(el, data); addWm(el, data);
   scl.innerHTML = '<div class="vt" style="position:relative;height:' + (L.length * P) + 'px"></div>';
   var vt = scl.firstChild, live = {}, tmp = document.createElement('div');
   function ensure(j) {
@@ -653,7 +669,7 @@ function curEntries() {
 }
 function titleOf() {
   var b = nav.brand && BR_BY[nav.brand];
-  return b ? { t: b.name, s: fa(b.models.length) + ' عطر', c: b.name } : { t: 'برندها', s: fa(TREE.length) + ' برند', c: '' };
+  return b ? { t: b.name, s: fa(b.models.length) + ' عطر', c: b.name, w: b.id === 'other' ? '' : (b.en || '') } : { t: 'برندها', s: fa(TREE.length) + ' برند', c: '', w: '' };
 }
 function structOf(l) { return l.length + '|' + l.map(function (p) { return p.id + ':' + p.name + ':' + p.tag; }).join(';'); }
 function priceMap(l) { var o = {}; l.forEach(function (g) { o[g.id] = g.sizes.map(function (z) { return z.ml + ':' + z.price; }).join(','); }); return o; }
@@ -938,6 +954,18 @@ function treeSave(lang, stamp, tree, l) {
     } catch (e) { }
   }, 2500);
 }
+/* نامِ مدلی که با قاعده‌ی تمیزکاریِ تازه کوتاه‌تر شد («پرفیومز دو پگاسوس» ← «پگاسوس»): ستاره‌ی لیست مغازه به همان مدلِ تازه می‌رسد */
+function migrateFav() {
+  var ch = false;
+  Object.keys(set.fav || {}).forEach(function (id) {
+    if (MD_BY[id]) return;
+    var lab = String(set.fav[id]).split(' | '), bn = lab[0], mn = lab.slice(1).join(' | '), b = bn && TREE.filter(function (x) { return x.name === bn; })[0];
+    if (!b || !mn) return;
+    var hit = b.models.filter(function (m) { return mn === m.name || (mn.length > m.name.length && mn.slice(-m.name.length - 1) === ' ' + m.name && mn.slice(0, mn.length - m.name.length - 1).split(' ').length <= 3); });
+    if (hit.length === 1 && !set.fav[hit[0].id]) { set.fav[hit[0].id] = bn + ' | ' + hit[0].name; delete set.fav[id]; ch = true; }
+  });
+  if (ch) ls.set('pp.set', set);
+}
 function rebuild(light) {
   var lang = set.lang === 'en' ? 'en' : 'fa', stamp = dataStamp(lang), l;
   if (ALLB.length && stamp === treeStamp) l = FLAT;                    // داده همان است (فقط روشن/خاموشیِ برندها یا عطرها عوض شده)
@@ -965,6 +993,7 @@ function rebuild(light) {
   VM = {}; VA = {};
   ALLB.forEach(function (b) { b.models.forEach(function (m) { m.variants.forEach(function (v) { VA[v.id] = { m: m.id, b: b.id, bn: b.name }; }); }); });
   TREE.forEach(function (b) { BR_BY[b.id] = b; b.models.forEach(function (m) { m.brandId = b.id; MD_BY[m.id] = m; m.variants.forEach(function (v) { VM[v.id] = m.id; }); }); });
+  migrateFav();
   srWarm();      // نمایه‌ی جستجو را وقتِ بیکاری بساز، نه وقتی پدر روی ذره‌بین می‌زند
   if (nav.brand && !BR_BY[nav.brand]) { nav.lvl = 0; nav.brand = null; }
   var vis = []; TREE.forEach(function (b) { b.models.forEach(function (m) { m.variants.forEach(function (v) { vis.push(v); }); }); });
@@ -987,7 +1016,7 @@ function mountModel(anchor) {
   if (curModel) { curModel.destroy(); curModel = null; }
   if (!list.length || !db.ready) return;
   var T = titleOf();
-  curModel = MODELS[set.model]($('stage'), decorate(list, T.t, T.s, T.c), anchor);
+  curModel = MODELS[set.model]($('stage'), decorate(list, T.t, T.s, T.c, T.w), anchor);
 }
 /* ورود به برنامه (بعد از پایان دانلود اولیه) */
 function enter() { setEntries(); mountModel(nav.lvl ? null : startAnchor); overlay(); navUi(); updPill(); }
@@ -1025,6 +1054,7 @@ function navUi() { var dk = !!db.ready, was = document.body.classList.contains('
   var b = $('bk'); if (b) b.classList.toggle('on', nav.lvl === 1 && !!db.ready); var q = $('sr'); if (q) q.style.display = db.ready && !(nav.lvl === 1) ? '' : 'none'; var nw = $('nw'); if (nw) nw.classList.toggle('on', !!db.ready && nav.lvl !== 1); }
 $('bk').onclick = function () { goUp(); };
 $('stage').addEventListener('click', function (e) {
+  if (e.target.closest && e.target.closest('.crb')) { goUp(); return; }
   var h = e.target.closest && e.target.closest('.rw,.pn'); if (!h || !h.dataset.id) return;
   if (e.target.closest('.tile')) viewImg(h.dataset.id, list.map(function (p) { return p.id; }), 'stage'); else openEntry(h.dataset.id);
 });

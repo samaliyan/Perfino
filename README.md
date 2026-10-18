@@ -265,6 +265,9 @@ python3 tests/t71_diag_report.py  # گزارش کامل تشخیص برای سا
 node tests/t72_page_retry.js     # صفحه‌های خرابِ فروشگاه دوباره خوانده می‌شود (۴۲۹/۵۰۰/قطعی)
 node tests/t73_round1_core.js    # ردیف خراب، ك/ي عربی، عنوان غول‌پیکر، تطبیقِ تکه‌تکه
 python3 tests/t74_round1_ui.py   # دکمه‌ی بستن تنظیمات، حافظه‌ی خراب، درختِ بدون بازسازی
+node tests/t75_name_audit.js     # تمیزیِ نامِ عطرها روی ۱۸ هزار عنوانِ واقعی (املای برند، عنوانِ خراب‌شده‌ی هایلند)
+python3 tests/t76_crumb.py       # مسیرِ برند («برندها ‹ دیور») و نامِ محوِ برند، ۴ مدل × ۲ رنگ
+python3 tests/t77_fav_migrate.py # ستاره‌ی لیست مغازه به نامِ تازه‌ی مدل وصل می‌شود
 bash tests/run_node.sh           # همه‌ی آزمون‌های Node با هم (در CI هم اجرا می‌شود)
 python3 tests/t55_voice.py     # گفتن نام عطر، نوار پایین، آخرین‌ها
 python3 tests/t3_flow.py       # روند کامل بروزرسانی

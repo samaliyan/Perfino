@@ -36,7 +36,7 @@ async def run(p,model):
     chk(nav['lvl']==1 and nav['brand'],'%s: tap brand → models list %s'%(model,json.dumps(nav)))
     exp=await pg.evaluate("(function(b){var o=__pp.tree.filter(function(x){return x.id==b})[0];return {n:o.models.length,name:o.name}})(__pp.nav.brand)")
     n1=await pg.evaluate("__pp.list.length"); chk(n1==exp['n'],'%s: models list size %d == %d'%(model,n1,exp['n']))
-    hdr=await pg.evaluate("(document.querySelector('.mod .t1')||document.querySelector('.mod .bn')||{}).textContent")
+    hdr=await pg.evaluate("(document.querySelector('.mod .crc')||document.querySelector('.mod .t1')||document.querySelector('.mod .bn')||{}).textContent")      # مسیرِ «برندها ‹ نامِ برند»: نامِ برند در .crc است
     chk(hdr==exp['name'],'%s: title shows brand "%s" / "%s"'%(model,hdr,exp['name']))
     chk(await pg.evaluate("getComputedStyle(document.getElementById('bk')).display!=='none'"),'%s: back button visible'%model)
     # لمس عکس مدل
