@@ -237,7 +237,7 @@ function dedupeWords(ws, BW) {      // BW: واژه‌های نامِ برندِ
     lastW = w; res.push(w);
   });
   while (res.length > 1 && CONN_END[res[res.length - 1]]) res.pop();
-  while (res.length > 1 && (CONN_END[res[0]] || res[0] === 'دو')) res.shift();      // «دو»ِ اولِ نام باقی‌مانده‌ی «ادو پرفیوم» است
+  while (res.length > 1 && CONN_END[res[0]]) res.shift();
   if (res.length < ws.length) CLEANSE.dupw = (CLEANSE.dupw | 0) + 1;      // برای گزارشِ «پالایش»
   return res;
 }
@@ -1229,11 +1229,18 @@ function nearStrip(out, ent) {
   }
   return out;
 }
+function medKey(w) { var t = faKey(w); return t.length < 3 ? t : (t.charAt(0) + t.slice(1, -1).replace(/[اوی]/g, '') + t.slice(-1)).replace(/(.)\1+/g, '$1'); }      // حرفِ اول و آخر می‌ماند، صدادارهای میانی نه
+function brandTypo(w, b) { return w !== b && HAS_FA.test(w) && HAS_FA.test(b) && w.length >= 3 && (faKey(w) === faKey(b) || (medKey(w) === medKey(b) && medKey(b).length >= 4)); }      // اسکلتِ کوتاه کافی نیست («کلون» ≠ کلین)      // «فرگامو» = فراگامو، «کرکجان» = کورکجان، «آرمانیی» = آرمانی؛ «والنتینا» ≠ والنتینو (حرفِ آخر)
+function typoStrip(out, ent) {
+  var bw = []; (ent.al || []).forEach(function (al) { al.forEach(function (x) { if (bw.indexOf(x) < 0) bw.push(x); }); });
+  var pm = protMask(out);
+  return out.filter(function (w, i) { return pm[i] || i >= 4 || !bw.some(function (b) { return brandTypo(w, b); }); });
+}
 function stripBrand(toks, ent) {
   var out = toks.slice();
   if (ent.id.charAt(0) === 'b' && ent.al && ent.al.length) out = nearStrip(out, ent);      // املای نزدیک به نامِ برند (اول، تا «مزون فرانسیس کرکجان» تکه‌تکه نشود)
   (ent.al || []).forEach(function (al) { out = stripSeqs(out, null, al); });
-  if (ent.id.charAt(0) === 'b' && ent.al && ent.al.length && out.length === toks.length) out = fzStrip(out, ent);      // برند پیدا و برداشته شد: واژه‌ی شبیهِ برندِ بعدی نامِ خودِ عطر است («والنتینو والنتینا»)
+  if (ent.id.charAt(0) === 'b' && ent.al && ent.al.length) out = out.length === toks.length ? fzStrip(out, ent) : typoStrip(out, ent);      // برند پیدا و برداشته شد: بعد از آن فقط غلطِ املاییِ همان واژه‌ی برند می‌رود («فرگامو»، «کرکجان»)، نه واژه‌ی شبیه («والنتینو والنتینا»: ولنتینا نامِ عطر است)
   return out;
 }
 function stripName(name, ent) {
@@ -1241,7 +1248,7 @@ function stripName(name, ent) {
   var out = nt.slice(), fzb = ent.id.charAt(0) === 'b' && ent.al && ent.al.length;
   if (fzb) out = nearStrip(out, ent);      // همان قاعده‌ی کلید: نام نمایشی با کلید یکی باشد
   (ent.al || []).forEach(function (al) { out = stripSeqs(out, null, al); });
-  if (fzb && out.length === nt.length) out = fzStrip(out, ent);
+  if (fzb) out = out.length === nt.length ? fzStrip(out, ent) : typoStrip(out, ent);
   // همان حذف‌ها روی خودِ واژه‌های نمایشی (به ترتیب)
   var r = [], k = 0; w.forEach(function (x, i) { if (k < out.length && nt[i] === out[k]) { r.push(x); k++; } });
   return r.join(' ');

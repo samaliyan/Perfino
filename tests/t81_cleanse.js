@@ -104,5 +104,9 @@ one(Q, /استرنج|سترانگ|strange/i, 'digikala+hiland', 'Exodus «است
 one(Q, /پینک|pink/i, 'digikala+hiland', 'Valentina Pink: Persian and Latin listings are one row');
 chk(find(Q, /والنتینا|valentina/i).length === 1, 'Persian-only «والنتینو والنتینا پینک» keeps Valentina in the name', JSON.stringify(find(Q, /والنتینو/)));
 one(Q, /گود گرل/, 'hiland+liliome', 'misspelled repeated brand «هررا هرر» is removed; matches Good Girl');
-chk(!/^دو /.test(C.parseTitle('اکستریت دو پرفیوم زنانه ژیل کانتوئل وانیل 100 میل').name || ''), 'leading «دو» left from «ادو پرفیوم» is not part of the name', C.parseTitle('اکستریت دو پرفیوم زنانه ژیل کانتوئل وانیل 100 میل').name);
+chk(/دو سون/.test(C.parseTitle('ادوتویلت زنانه دو سون دیپتیک 100 میل').name || ''), 'Diptyque «دو سون» (Do Son) keeps «دو»', C.parseTitle('ادوتویلت زنانه دو سون دیپتیک 100 میل').name);
+// ۱۲) یافته‌های بازبینیِ سوم: غلطِ املاییِ برند بعد از خودِ برند پاک می‌شود، ولی نامِ شبیهِ برند نه
+var Z = build({ hiland: [['ادوپرفیوم سالوادور فرگامو توسکان سول وندمیا 75 میل', 5e6], ['ادوپرفیوم مزون فرانسیس کورکجان کرکجان باکارات رژ 540 70 میل', 9e6]], liliome: [['عطر ادکلن مزون فرانسیس کورکجان باکارات رژ 540 ادو پرفیوم یونیسکس 70 میل', 9.3e6]] });
+chk(find(Z, /توسکان/).length === 1 && !/فرگامو/.test(find(Z, /توسکان/)[0].n.split(' :: ')[1]), 'misspelled brand remainder «فرگامو» is not in the perfume name', JSON.stringify(find(Z, /توسکان/)));
+one(Z, /باکارات/, 'hiland+liliome', '«کورکجان کرکجان» (brand + misspelled repeat) still matches Baccarat Rouge 540');
 console.log(ok + ' pass ' + bad + ' fail'); process.exit(bad ? 1 : 0);
