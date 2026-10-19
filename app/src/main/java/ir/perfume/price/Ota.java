@@ -38,7 +38,7 @@ final class Ota {
      */
     static final int NATIVE_API = 2;
 
-    static final String BASE = "https://github.com/samaliyan/PerfumePrice/releases/latest/download/";      // فایل‌های آخرین نسخه‌ی رسمی
+    static final String BASE = "https://github.com/samaliyan/Perfino/releases/latest/download/";      // فایل‌های آخرین نسخه‌ی رسمی
     static final String INFO_URL = BASE + "ota.json";
     static final String ZIP_URL = BASE + "www.zip";
 

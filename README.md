@@ -6,7 +6,7 @@
 
 **برنامهٔ اندروید سبک برای عطرفروشی‌ها؛ فهرست الفبایی عطرها با یک قیمت روز، جمع‌آوری‌شده خودکار از فروشگاه‌های اینترنتی ایران.**
 
-[English](#english) · [فارسی](#فارسی) · [Changelog](CHANGELOG.md) · [Download APK](https://github.com/samaliyan/PerfumePrice/releases/latest/download/Perfino.apk)
+[English](#english) · [فارسی](#فارسی) · [Changelog](CHANGELOG.md) · [Download APK](https://github.com/samaliyan/Perfino/releases/latest/download/Perfino.apk)
 
 </div>
 
@@ -72,7 +72,7 @@ Online-shop titles are messy. A multi-stage pipeline keeps the list clean:
 1. On the phone, open this link:
 
    ```
-   https://github.com/samaliyan/PerfumePrice/releases/latest/download/Perfino.apk
+   https://github.com/samaliyan/Perfino/releases/latest/download/Perfino.apk
    ```
 2. Download the file and open it.
 3. If Android asks, allow installing apps from this source.
@@ -206,7 +206,7 @@ Python tests need Playwright with Chromium. `Ota.java`, `OtaGuard.java` and `Htt
 1. روی گوشی این نشانی را باز کنید:
 
    ```
-   https://github.com/samaliyan/PerfumePrice/releases/latest/download/Perfino.apk
+   https://github.com/samaliyan/Perfino/releases/latest/download/Perfino.apk
    ```
 2. فایل را دانلود و باز کنید.
 3. اگر اندروید پرسید، نصب برنامه از این منبع را اجازه بدهید.

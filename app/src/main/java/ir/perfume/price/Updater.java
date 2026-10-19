@@ -32,8 +32,8 @@ import java.util.regex.Pattern;
 class Updater {
     interface Js { void run(String script); }
 
-    private static final String API = "https://api.github.com/repos/samaliyan/PerfumePrice/releases/latest";      // آخرین نسخه‌ی رسمی (مثلاً «Perfino 1.46»)
-    private static final String APK_URL = "https://github.com/samaliyan/PerfumePrice/releases/latest/download/Perfino.apk";
+    private static final String API = "https://api.github.com/repos/samaliyan/Perfino/releases/latest";      // آخرین نسخه‌ی رسمی (مثلاً «Perfino 1.46»)
+    private static final String APK_URL = "https://github.com/samaliyan/Perfino/releases/latest/download/Perfino.apk";
     private static final String ACTION = "ir.perfume.price.UPDATE_RESULT";
     private static final int MAX_APK = 25 * 1024 * 1024;
 
@@ -128,7 +128,7 @@ class Updater {
         new Thread(new Runnable() {
             @Override public void run() {
                 File dir = new File(act.getCacheDir(), "upd");
-                File tmp = new File(dir, "new.tmp"), dst = new File(dir, "PerfumePrice.apk");
+                File tmp = new File(dir, "new.tmp"), dst = new File(dir, "Perfino.apk");
                 try {
                     dir.mkdirs();
                     HttpURLConnection c = open(APK_URL, 30000);
@@ -205,7 +205,7 @@ class Updater {
             sessId = id;
             PackageInstaller.Session s = pi.openSession(id);
             try {
-                OutputStream o = s.openWrite("PerfumePrice.apk", 0, f.length());
+                OutputStream o = s.openWrite("Perfino.apk", 0, f.length());
                 InputStream in = new FileInputStream(f);
                 byte[] buf = new byte[65536]; int n;
                 while ((n = in.read(buf)) > 0) o.write(buf, 0, n);
