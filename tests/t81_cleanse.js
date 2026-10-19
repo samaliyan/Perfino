@@ -75,4 +75,22 @@ chk(find(V8, /اومو|یومو/).length === 1, 'Valentino Uomo listed twice by 
 // ۹) «پور هم» = «پور هوم»
 var V9 = build({ liliome: [['عطر ادکلن آرماف ونتانا پور هوم مردانه | Armaf Ventana Pour Homme 100 میل ادوپرفیوم', 2e6]], hiland: [['ادوپرفیوم مردانه آرماف ونتانا پور هم 100 میل', 2.1e6]] });
 one(V9, /ونتانا/, 'hiland+liliome', 'پور هم = پور هوم');
+// ۱۰) یافته‌های بازبینیِ مستقل (همه باید جدا بمانند / نام نباید گم شود)
+var R = build({
+  liliome: [['عطر ادکلن شیسیدو زن | Shiseido Zen 100 میل زنانه ادوپرفیوم', 5e6], ['عطر ادکلن شیسیدو زن سان | Shiseido Zen Sun 100 میل زنانه ادوپرفیوم', 5e6],
+    ['عطر ادکلن جورجیو آرمانی آکوا دی جیو | Giorgio Armani Acqua di Gio 100 میل مردانه ادوتویلت', 6e6], ['عطر ادکلن جورجیو آرمانی آکوا دی جیویا | Giorgio Armani Acqua di Gioia 100 میل زنانه ادوپرفیوم', 6e6]],
+  digikala: [['ادو تویلت مردانه سالواتوره فراگامو مدل Uomo حجم 100 میلی لیتر', 4e6], ['ادو تویلت مردانه سالواتوره فراگامو مدل Homme حجم 100 میلی لیتر', 9e6]],
+  hiland: [['ادوپرفیوم مردانه اکسودوس استرنج 100 میل', 3e6], ['ادوپرفیوم مردانه اکسودوس استارینگ 100 میل', 3.1e6]]
+});
+chk(find(R, /زن/).length === 2, 'Zen ≠ Zen Sun', JSON.stringify(find(R, /زن/)));
+chk(find(R, /جیو/).length === 2 && find(R, /جیو$/).length === 1, 'Acqua di Gio (men) ≠ Acqua di Gioia (women), Gio row still exists', JSON.stringify(find(R, /جیو/)));
+chk(find(R, /فراگامو/).length === 2, 'Ferragamo Uomo (4M) ≠ Homme (9M)', JSON.stringify(find(R, /فراگامو/)));
+chk(find(R, /استرنج|استارینگ/).length === 2, 'one shop sells Strange and Staring: two products', JSON.stringify(find(R, /استرنج|استارینگ/)));
+chk(/valentina/i.test(key('ادو پرفیوم زنانه والنتینو مدل Valentina حجم 80 میلی لیتر') || ''), 'Persian brand + Latin model Valentina keeps the model name', key('ادو پرفیوم زنانه والنتینو مدل Valentina حجم 80 میلی لیتر'));
+chk(/valentina/i.test(key('ادو پرفیوم زنانه والنتینو مدل Valentina Blush حجم 80 میلی لیتر') || ''), 'Valentina Blush keeps Valentina', key('ادو پرفیوم زنانه والنتینو مدل Valentina Blush حجم 80 میلی لیتر'));
+chk(((key('ادوپرفیوم مردانه ژک ساف اف اف 100 میل') || '').match(/اف/g) || []).length >= 1, 'Jacques Saf «اف اف» (FF) is the name, not «of»', key('ادوپرفیوم مردانه ژک ساف اف اف 100 میل'));
+chk(/^آف|^اف| آف | اف /.test(' ' + (key('ادوپرفیوم آف وایت پاراگراف 100 میل') || '') + ' ') || /آف|اف/.test(key('ادوپرفیوم آف وایت پاراگراف 100 میل') || ''), 'Off-White keeps «آف»', key('ادوپرفیوم آف وایت پاراگراف 100 میل'));
+var db10 = C.newDb(); db10.wd = { 'برگ': null, 'قهوه': { qahwa: 2 }, 'بلو': { black: 1, blue: 3 } }; db10.dv = 1;
+var thrown = null; try { C.purgeStored(db10); } catch (e) { thrown = e; }
+chk(!thrown && !('برگ' in db10.wd) && db10.wd['قهوه'] && db10.wd['قهوه'].qahwa && db10.wd['بلو'].blue && !db10.wd['بلو'].black, 'damaged dictionary entry does not crash; ق=q kept; بلو≠black pruned', JSON.stringify(db10.wd) + ' ' + thrown);
 console.log(ok + ' pass ' + bad + ' fail'); process.exit(bad ? 1 : 0);

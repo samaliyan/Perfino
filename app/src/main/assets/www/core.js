@@ -113,7 +113,8 @@ function cleanToks(toks) {
   toks.forEach(function (w, i) {
     var nk = NK(w);
     if (/^\d+$/.test(nk) || pm[i]) { out.push(w); return; }
-    if (seen[nk]) return; seen[nk] = 1; out.push(w);
+    if (seen[nk]) { if (!CONN_W[nk] && out.length > 1 && CONN_W[out[out.length - 1]]) out.pop(); return; }      // تکرارِ «... اف سداکشن»: «اف»ِ پیش از واژه‌ی تکراری هم می‌رود
+    seen[nk] = 1; out.push(w);
   });
   return out;
 }
@@ -211,8 +212,15 @@ function sameWord(a, b) {      // یک واژه با دو املا/دو خط؟
   var pa = ka.split('|'), pb = kb.split('|');
   return pa[0] === pb[0] && levD(pa[1], pb[1]) <= 1;      // همان همخوان‌ها؛ صدادارِ آخر مهم نیست (میوز = muse)
 }
+function bwKey(w) { return String(w).toLowerCase().replace(/آ/g, 'ا').replace(/ؤ/g, 'و').replace(/ئ/g, 'ی'); }
+function brandWords(toks) {      // همه‌ی واژه‌های نام‌های برندِ تشخیص‌داده‌شده (فارسی و لاتین)
+  var e = brandOf(toks.map(bwKey), []), W = null;
+  if (e && e.al && e.al.length) { W = {}; e.al.forEach(function (al) { al.forEach(function (x) { W[bwKey(x)] = 1; }); }); }
+  return W;
+}
 function phraseWord(a, b) { var ka = phKeyW(a); if (ka.charAt(0) === 'r') return false; return ka === phKeyW(b) || phKeyW(a, 1) === phKeyW(b, 1); }      // در تکرارِ یک عبارتِ چندواژه‌ای، املای دیگرِ همان صدا هم یکی است («بلو شنل» / «بلو چنل»)
-function dedupeWords(ws) {
+var CONN_END = { 'د': 1, 'de': 1, 'the': 1, 'du': 1 };      // فقط این‌ها در اول/آخرِ نام «آویزان»اند؛ «اف»/«آف» آنجا حرفِ F یا Off است («اف اف»، «آف وایت»، «جی اف») و «دو» شاید عدد باشد
+function dedupeWords(ws, BW) {      // BW: واژه‌های نامِ برندِ همین عنوان (نرمال‌شده)
   var out = ws.slice();
   /* ۱) عبارتِ تکراری: «کویین او سداکشن لایولی میوز کوئین اف سداکشن لیولی میوز» ← نیمه‌ی دوم همان نیمه‌ی اول است (فارسی + لاتینِ واج‌نویسی‌شده) */
   var core = out.map(function (w, i) { return { w: w, i: i }; }).filter(function (x) { return !CONN_W[x.w] && x.w !== 'او' && x.w !== 'o'; });      // «او»ِ وسطِ نام (of) در مقایسه نادیده
@@ -225,11 +233,11 @@ function dedupeWords(ws) {
   var res = [], lastW = null;
   out.forEach(function (w) {
     if (CONN_W[w]) { res.push(w); return; }
-    if (lastW !== null && w !== lastW && sameWord(w, lastW)) { while (res.length && CONN_W[res[res.length - 1]]) res.pop(); return; }
+    if (lastW !== null && w !== lastW && sameWord(w, lastW) && !(BW && BW[bwKey(lastW)] && !BW[bwKey(w)])) { while (res.length && CONN_W[res[res.length - 1]]) res.pop(); return; }      // واژه‌ی بعد از نامِ برند که خودش نامِ برند نیست، نامِ عطر است (والنتینو Valentina، نه تکرار)
     lastW = w; res.push(w);
   });
-  while (res.length > 1 && CONN_W[res[res.length - 1]]) res.pop();
-  while (res.length > 1 && CONN_W[res[0]] && res[0] !== 'd') res.shift();
+  while (res.length > 1 && CONN_END[res[res.length - 1]]) res.pop();
+  while (res.length > 1 && CONN_END[res[0]]) res.shift();
   if (res.length < ws.length) CLEANSE.dupw = (CLEANSE.dupw | 0) + 1;      // برای گزارشِ «پالایش»
   return res;
 }
@@ -286,7 +294,7 @@ function parseTitle(raw) {
   shown = shown.filter(function (w) { return w.length > 1 || /[a-z0-9]/.test(w); });      // حرفِ تکِ فارسی = باقی‌مانده‌ی خراب
   if (!shown.length || !meaningful(shown)) { CLEANSE.junk++; return null; }
   var nseen = {}; shown = shown.filter(function (w) { if (!/^\d+$/.test(w)) return true; if (nseen[w]) return false; nseen[w] = 1; return true; });
-  shown = dedupeWords(shown); if (!shown.length) return null;      // پاک‌سازی: «آکوا اکوا»، نامِ فارسی + همان نامِ لاتینِ واج‌نویسی‌شده، «د»ِ آویزانِ آخر      // «2004 ... 2004» (سالِ تکراری در بخشِ فارسی و انگلیسیِ عنوان)
+  shown = dedupeWords(shown, brandWords(shown)); if (!shown.length) return null;      // پاک‌سازی: «آکوا اکوا»، نامِ فارسی + همان نامِ لاتینِ واج‌نویسی‌شده، «د»ِ آویزانِ آخر      // «2004 ... 2004» (سالِ تکراری در بخشِ فارسی و انگلیسیِ عنوان)
   var lw = shown[shown.length - 1], pgn = '';
   if (shown.length > 2 && (lw === 'من' || lw === 'وومن' || lw === 'ومن')) { pgn = lw === 'من' ? 'm' : 'w'; shown = shown.slice(0, -1); lw = shown[shown.length - 1]; }
   if (shown.length > 2 && (lw === 'man' || lw === 'woman' || lw === 'مرد' || lw === 'زن')) {      // «Man/Woman» آخرِ عنوان = جنسیت؛ مگر اینکه نامِ خودِ عطر باشد (Jimmy Choo Man)
@@ -517,7 +525,7 @@ function phTok(x, y) {      // دو واژه‌ی لاتین (یا فارسیِ 
   if (/\d/.test(x) || /\d/.test(y)) return false;
   if (skel(x) !== skel(y)) { if (!vEq(x, y) || !(leadOK(x, y) || skLead(vNorm(x)) === skLead(vNorm(y)))) return false; var nx = vNorm(x);      // همخوانِ اول هم یکی (Havak ≠ Ach)
     return skel(nx).length > 2 || /[vw]/.test(x + y) || vowSlots(nx, vNorm(y)) <= 1; }      // واژه‌ی کوتاه که فقط با خوانشِ دیگرِ c جور شد: صدادارها هم (Cherry ≠ Kara)؛ با «و» جای صدادارها روشن نیست (House = هوس)
-  if (skel(x).length >= 5) return true;      // پنج همخوانِ یکسان و پشتِ‌سرهم: همان واژه (واج‌نویسیِ فارسی صدادارِ اضافه می‌گذارد: «سدکشان» = Seduction)
+  if (skel(x).length >= 5) { var px = phCol(consNorm(x)).replace(/^a(?=s[^a])/, ''), py = phCol(consNorm(y)).replace(/^a(?=s[^a])/, ''); return levD(px, py) <= Math.max(2, Math.floor(Math.max(px.length, py.length) * .35)); }      // پنج همخوانِ یکسان: فارسی صدادارِ اضافه می‌گذارد («سدکشان» = Seduction، «استرانگ» = Strong)، ولی نه هر چیزی      // پنج همخوانِ یکسان و پشتِ‌سرهم: همان واژه (واج‌نویسیِ فارسی صدادارِ اضافه می‌گذارد: «سدکشان» = Seduction)
   var cx = phCol(consNorm(x)), cy = phCol(consNorm(y)), d = levD(cx, cy);
   if (skel(x).length <= 2) return d === 0 && vowSlots(x, y) <= 1 && hyMid(x) === hyMid(y);      // واژه‌ی کوتاه (یک-دو همخوان): قالبِ صدا یکی و صدادارِ هر جایگاه هم نزدیک («اله» ≠ «لاولی»، «ساهاری» ≠ «زهیرا»، ولی Blue = Bleu)
   return d <= (Math.max(cx.length, cy.length) >= 7 ? 2 : 1);
@@ -576,9 +584,8 @@ function canonToks(r) {
   });
   var out = [];
   t.forEach(function (w, i) {
-    if (CANON_ANY[w] || (CANON_MID[w] && i > 0 && i < t.length - 1)) return;
+    if (CANON_ANY[w] || (CANON_MID[w] && i > 0)) return;      // «of» وسط یا آخر (نامِ بریده‌شده‌ی «سنت آف»)؛ اولِ نام نه (Off-White)
     if (/\d/.test(w)) { out.push(w); return; }
-    if (out.length && out[out.length - 1] !== w && /[a-z]/.test(w) && phKeyW(w) === phKeyW(out[out.length - 1]) && levD(w, out[out.length - 1]) <= 2) return;      // همان واژه‌ی کنارِ هم با املای دیگر
     out.push(w);
   });
   r._cnV = LEXV; return (r._cn = out);
@@ -1416,6 +1423,17 @@ function mergeVariant(tv, v) {
   tv.sizes.sort(function (x, y) { return x.ml - y.ml; });
   if (!tv.img && v.img) { tv.img = v.img; tv.big = v.big; }
 }
+function modelsFit(A, B) {      // دو مدلِ هم‌نامِ متعارف (املای دیگر): نسخه‌ای با جنسیت و غلظتِ سازگار که قیمتش هم فاحش فرق نکند
+  return A.variants.some(function (x) {
+    return B.variants.some(function (y) {
+      if (!(x.gn === y.gn || !x.gn || !y.gn || x.gn === 'u' || y.gn === 'u') || !concCmp(x.conc, y.conc)) return false;
+      var px = x.sizes.filter(function (z) { return z.price > 0; }).map(function (z) { return { ml: z.ml, p: z.price }; });
+      if (!px.length) return true;      // قیمتی برای سنجیدن نیست: نام و ویژگی‌ها کافی است
+      var py = y.sizes.filter(function (z) { return z.price > 0; });
+      return !py.length || py.some(function (z) { return priceSane(px, z.ml, z.price); });
+    });
+  });
+}
 function mergeSameName(b, AUD) {
   var by = {}, gone = {};
   b.models.forEach(function (m, i) {
@@ -1423,7 +1441,7 @@ function mergeSameName(b, AUD) {
     var at = null; ks.forEach(function (k) {
       if (at != null || by[k] == null || gone[by[k]]) return;
       var A0 = b.models[by[k]];
-      if (k.charAt(0) === 'c' && !(A0.rk && phAlign(canonToks(A0.rk), canonToks(m.rk), 0, 0))) return;      // واژه‌به‌واژه هم جور باشد (Only The Brave ≠ … High)
+      if (k.charAt(0) === 'c' && !(A0.rk && phAlign(canonToks(A0.rk), canonToks(m.rk), 0, 0) && modelsFit(A0, m))) return;      // واژه‌به‌واژه هم جور باشد (Only The Brave ≠ … High)؛ و دست‌کم یک نسخه با جنسیت/غلظتِ سازگار و قیمتِ نه‌چندان دور (Acqua di Gio ≠ Gioia، Uomo ≠ Homme)
       at = by[k];
     });
     if (at == null) { ks.forEach(function (k) { if (by[k] == null) by[k] = i; }); return; }
@@ -1571,8 +1589,8 @@ function* reconcileGen(db, idx) {      // مولّد: هر چند گروه یک�
     var mine = SM[hid] || {}, loose2 = {}, strong2 = {};
     var sib = idx.cands(H.key, true).filter(function (id) {
       var S = G[id]; if (!S || id === hid || S.conc !== H.conc || !(S.gn === H.gn || (S.gn === 'u' && (!S.ug || S.ug === H.gn)) || (H.gn === 'u' && (!H.ug || H.ug === S.gn)))) return false;      // یونیسکسی که یک مردانه را گرفته، زنانه را نمی‌گیرد      // یونیسکس با مردانه/زنانه: یک سایت عطرِ یونیسکس را «مردانه» می‌نویسد
-      if (canonEq(H.key, S.key)) { strong2[id] = 1; return true; }      // نامِ متعارف یکی: همان عطر (حتی اگر یک سایت دو بار گذاشته باشد)
-      if (!nameCmp(H.key, S.key)) { if (!looseName(H.key, S.key)) return false; loose2[id] = 1; }
+      if (canonEq(H.key, S.key)) strong2[id] = 1;      // نامِ متعارف یکی: همان عطر؛ قیمت فقط اشتباهِ فاحش را رد می‌کند
+      else if (!nameCmp(H.key, S.key)) { if (!looseName(H.key, S.key)) return false; loose2[id] = 1; }
       var o = SM[id] || {}; for (var q in mine) if (o[q]) return false;       // همان سایت و همان اندازه در هر دو = دو کالای جدا
       return true;
     });
@@ -1611,21 +1629,23 @@ function stripBrandEn(tk, ent) {
 }
 /* نام انگلیسیِ عطر (اگر سایت داده باشد) را به گروه اضافه می‌کند و جفتِ واژه‌ی فارسی/انگلیسی را یاد می‌گیرد */
 /* آیا واژه‌ی فارسیِ f با واژه‌ی لاتینِ e هم‌صداست؟ (برای یادگرفتنِ واژه‌نامه: ترجمه یا جابه‌جایی یاد گرفته نمی‌شود) */
-function wdNz(w) { return w.replace(/'/g, '').replace(/^x/, 'z').replace(/([aeiou])si(?=[aeou])/g, '$1ji').replace(/tch/g, 'ch').replace(/ch(?=[lr])/g, 'k').replace(/ch/g, 'sh').replace(/x/g, 'ks').replace(/c(?=[eiy])/g, 's').replace(/^y/, 'i').replace(/^kn/, 'n').replace(/^ps/, 's').replace(/zh/g, 'j'); }
+function wdNz(w) { return w.replace(/'/g, '').replace(/^x(?=[aeiouy])/, 'z').replace(/([aeiou])si(?=[aeou])/g, '$1ji').replace(/tch/g, 'ch').replace(/ch(?=[lr])/g, 'k').replace(/ch/g, 'sh').replace(/x/g, 'ks').replace(/c(?=[eiy])/g, 's').replace(/^y/, 'i').replace(/^kn/, 'n').replace(/^ps/, 's').replace(/zh/g, 'j'); }
 function wdSk(w) { return skel(vNorm(w)).replace(/x/g, 's'); }
 function wdNear(t, l) {
   var a = wdSk(t), b = wdSk(l);
   if (!a || !b) return Math.max(a.length, b.length) <= 1;      // واژه‌ی تمام‌صدادار («او» / Eau)
+  if (Math.max(a.length, b.length) <= 3) return a === b;      // واژه‌ی کوتاه: همخوان‌ها باید عیناً یکی باشند (بلو ≠ Black)
   return a.charAt(0) === b.charAt(0) && levD(a, b) <= Math.max(1, Math.floor(Math.max(a.length, b.length) * .4));
 }
 function wdSound(f, e) {
   var t = wdNz(String(translitFaWord(f) || '').toLowerCase()), l = wdNz(String(e).toLowerCase());
-  return wdNear(t, l) || (/^[ld][aeiou]/.test(l) && wdNear(t, l.slice(1))) || (/ks/.test(l) && wdNear(t, l.replace(/ks/g, 'gz')));      // L'Intense، D'Azur؛ x = گز (Exotic = اگزوتیک)
+  return wdNear(t, l) || (/^[ld][aeiou]/.test(l) && wdNear(t, l.slice(1))) || (/ks/.test(l) && wdNear(t, l.replace(/ks/g, 'gz'))) || (/gh/.test(t) && wdNear(t.replace(/gh/g, 'k'), l)) || (/[td]h/.test(l) && wdNear(t, l.replace(/th/g, 's').replace(/dh/g, 'z')));      // ق = q، ث = th، ذ = dh      // L'Intense، D'Azur؛ x = گز (Exotic = اگزوتیک)
 }
 /* واژه‌نامه‌ی یادگرفته‌شده با قاعده‌ی قدیمی جفت‌های جابه‌جا هم دارد («برگ» = Fluid): آن‌ها پاک می‌شوند */
 function pruneLex(db) {
   var n = 0; Object.keys(db.wd || {}).forEach(function (f) {
-    var m = db.wd[f]; Object.keys(m).forEach(function (e) { if (!wdSound(f, e)) { delete m[e]; n++; } });
+    var m = db.wd[f]; if (!m || typeof m !== 'object') { delete db.wd[f]; n++; return; }
+    Object.keys(m).forEach(function (e) { if (!wdSound(f, e)) { delete m[e]; n++; } });
     if (!Object.keys(m).length) delete db.wd[f];
   });
   return n;
