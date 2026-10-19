@@ -1,7 +1,7 @@
 (function () {
 'use strict';
 var RM = !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
-var VERSION = '1.48';
+var VERSION = '1.49';
 var myCode = (function () { var m = /\/b(\d{1,10})\/index\.html$/.exec(String(location.pathname || '')); return m ? m[1] : '0'; })();      // نسخه‌ی این صفحه از روی آدرسش؛ در گزارش‌ها به جاوا فرستاده می‌شود تا صفحه‌ی کهنه نتواند نسخه‌ی تازه را «سالم» اعلام کند
 function otaCall(n) { try { if (window.Native && typeof window.Native[n] === 'function') window.Native[n](myCode); } catch (e) { } }
 otaCall('otaBoot');      // «جاوااسکریپتِ این صفحه شروع شد»: برنامه به صفحه‌ی بی‌نصب مهلتِ بیشتری برای ساختن فهرست می‌دهد
@@ -1330,7 +1330,7 @@ async function refresh(manual) {
 }
 async function refresh0(manual) {
   if (busy) return;
-  if (Core.CLEANSE) { Core.CLEANSE.n = 0; Core.CLEANSE.junk = 0; }
+  if (Core.CLEANSE) { Core.CLEANSE.n = 0; Core.CLEANSE.junk = 0; Core.CLEANSE.dupw = 0; Core.CLEANSE.lexfix = 0; }
   if (Core.REJ) { Core.REJ.n = 0; Core.REJ.by = {}; Core.REJ.ex = []; }
   busy = true; prog = {}; updPill(); overlay(); refBtn(); if (open) renderSheet();
   var ok = 0, bad = 0, t0 = Date.now(), snap0 = FLAT.length ? sizeMap(FLAT) : null;
@@ -1354,7 +1354,7 @@ async function refresh0(manual) {
     Core.SOURCES.forEach(function (s) { mg += (stt[s.id] && stt[s.id].merged) | 0; pg += (stt[s.id] && stt[s.id].purged) | 0; });
     RUN = { t: Date.now(), dur: Date.now() - t0, manual: !!manual, chg: snap0 ? diffMaps(snap0, sizeMap(FLAT)) : null,
       src: actv().map(function (s) { var o = srcState(s); return { name: o.name, kind: o.kind, cnt: o.cnt }; }),
-      clean: { rej: (Core.REJ || {}).n | 0, rejBy: (Core.REJ || {}).by || {}, rejEx: ((Core.REJ || {}).ex || []).slice(0, 12), nl: CL2.nameless | 0, nlS: (CL2.nlEx || []).slice(0, 12), healed: CL2.healed | 0, unk: au2.nunk | 0, unkS: (au2.unk || []).slice(0, 12), clone: CL2.clone | 0, purged: pg, titles: CL2.n | 0, junk: CL2.junk | 0, merged: mg, names: au2.nmod | 0, brands: (au2.brands || []).length, sus: au2.nsus | 0 } };
+      clean: { rej: (Core.REJ || {}).n | 0, rejBy: (Core.REJ || {}).by || {}, rejEx: ((Core.REJ || {}).ex || []).slice(0, 12), nl: CL2.nameless | 0, nlS: (CL2.nlEx || []).slice(0, 12), healed: CL2.healed | 0, unk: au2.nunk | 0, unkS: (au2.unk || []).slice(0, 12), clone: CL2.clone | 0, purged: pg, titles: CL2.n | 0, junk: CL2.junk | 0, dupw: CL2.dupw | 0, lexfix: CL2.lexfix | 0, merged: mg, names: au2.nmod | 0, brands: (au2.brands || []).length, sus: au2.nsus | 0 } };
     ls.set('pp.run', RUN);
   } catch (e4) { console.error(e4); }
   busy = false; lastTried = Date.now(); lastTry = lastTried; ls.set('pp.try', lastTry); saveDb(); updPill(); overlay(); refBtn(); renderSheet();
@@ -1472,7 +1472,9 @@ function renderReport() {
   if (rc.unk) P.push('عطر با برندِ ناشناخته (زیر «سایر برندها»): ' + B(rc.unk) + '. اگر عطرِ معروفی بود یا درست به نظر نمی‌رسید، از «نمونه‌ها» ببینید و در صفحه‌ی عطر «پنهانش کن» یا در تنظیمات «واژه‌های ممنوع» را بزنید.');
   if (merged) P.push('عطرِ تکراری که یکی شد (مثلاً فارسی و انگلیسیِ یک عطر): ' + B(merged));
   if (au.brands.length) P.push('برندِ تکراری که یکی شد: ' + B(au.brands.length));
-  if (au.models.length) P.push('نامِ تکراری که یکی شد: ' + B(au.models.length));
+  if (au.nmod || au.models.length) P.push('نامِ تکراری که یکی شد (همان عطر با املا، فاصله یا واژه‌ی ربطِ دیگر): ' + B(au.nmod || au.models.length));
+  if (rc.dupw) P.push('عنوان با واژه‌ی تکراری که تمیز شد (مثلاً نامِ فارسی و همان نام با خطِ لاتین): ' + B(rc.dupw));
+  if (rc.lexfix) P.push('ترجمه‌ی غلطِ یادگرفته‌شده که پاک شد: ' + B(rc.lexfix));
   if (au.nb) P.push('عطرِ بی‌نام که حذف شد: ' + B(au.nb));
   if (RUN && RUN.clean && RUN.clean.healed) P.push('عنوانِ بدون نامِ عطر که نامش از نشانیِ صفحه پیدا شد: ' + B(RUN.clean.healed));
   if (P.length === 1) P.push('مورد تکراری یا ایرادداری پیدا نشد.');
