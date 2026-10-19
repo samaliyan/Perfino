@@ -233,11 +233,11 @@ function dedupeWords(ws, BW) {      // BW: واژه‌های نامِ برندِ
   var res = [], lastW = null;
   out.forEach(function (w) {
     if (CONN_W[w]) { res.push(w); return; }
-    if (lastW !== null && w !== lastW && sameWord(w, lastW) && !(BW && BW[bwKey(lastW)] && !BW[bwKey(w)])) { while (res.length && CONN_W[res[res.length - 1]]) res.pop(); return; }      // واژه‌ی بعد از نامِ برند که خودش نامِ برند نیست، نامِ عطر است (والنتینو Valentina، نه تکرار)
+    if (lastW !== null && w !== lastW && sameWord(w, lastW) && !(BW && BW[bwKey(lastW)] && !BW[bwKey(w)] && isFa(w) !== isFa(lastW))) { while (res.length && CONN_W[res[res.length - 1]]) res.pop(); return; }      // واژه‌ی بعد از نامِ برند که خودش نامِ برند نیست، نامِ عطر است (والنتینو Valentina، نه تکرار)
     lastW = w; res.push(w);
   });
   while (res.length > 1 && CONN_END[res[res.length - 1]]) res.pop();
-  while (res.length > 1 && CONN_END[res[0]]) res.shift();
+  while (res.length > 1 && (CONN_END[res[0]] || res[0] === 'دو')) res.shift();      // «دو»ِ اولِ نام باقی‌مانده‌ی «ادو پرفیوم» است
   if (res.length < ws.length) CLEANSE.dupw = (CLEANSE.dupw | 0) + 1;      // برای گزارشِ «پالایش»
   return res;
 }
@@ -525,7 +525,7 @@ function phTok(x, y) {      // دو واژه‌ی لاتین (یا فارسیِ 
   if (/\d/.test(x) || /\d/.test(y)) return false;
   if (skel(x) !== skel(y)) { if (!vEq(x, y) || !(leadOK(x, y) || skLead(vNorm(x)) === skLead(vNorm(y)))) return false; var nx = vNorm(x);      // همخوانِ اول هم یکی (Havak ≠ Ach)
     return skel(nx).length > 2 || /[vw]/.test(x + y) || vowSlots(nx, vNorm(y)) <= 1; }      // واژه‌ی کوتاه که فقط با خوانشِ دیگرِ c جور شد: صدادارها هم (Cherry ≠ Kara)؛ با «و» جای صدادارها روشن نیست (House = هوس)
-  if (skel(x).length >= 5) { var px = phCol(consNorm(x)).replace(/^a(?=s[^a])/, ''), py = phCol(consNorm(y)).replace(/^a(?=s[^a])/, ''); return levD(px, py) <= Math.max(2, Math.floor(Math.max(px.length, py.length) * .35)); }      // پنج همخوانِ یکسان: فارسی صدادارِ اضافه می‌گذارد («سدکشان» = Seduction، «استرانگ» = Strong)، ولی نه هر چیزی      // پنج همخوانِ یکسان و پشتِ‌سرهم: همان واژه (واج‌نویسیِ فارسی صدادارِ اضافه می‌گذارد: «سدکشان» = Seduction)
+  if (skel(x).length >= 5) return true;      // پنج همخوانِ یکسان و پشتِ‌سرهم: همان واژه (واج‌نویسیِ فارسی صدادارِ اضافه می‌گذارد: «سدکشان» = Seduction)
   var cx = phCol(consNorm(x)), cy = phCol(consNorm(y)), d = levD(cx, cy);
   if (skel(x).length <= 2) return d === 0 && vowSlots(x, y) <= 1 && hyMid(x) === hyMid(y);      // واژه‌ی کوتاه (یک-دو همخوان): قالبِ صدا یکی و صدادارِ هر جایگاه هم نزدیک («اله» ≠ «لاولی»، «ساهاری» ≠ «زهیرا»، ولی Blue = Bleu)
   return d <= (Math.max(cx.length, cy.length) >= 7 ? 2 : 1);
@@ -573,18 +573,19 @@ function looseName(A, B) {
    ۴) واژه‌ی تکراری که فقط املایش فرق دارد یک بار حساب می‌شود (آکوا اکوا)
    ۵) عددها باید دقیقاً یکی باشند (۲۱۲ ≠ ۲۱۲ VIP، تورینو ۲۱ ≠ ۲۲)
    این «تطبیقِ قوی» است: اختلافِ قیمت بینِ سایت‌ها جلویش را نمی‌گیرد (هر سایت قیمتِ خودش را دارد). */
+var CANON_OF = { of: 1, af: 1, av: 1, ov: 1 }, FA_OF = { 'آف': 1, 'اف': 1, 'آو': 1 };
 var CANON_ANY = { the: 1, de: 1, d: 1, du: 1, dh: 1 }, CANON_MID = { of: 1, af: 1, av: 1, ov: 1, off: 1, au: 1, ao: 1, aw: 1, o: 1, ou: 1 };
 function canonToks(r) {
   if (r._cn && r._cnV === LEXV) return r._cn;      // آرایه‌ی کلید هرگز درجا عوض نمی‌شود؛ فقط واژه‌نامه (LEXV)
   var t = [];      // واژه‌به‌واژه (نه کلِ عبارت): واژه‌ای که لاتینش خالی شد («های») گم نشود
   r.forEach(function (w) {
-    var l = isFa(w) ? String(fa2en([w], LEX) || '') : String(w);
+    var l = FA_OF[w] ? 'of' : isFa(w) ? String(fa2en([w], LEX) || '') : String(w);      // «آف/اف/آو» = of (نه «او» = Eau)
     l.toLowerCase().split(/\s+/).forEach(function (x) { x = x.replace(/[^a-z0-9]/g, ''); if (x) t.push(x); });
     if (!l.replace(/[^a-z0-9]/gi, '')) t.push('_' + faKey(String(w)));
   });
   var out = [];
   t.forEach(function (w, i) {
-    if (CANON_ANY[w] || (CANON_MID[w] && i > 0)) return;      // «of» وسط یا آخر (نامِ بریده‌شده‌ی «سنت آف»)؛ اولِ نام نه (Off-White)
+    if (CANON_ANY[w] || (CANON_MID[w] && i > 0 && (i < t.length - 1 || CANON_OF[w]))) return;      // «of» وسطِ نام؛ آخرِ نام فقط خودِ «of/آف/آو» (نامِ بریده‌شده‌ی «سنت آف»)، نه «او» (Guilty Eau ≠ Guilty)؛ اولِ نام هرگز (Off-White)
     if (/\d/.test(w)) { out.push(w); return; }
     out.push(w);
   });
@@ -1152,6 +1153,9 @@ function canonBrand(key) {
     var okp = true; for (var q = 0; q < lead; q++) if (!tokEq(key[p0 - lead + q], can[q])) { okp = false; break; }
     if (okp) { p0 -= lead; n0 += lead; }
   }
+  if (can.length > best.al.length) {      // نامِ برند کوتاه‌تر نوشته شد و بقیه‌اش با املای دیگر آمده («سالوادور فرگامو» = سالواتوره فراگامو): آن تکه هم جزوِ برند است
+    for (var ci = best.al.length; ci < can.length && p0 + n0 < key.length; ci++) { var nx = key[p0 + n0]; if (nx !== can[ci] && nearTok(nx, can[ci])) n0++; else break; }
+  }
   return key.slice(0, p0).concat(can, key.slice(p0 + n0));
 }
 /* برندِ یک گروه: ۱) دسته‌بندیِ سایت ۲) واژه‌های نام ۳) «سایر». خروجی: {id,name,strip:[واژه‌های برند داخل نام]} */
@@ -1229,7 +1233,7 @@ function stripBrand(toks, ent) {
   var out = toks.slice();
   if (ent.id.charAt(0) === 'b' && ent.al && ent.al.length) out = nearStrip(out, ent);      // املای نزدیک به نامِ برند (اول، تا «مزون فرانسیس کرکجان» تکه‌تکه نشود)
   (ent.al || []).forEach(function (al) { out = stripSeqs(out, null, al); });
-  if (ent.id.charAt(0) === 'b' && ent.al && ent.al.length) out = fzStrip(out, ent);
+  if (ent.id.charAt(0) === 'b' && ent.al && ent.al.length && out.length === toks.length) out = fzStrip(out, ent);      // برند پیدا و برداشته شد: واژه‌ی شبیهِ برندِ بعدی نامِ خودِ عطر است («والنتینو والنتینا»)
   return out;
 }
 function stripName(name, ent) {
@@ -1237,7 +1241,7 @@ function stripName(name, ent) {
   var out = nt.slice(), fzb = ent.id.charAt(0) === 'b' && ent.al && ent.al.length;
   if (fzb) out = nearStrip(out, ent);      // همان قاعده‌ی کلید: نام نمایشی با کلید یکی باشد
   (ent.al || []).forEach(function (al) { out = stripSeqs(out, null, al); });
-  if (fzb) out = fzStrip(out, ent);
+  if (fzb && out.length === nt.length) out = fzStrip(out, ent);
   // همان حذف‌ها روی خودِ واژه‌های نمایشی (به ترتیب)
   var r = [], k = 0; w.forEach(function (x, i) { if (k < out.length && nt[i] === out[k]) { r.push(x); k++; } });
   return r.join(' ');
@@ -1639,7 +1643,7 @@ function wdNear(t, l) {
 }
 function wdSound(f, e) {
   var t = wdNz(String(translitFaWord(f) || '').toLowerCase()), l = wdNz(String(e).toLowerCase());
-  return wdNear(t, l) || (/^[ld][aeiou]/.test(l) && wdNear(t, l.slice(1))) || (/ks/.test(l) && wdNear(t, l.replace(/ks/g, 'gz'))) || (/gh/.test(t) && wdNear(t.replace(/gh/g, 'k'), l)) || (/[td]h/.test(l) && wdNear(t, l.replace(/th/g, 's').replace(/dh/g, 'z')));      // ق = q، ث = th، ذ = dh      // L'Intense، D'Azur؛ x = گز (Exotic = اگزوتیک)
+  return wdNear(t, l) || (/^[ld][aeiou]/.test(l) && wdNear(t, l.slice(1))) || (/ks/.test(l) && wdNear(t, l.replace(/ks/g, 'gz'))) || (/gh/.test(t) && wdNear(t.replace(/gh/g, 'k'), l)) || (/[td]h/.test(l) && wdNear(t, l.replace(/th/g, 's').replace(/dh/g, 'z'))) || (/ill[aeiou]/.test(l) && wdNear(t, l.replace(/ill(?=[aeiou])/g, 'iy')));      // ill فرانسوی = «ی» (Sillage = سیاژ)      // ق = q، ث = th، ذ = dh      // L'Intense، D'Azur؛ x = گز (Exotic = اگزوتیک)
 }
 /* واژه‌نامه‌ی یادگرفته‌شده با قاعده‌ی قدیمی جفت‌های جابه‌جا هم دارد («برگ» = Fluid): آن‌ها پاک می‌شوند */
 function pruneLex(db) {

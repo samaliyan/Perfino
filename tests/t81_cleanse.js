@@ -93,4 +93,16 @@ chk(/^آف|^اف| آف | اف /.test(' ' + (key('ادوپرفیوم آف وای�
 var db10 = C.newDb(); db10.wd = { 'برگ': null, 'قهوه': { qahwa: 2 }, 'بلو': { black: 1, blue: 3 } }; db10.dv = 1;
 var thrown = null; try { C.purgeStored(db10); } catch (e) { thrown = e; }
 chk(!thrown && !('برگ' in db10.wd) && db10.wd['قهوه'] && db10.wd['قهوه'].qahwa && db10.wd['بلو'].blue && !db10.wd['بلو'].black, 'damaged dictionary entry does not crash; ق=q kept; بلو≠black pruned', JSON.stringify(db10.wd) + ' ' + thrown);
+// ۱۱) یافته‌های بازبینیِ دوم
+var Q = build({
+  hiland: [['ادوتویلت زنانه گوچی گیلتی 75 میل', 6e6], ['ادوتویلت زنانه گوچی گیلتی او 75 میل', 5.5e6], ['ادوپرفیوم مردانه اکسودوس استرنج 100 میل', 3e6], ['ادوپرفیوم زنانه والنتینو والنتینا پینک 80 میل', 7e6], ['ادوپرفیوم زنانه کارولینا هررا کارولینا هرر گود گرل 80 میل', 8e6]],
+  digikala: [['ادو پرفیوم مردانه اکسودوس مدل Strange حجم 100 میلی لیتر', 3.3e6], ['ادو پرفیوم زنانه والنتینو مدل Valentina Pink حجم 80 میلی لیتر', 7.2e6]],
+  liliome: [['عطر ادکلن کارولینا هررا گود گرل ادو پرفیوم زنانه 80 میل', 8.1e6]]
+});
+chk(find(Q, /گیلتی/).length === 2, 'Guilty ≠ Guilty Eau', JSON.stringify(find(Q, /گیلتی/)));
+one(Q, /استرنج|سترانگ|strange/i, 'digikala+hiland', 'Exodus «استرنج» = Strange across shops');
+one(Q, /پینک|pink/i, 'digikala+hiland', 'Valentina Pink: Persian and Latin listings are one row');
+chk(find(Q, /والنتینا|valentina/i).length === 1, 'Persian-only «والنتینو والنتینا پینک» keeps Valentina in the name', JSON.stringify(find(Q, /والنتینو/)));
+one(Q, /گود گرل/, 'hiland+liliome', 'misspelled repeated brand «هررا هرر» is removed; matches Good Girl');
+chk(!/^دو /.test(C.parseTitle('اکستریت دو پرفیوم زنانه ژیل کانتوئل وانیل 100 میل').name || ''), 'leading «دو» left from «ادو پرفیوم» is not part of the name', C.parseTitle('اکستریت دو پرفیوم زنانه ژیل کانتوئل وانیل 100 میل').name);
 console.log(ok + ' pass ' + bad + ' fail'); process.exit(bad ? 1 : 0);
