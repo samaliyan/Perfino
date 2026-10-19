@@ -12,6 +12,8 @@ import android.graphics.Color;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
+import android.os.PowerManager;
+import android.view.WindowManager;
 import android.provider.MediaStore;
 import android.view.View;
 import android.view.ViewGroup;
@@ -41,6 +43,7 @@ import java.util.concurrent.Executors;
 /** یک WebView تمام‌صفحه؛ رابط و منطق در assets/www است. این کلاس فقط دانلود (بدون محدودیت CORS) و چند کار کوچک سیستمی را انجام می‌دهد. */
 public class MainActivity extends Activity {
     private WebView web;
+    private PowerManager.WakeLock busyLock;      // در طولِ دریافتِ قیمت‌ها: پردازنده نخوابد
     private FrameLayout root;
     private static long rgT;
     private static int rgN;
@@ -536,6 +539,14 @@ public class MainActivity extends Activity {
             }
         }
 
+        /** دریافتِ قیمت‌ها شروع/تمام شد: در این مدت صفحه خاموش نمی‌شود و پردازنده نمی‌خوابد (حداکثر ۳۰ دقیقه)، تا لازم نباشد کسی دست به گوشی باشد. */
+        @JavascriptInterface
+        public void busy(final boolean on) {
+            runOnUiThread(new Runnable() {
+                @Override public void run() { setBusy(on); }
+            });
+        }
+
         @JavascriptInterface
         public void copy(final String text) {
             runOnUiThread(new Runnable() {
@@ -593,6 +604,22 @@ public class MainActivity extends Activity {
         }
     }
 
+    private void setBusy(boolean on) {
+        try {
+            if (on) getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+            else getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        } catch (Throwable ignore) { }
+        try {
+            if (on) {
+                if (busyLock == null) {
+                    PowerManager pm = (PowerManager) getSystemService(Context.POWER_SERVICE);
+                    if (pm != null) { busyLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "perfino:refresh"); busyLock.setReferenceCounted(false); }
+                }
+                if (busyLock != null) busyLock.acquire(30 * 60 * 1000L);      // سقف: اگر صفحه هرگز «تمام شد» نگفت، خودش رها می‌شود
+            } else if (busyLock != null && busyLock.isHeld()) busyLock.release();
+        } catch (Throwable ignore) { }
+    }
+
     @Override
     protected void onPause() {
         if (guard != null) guard.pause();
@@ -618,6 +645,7 @@ public class MainActivity extends Activity {
 
     @Override
     protected void onDestroy() {
+        setBusy(false);
         ui.removeCallbacks(otaDog);
         if (guard != null) guard.cancel();
         pool.shutdownNow();

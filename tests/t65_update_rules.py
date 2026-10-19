@@ -26,7 +26,7 @@ async def main():
     async with async_playwright() as p:
         # ---- ۱) برنامه روی «در حال بارگذاری» گیر کرده و کسی کاری نمی‌کند: بروزرسانی باز هم انجام می‌شود
         b,ctx,pg,errs=await load(p,native()); await pg.wait_for_timeout(1900)
-        await ev(pg,FWD+"window.__fw=0;window.__pp.state.db.ready=false;window.__nc.length=0;window.__otaInfo({ok:true,state:'new',code:999,v:'9.9',cur:100,run:100});window.__otaReady(999)")
+        await ev(pg,FWD+"window.__fw=0;window.dispatchEvent(new Event('pointerdown'));window.__pp.state.db.ready=false;window.__nc.length=0;window.__otaInfo({ok:true,state:'new',code:999,v:'9.9',cur:100,run:100});window.__otaReady(999)")
         await settle(pg); c=await calls(pg)
         chk('۱ هنوز ۳۰ ثانیه نشده: گیر کرده هم باشد صبر می‌کند',c.count('otaApply')==0,c)
         await ev(pg,"window.__fw=40000"); await settle(pg); c=await calls(pg)

@@ -1,7 +1,7 @@
 (function () {
 'use strict';
 var RM = !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
-var VERSION = '1.46';
+var VERSION = '1.47';
 var myCode = (function () { var m = /\/b(\d{1,10})\/index\.html$/.exec(String(location.pathname || '')); return m ? m[1] : '0'; })();      // نسخه‌ی این صفحه از روی آدرسش؛ در گزارش‌ها به جاوا فرستاده می‌شود تا صفحه‌ی کهنه نتواند نسخه‌ی تازه را «سالم» اعلام کند
 function otaCall(n) { try { if (window.Native && typeof window.Native[n] === 'function') window.Native[n](myCode); } catch (e) { } }
 otaCall('otaBoot');      // «جاوااسکریپتِ این صفحه شروع شد»: برنامه به صفحه‌ی بی‌نصب مهلتِ بیشتری برای ساختن فهرست می‌دهد
@@ -1319,7 +1319,16 @@ async function doSource(s) {
   stt[s.id] = { ok: true, n: cnt, t: Date.now(), mode: mode, note: r.note || '', full: !!(db.full[s.id]), added: st.added, removed: st.removed | 0, merged: st.merged | 0, purged: st.purged | 0 };
   P.done = true;
 }
+/* در طولِ دریافت، صفحه‌ی گوشی خاموش نمی‌شود و پردازنده نمی‌خوابد (بخشِ اندرویدِ ۱.۴۶ به بعد)؛ وگرنه با خاموش شدنِ صفحه کار می‌ایستاد */
+function nativeBusy(on) { try { if (window.Native && typeof window.Native.busy === 'function') window.Native.busy(!!on); } catch (e) { } }
 async function refresh(manual) {
+  if (busy) return;
+  nativeBusy(true);
+  try { await refresh0(manual); }
+  catch (e) { console.error(e); if (busy) { busy = false; updPill(); overlay(); refBtn(); } }      // خطای پیش‌بینی‌نشده: دکمه‌ها قفل نمانند
+  finally { nativeBusy(false); }
+}
+async function refresh0(manual) {
   if (busy) return;
   if (Core.CLEANSE) { Core.CLEANSE.n = 0; Core.CLEANSE.junk = 0; }
   if (Core.REJ) { Core.REJ.n = 0; Core.REJ.by = {}; Core.REJ.ex = []; }
