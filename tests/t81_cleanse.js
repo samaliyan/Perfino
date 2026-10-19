@@ -109,4 +109,8 @@ chk(/دو سون/.test(C.parseTitle('ادوتویلت زنانه دو سون د�
 var Z = build({ hiland: [['ادوپرفیوم سالوادور فرگامو توسکان سول وندمیا 75 میل', 5e6], ['ادوپرفیوم مزون فرانسیس کورکجان کرکجان باکارات رژ 540 70 میل', 9e6]], liliome: [['عطر ادکلن مزون فرانسیس کورکجان باکارات رژ 540 ادو پرفیوم یونیسکس 70 میل', 9.3e6]] });
 chk(find(Z, /توسکان/).length === 1 && !/فرگامو/.test(find(Z, /توسکان/)[0].n.split(' :: ')[1]), 'misspelled brand remainder «فرگامو» is not in the perfume name', JSON.stringify(find(Z, /توسکان/)));
 one(Z, /باکارات/, 'hiland+liliome', '«کورکجان کرکجان» (brand + misspelled repeat) still matches Baccarat Rouge 540');
+// ۱۳) بازبینیِ چهارم
+chk(!/^(دو|پغفم|پرفیوم)/.test(C.parseTitle('اکستریت دو پغفم تیزیانا ترنزی دراکو 100 میل').name || '') && !/^دو/.test(C.parseTitle('دو پرفیوم ژیل کانتوئل وانیلا 100 میل').name || ''), '«دو پرفیوم» / «دو پغفم» is concentration, not name', [C.parseTitle('اکستریت دو پغفم تیزیانا ترنزی دراکو 100 میل').name, C.parseTitle('دو پرفیوم ژیل کانتوئل وانیلا 100 میل').name]);
+var F = build({ hiland: [['ادوتویلت مردانه سالواتور فراگامو اف بای فرگامو پورهوم 100 میل', 4e6]] });
+chk(find(F, /بای/).length === 1 && /فرگامو/.test(find(F, /بای/)[0].n.split(' :: ')[1]), '«F by Ferragamo» keeps «فرگامو» inside the name', JSON.stringify(F));
 console.log(ok + ' pass ' + bad + ' fail'); process.exit(bad ? 1 : 0);

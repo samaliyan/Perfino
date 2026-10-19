@@ -46,8 +46,8 @@ var CONC = [
   ['ادوپرفیوم', /ا?دوپرفیوم|ادو ?پرفیوم|ادو ?پارفوم|ادو ?پرفوم|او ?د[وی] ?پرفیوم|ادی ?پرفیوم|اد ?پرفیوم|eau d[ue] parfum|\bedp\b|e\.d\.p/g],
   ['ادوتویلت', /ا?دوتویلت|ادو ?تویلت|ادو ?توالت|ادو ?تواله|او ?د[وی] ?تو[یا]لت|ادی ?تویلت|اد ?تویلت|eau d[ue] toilette|\bedt\b/g],
   ['ادوکلن', /ادو ?کلن|ادوکلن|eau de cologne|\bcologne\b|\bedc\b/g],
-  ['اکستریت', /اکستریت( ?د ?پرفیوم)?|اکسترایت|extrait( de parfum)?/g],
-  ['پرفیوم', /(^| )(پرفیوم|پارفوم|parfum)( |$)/g]
+  ['اکستریت', /اکستریت( ?دو? ?(پرفیوم|پغفم|پارفوم))?|اکسترایت|extrait( de parfum)?/g],      // «اکستریت دو پغفم» (پغفم = Parfum با حروفِ خراب‌شده‌ی هایلند)
+  ['پرفیوم', /(^| )((دو|د) )?(پرفیوم|پارفوم|پغفم|parfum)( |$)/g]      // «دو پرفیوم» یکجا: «دو»ِ آن جزوِ نام نیست
 ];
 function isFa(w) { return /[؀-ۿ]/.test(w); }
 function cap(w) { return w.charAt(0).toUpperCase() + w.slice(1); }
@@ -1231,10 +1231,11 @@ function nearStrip(out, ent) {
 }
 function medKey(w) { var t = faKey(w); return t.length < 3 ? t : (t.charAt(0) + t.slice(1, -1).replace(/[اوی]/g, '') + t.slice(-1)).replace(/(.)\1+/g, '$1'); }      // حرفِ اول و آخر می‌ماند، صدادارهای میانی نه
 function brandTypo(w, b) { return w !== b && HAS_FA.test(w) && HAS_FA.test(b) && w.length >= 3 && (faKey(w) === faKey(b) || (medKey(w) === medKey(b) && medKey(b).length >= 4)); }      // اسکلتِ کوتاه کافی نیست («کلون» ≠ کلین)      // «فرگامو» = فراگامو، «کرکجان» = کورکجان، «آرمانیی» = آرمانی؛ «والنتینا» ≠ والنتینو (حرفِ آخر)
-function typoStrip(out, ent) {
-  var bw = []; (ent.al || []).forEach(function (al) { al.forEach(function (x) { if (bw.indexOf(x) < 0) bw.push(x); }); });
-  var pm = protMask(out);
-  return out.filter(function (w, i) { return pm[i] || i >= 4 || !bw.some(function (b) { return brandTypo(w, b); }); });
+function typoStrip(out, ent) {      // فقط غلط‌های املاییِ برند در اولِ نامِ باقی‌مانده («فرگامو توسکان سول») تا اولین واژه‌ای که چنین نیست؛ «اف بای فرگامو» دست نمی‌خورد؛ دست‌کم یک واژه می‌ماند
+  var bw = []; (ent.al || []).forEach(function (al) { al.forEach(function (x) { if (x.length >= 3 && bw.indexOf(x) < 0) bw.push(x); }); });
+  var pm = protMask(out), i = 0;
+  while (i < out.length - 1 && !pm[i] && bw.some(function (b) { return brandTypo(out[i], b); })) i++;
+  return i ? out.slice(i) : out;
 }
 function stripBrand(toks, ent) {
   var out = toks.slice();
