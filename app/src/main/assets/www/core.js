@@ -243,10 +243,19 @@ function dedupeWords(ws, BW) {      // BW: واژه‌های نامِ برندِ
   if (res.length < ws.length) CLEANSE.dupw = (CLEANSE.dupw | 0) + 1;      // برای گزارشِ «پالایش»
   return res;
 }
+/* رنگِ فارسی فقط وقتی حذف می‌شود که همان رنگ به زبانِ دیگر در عنوان هست (پس نامِ عطر عوض نمی‌شود؛ «جگوار مردانه-سبز» بدونِ Green می‌ماند) */
+var COLOR_EQ = [['طلایی', 'gold|golden|گلد|گلدن'], ['ابی|آبی', 'blue|bleu|blu|بلو'], ['قرمز', 'red|rouge|rosso|رد|روژ|روسو'], ['مشکی', 'black|noir|nero|بلک|نوآر|نوار|نویر|نرو'],
+  ['سفید', 'white|blanc|bianco|وایت|بلان|بیانکو'], ['سبز', 'green|vert|verde|گرین|ورت|ورده'], ['صورتی', 'pink|پینک'], ['نقره ?ای', 'silver|argent|سیلور|آرجنت|ارجنت'], ['بنفش', 'purple|violet|پرپل|ویولت'],
+  ['زرد', 'yellow|یلو'], ['نارنجی', 'orange|اورنج']].map(function (c) { return { fa: new RegExp('(^|[\\s\\-–(|])(' + c[0] + ')(?=[\\s\\-–)|]|$)'), eq: new RegExp('(^|[\\s\\-–(|])(' + c[1] + ')(?=[\\s\\-–)|]|$)') }; });
+function colorDup(t) {      // فقط وقتی معادل در همان بخشِ فارسیِ عنوان است («گلد-طلایی»)؛ اگر فقط در نیمه‌ی لاتین آمده («لاگوست سفید | L.12.12 Blanc») رنگ خودِ نام است
+  var bar = t.indexOf('|'), fa = bar >= 0 ? t.slice(0, bar) : t, rest = bar >= 0 ? t.slice(bar) : '';
+  COLOR_EQ.forEach(function (c) { if (c.fa.test(fa) && c.eq.test(fa)) fa = fa.replace(c.fa, '$1 '); });
+  return fa + rest;
+}
 function parseTitle(raw) {
   var t = normFa(stripPriceTail(String(raw == null ? '' : raw).replace(/<[^>]*>/g, ' ')), true);
   t = t.replace(/(\d)[,٫](\d{1,2})(?=\s*(?:fl|oz|میل(?!یون)|ml))/g, '$1.$2');          // «3,4 oz» = 3.4 oz
-  t = t.replace(/[-–]\s*(?:سفید|آبی|ابی|طلایی|مشکی|قرمز|صورتی|نقره ?ای|سبز|بنفش|زرد|نارنجی|قهوه ?ای|طوسی|خاکستری|سرمه ?ای|کرم|بژ)(?=\s|$|\|)/g, ' ');      // «گلد-طلایی»، «پیور لندن-سفید»: رنگِ بعد از خط تیره توضیحِ سایت است، نه نامِ عطر
+  t = colorDup(t);      // «گلد-طلایی»، «کریستال نوآر-مشکی»: رنگِ فارسی که ترجمه‌ی رنگی است که در خودِ نام آمده، تکرار است
   t = t.replace(/[()\[\]{}]/g, ' ').replace(/[،؛؟٪٫٬٭]/g, ' ').replace(/\b(?:number|n ?°|n\.|no\.)\s*(\d)/g, 'no $1').replace(/(?:نامبر|نمبر|شماره)\s*(\d)/g, 'نامبر $1');
   if (!t) return null;
   if (EXCL.test(t)) { REJ.n++; return null; }
@@ -282,12 +291,15 @@ function parseTitle(raw) {
     var NK0 = function (w) { return w.replace(/آ/g, 'ا').replace(/ؤ/g, 'و').replace(/ئ/g, 'ی'); };
     var fc = cleanToks(fa), fcn = fc.map(NK0), fe = brandOf(fcn, []);
     var latin = toks.filter(function (w) { return !isFa(w) && !/^\d+$/.test(w); });
-    var le0 = latin.length ? brandOf(cleanToks(latin), [], true) : { id: 'other' }, slead = 0;
+    var le0 = latin.length ? brandOf(cleanToks(latin), [], true) : { id: 'other' }, slead = 0, latRest = le0.id !== 'other' ? stripBrandEn(cleanToks(latin), le0) : [];
     if (/(^| )مدل [a-z]/.test(k) && latin.length) shown = toks;                      // «داویدف مدل Zino»: واژه‌ی لاتینِ بعد از «مدل» نامِ خودِ عطر است
     else if (fe.id !== 'other' && !stripBrand(fcn, fe).length) shown = toks;
-    else if (fe.id === 'other' && le0.id !== 'other' && !(slead = soundLead(fcn, le0) || tailLead(fcn, stripBrandEn(cleanToks(latin), le0)))) shown = toks;      // «Lattafa خمره»: برندِ لاتین + نامِ فارسی؛ برند نباید گم شود
+    else if (fe.id === 'other' && le0.id !== 'other' && !(slead = faBrandLen(fcn, le0, latRest)) && !(latRest.length && tailAlign(fcn, latRest))) shown = toks;      // «Lattafa خمره»: برندِ لاتین + نامِ فارسی؛ برند نباید گم شود
     else {
-      if (slead) { fa = (le0.canFa || le0.weak || brandNorm(le0.name)).concat(fa.slice(slead)); fcn = fa.map(NK0); shown = fa; }      // «فره آبی ... | Gianfranco Ferre ...»: نامِ کوتاهِ فارسیِ همان برند اولِ عنوان آمده؛ فارسی کافی است (لاتین تکرارِ همان است) و برند با نامِ استانداردش نوشته می‌شود
+      if (fe.id === 'other' && le0.id !== 'other') {      // برندِ فارسی شناخته نشد ولی بخشِ لاتین برند و همان نام را دارد: برند (به نامِ استانداردش) + نامِ فارسی؛ لاتینِ تکراری نمی‌آید
+        var bt = brandToks(le0);
+        fa = bt.concat(fa.slice(slead).filter(function (w) { return !(w.length === 1 && HAS_FA.test(w)); })); fcn = fa.map(NK0); shown = fa;
+      }      // «فره آبی ... | Gianfranco Ferre ...»: نامِ کوتاهِ فارسیِ همان برند اولِ عنوان آمده؛ فارسی کافی است (لاتین تکرارِ همان است) و برند با نامِ استانداردش نوشته می‌شود
       // (بقیه:) «اروس Flame»: واژه‌ی خطِ محصول (لاتین) جزو نام است
       var D = nameDict(), extra = [];
       latin.forEach(function (w) { if (LINEW[w]) { var pf = D.e2f[w]; var add = pf ? pf.split(' ') : [w]; if (add.every(function (x) { return fcn.indexOf(NK0(x)) >= 0; })) return; add.forEach(function (x) { extra.push(x); }); } });
@@ -301,7 +313,10 @@ function parseTitle(raw) {
   var nseen = {}; shown = shown.filter(function (w) { if (!/^\d+$/.test(w)) return true; if (nseen[w]) return false; nseen[w] = 1; return true; });
   shown = dedupeWords(shown, brandWords(shown)); if (!shown.length) return null;      // پاک‌سازی: «آکوا اکوا»، نامِ فارسی + همان نامِ لاتینِ واج‌نویسی‌شده، «د»ِ آویزانِ آخر      // «2004 ... 2004» (سالِ تکراری در بخشِ فارسی و انگلیسیِ عنوان)
   var lw = shown[shown.length - 1], pgn = '';
-  if (shown.length > 2 && (lw === 'من' || lw === 'وومن' || lw === 'ومن')) { pgn = lw === 'من' ? 'm' : 'w'; shown = shown.slice(0, -1); lw = shown[shown.length - 1]; }
+  if (shown.length > 2 && (lw === 'من' || lw === 'وومن' || lw === 'ومن')) {      // «... فور من» / «... من» آخرِ عنوان = جنسیت؛ مگر اینکه نامِ خودِ عطر باشد (سی کی من = CK Man)
+    var cut = shown[shown.length - 2] === 'فور' ? 2 : 1, tmpF = shown.slice(0, -cut), teF = brandOf(tmpF, []);
+    if (teF.id === 'other' || stripBrand(tmpF, teF).length || EPON[teF.name]) { pgn = lw === 'من' ? 'm' : 'w'; shown = tmpF; lw = shown[shown.length - 1]; }
+  }
   if (shown.length > 2 && (lw === 'man' || lw === 'woman' || lw === 'مرد' || lw === 'زن')) {      // «Man/Woman» آخرِ عنوان = جنسیت؛ مگر اینکه نامِ خودِ عطر باشد (Jimmy Choo Man)
     var tmp = shown.slice(0, -1), te = brandOf(tmp, []);
     if (te.id === 'other' || stripBrand(tmp, te).length) shown = tmp;
@@ -529,7 +544,7 @@ function phTok(x, y) {      // دو واژه‌ی لاتین (یا فارسیِ 
   if (x === y) return true;
   if (/\d/.test(x) || /\d/.test(y)) return false;
   if (skel(x) !== skel(y)) { if (!vEq(x, y) || !(leadOK(x, y) || skLead(vNorm(x)) === skLead(vNorm(y)))) return false; var nx = vNorm(x);      // همخوانِ اول هم یکی (Havak ≠ Ach)
-    return skel(nx).length > 2 || /[vw]/.test(x + y) || vowSlots(nx, vNorm(y)) <= 1; }      // واژه‌ی کوتاه که فقط با خوانشِ دیگرِ c جور شد: صدادارها هم (Cherry ≠ Kara)؛ با «و» جای صدادارها روشن نیست (House = هوس)
+    return skel(nx).length > 2 || /(^|[^aeiouy])[vw]|[vw]($|[^aeiouy])/.test(x + ' ' + y) || vowSlots(nx, vNorm(y)) <= 1; }      // «و» کنارِ همخوان شاید صدادار باشد (House = هوس)؛ «و»ِ میانِ دو صدادار همخوان است (Ivoire ≠ Rio)      // واژه‌ی کوتاه که فقط با خوانشِ دیگرِ c جور شد: صدادارها هم (Cherry ≠ Kara)؛ با «و» جای صدادارها روشن نیست (House = هوس)
   if (skel(x).length >= 5) return true;      // پنج همخوانِ یکسان و پشتِ‌سرهم: همان واژه (واج‌نویسیِ فارسی صدادارِ اضافه می‌گذارد: «سدکشان» = Seduction)
   var cx = phCol(consNorm(x)), cy = phCol(consNorm(y)), d = levD(cx, cy);
   if (skel(x).length <= 2) return d === 0 && vowSlots(x, y) <= 1 && hyMid(x) === hyMid(y);      // واژه‌ی کوتاه (یک-دو همخوان): قالبِ صدا یکی و صدادارِ هر جایگاه هم نزدیک («اله» ≠ «لاولی»، «ساهاری» ≠ «زهیرا»، ولی Blue = Bleu)
@@ -1067,7 +1082,7 @@ function brandTable() {
     });
     ent.al.sort(function (x, y) { return y.length - x.length; });
     var own = brandNorm(b[0]).map(function (w) { return CN[w] ? CN[w] : w; });      // نامِ خودِ برند همیشه نامِ برند است؛ اگر واژه‌ی رایجِ فارسی است («پلیس»، «کوچ») در فهرستِ نام‌ها نیامده و فقط اولِ عنوان یا از دسته‌بندیِ سایت پذیرفته می‌شود
-    if (own.length && !ent.al.some(function (a) { return a.join(' ') === own.join(' '); })) { ent.weak = own; if (!BR.byName[own.join(' ')]) BR.byName[own.join(' ')] = ent; }
+    if (own.length && !ent.al.some(function (a) { return a.join(' ') === own.join(' '); })) { ent.weak = own; ent.weakN = String(b[0]).replace(/\s+/g, '').length; if (!BR.byName[own.join(' ')]) BR.byName[own.join(' ')] = ent; }
     BR.list.push(ent);
   });
   return BR;
@@ -1205,7 +1220,7 @@ function brandOf0(key, hints, noLine) {
       b.al.forEach(function (al) { var p = seqAt(key, al); if (p >= 0 && (!best || p < best.p || (p === best.p && al.length > best.n))) best = { b: b, p: p, n: al.length }; });
     });
     if (best) ent = best.b;
-    if (!ent) T.list.some(function (b) { return b.weak && seqAt(key, b.weak) === 0 && (ent = b); });      // «پلیس آیکون گلد»: نامِ برندِ هم‌معنای واژه‌ی رایج، فقط وقتی اولِ نام آمده
+    if (!ent) T.list.some(function (b) { return b.weak && b.weakN >= 4 && seqAt(key, b.weak) === 0 && (ent = b); });      // «پلیس آیکون گلد»: نامِ برندی که واژه‌ی رایج است فقط اولِ نام؛ نامِ سه‌حرفی («مکس»، «کوچ»، «توس») فقط با تأییدِ سایت یا بخشِ لاتین (مکس مارا ≠ Mexx)
   }
   if (!ent && !unk && !noLine) { var fz2 = fzFind(key, 1, true); if (fz2) ent = fz2.b; }
   if (!ent && !unk && !noLine) { var LT = lineTable(); for (var li = 0; li < LT.length; li++) { var at = seqAt(key, LT[li].tk); if (at === 0 && key.length - LT[li].tk.length <= 3) { ent = LT[li].b; break; } } }      // فقط وقتی نامِ خط اولِ عنوان است («Dumont Nitro Pour Homme» ورساچه نیست)      // نامِ عطرِ معروف بدونِ نامِ برند
@@ -1246,23 +1261,69 @@ function typoStrip(out, ent) {      // فقط غلط‌های املاییِ ب�
   while (i < out.length - 1 && !pm[i] && bw.some(function (b) { return brandTypo(out[i], b); })) i++;
   return i ? out.slice(i) : out;
 }
-/* چند واژه‌ی اولِ نامِ فارسی که با واژه‌های نامِ لاتینِ برند هم‌صدا هستند (به همان ترتیب، شاید فقط بخشی از نام: «فره» = Gianfranco Ferre، «بالدسارینی» = Baldessarini) */
+/* چند واژه‌ی اولِ نامِ فارسی که با واژه‌های نامِ لاتینِ برند هم‌صدا هستند (به همان ترتیب، شاید فقط بخشی از نام: «فره» = Gianfranco Ferre، «بالدسارینی» = Baldessarini،
+   «ژولیت هز ا گان» = Juliette Has A Gun؛ حرفِ تکِ فارسی مثلِ «ا» یا «لِ» در میانه نادیده) */
 function soundLead(toks, ent) {
   var best = 0;
   (ent.al || []).concat(ent.en ? [brandNorm(ent.en)] : []).forEach(function (al) {
     if (!al.length || al.some(function (w) { return HAS_FA.test(w); })) return;
-    var i0 = 0; while (i0 < toks.length && toks[i0].length === 1 && HAS_FA.test(toks[i0])) i0++;      // «لِ لابو»: حرفِ تکِ باقی‌مانده («ل»)
-    var i = i0; for (var j = 0; j < al.length && i < toks.length; j++) if (HAS_FA.test(toks[i]) && toks[i].length >= 3 && wdSound(toks[i], al[j])) i++;
-    if (i > i0 && i > best) best = i;
+    var i = 0, j = 0, hit = 0;
+    while (i < toks.length && j < al.length) {
+      if (toks[i].length === 1 && HAS_FA.test(toks[i])) { i++; continue; }
+      if (HAS_FA.test(toks[i]) && toks[i].length >= (hit ? 2 : 3) && wdSound(toks[i], al[j])) { i++; j++; hit++; } else if (hit) break; else j++;      // واژه‌ی اول دست‌کم سه حرف («ژولیت»)، بعدی‌ها کوتاه هم («هز»)
+    }
+    if (hit && i > best) best = i;
   });
   return best;
 }
-/* نامِ لاتینِ بعد از برند («Obsession») با واژه‌های آخرِ نامِ فارسی («آبسشن») هم‌صداست؟ پس واژه‌های فارسیِ پیش از آن («سی کی») همان برندند؛ خروجی: تعدادِ آن واژه‌ها */
-function tailLead(fa, lat) {
-  if (!lat.length || lat.length >= fa.length) return 0;
-  var p = fa.length - lat.length;
-  for (var i = 0; i < lat.length; i++) if (!(wdSound(fa[p + i], lat[i]) || sameWord(fa[p + i], lat[i]))) return 0;
-  return p;
+/* نامِ برند با حروفِ الفبا («سی کی» = CK، «دی اند جی» = D&G، «اچ اف سی» = HFC) */
+var LETTER_FA = { 'ای': 'a', 'بی': 'b', 'سی': 'c', 'دی': 'd', 'اف': 'f', 'جی': 'g', 'اچ': 'h', 'آی': 'i', 'کی': 'k', 'ال': 'l', 'ام': 'm', 'ان': 'n', 'او': 'o', 'پی': 'p', 'کیو': 'q', 'آر': 'r', 'ار': 'r', 'اس': 's', 'تی': 't', 'یو': 'u', 'وی': 'v', 'دبلیو': 'w', 'ایکس': 'x', 'وای': 'y', 'زد': 'z', 'اند': '', 'و': '' };
+function acroLead(toks, ent) {
+  var al = (ent.al || []).filter(function (a) { return a.length === 1 && /^[a-z]{2,4}$/.test(a[0]); }).map(function (a) { return a[0]; });
+  if (!al.length) return 0;
+  var sp = '';
+  for (var i = 0; i < toks.length && i < 6; i++) {
+    var l = LETTER_FA[toks[i]]; if (l === undefined) break; sp += l;
+    if (l && al.indexOf(sp) >= 0) return i + 1;
+  }
+  return 0;
+}
+/* بخشِ فارسیِ عنوان («فره آبی آکوا آزورا | Gianfranco Ferre Acqua Azzurra») نامِ برند را دارد؟ چند واژه‌ی اول برند است؛ فقط وقتی که
+   بقیه‌ی فارسی نامِ واقعی داشته باشد و نامِ لاتینِ بعد از برند با آخرِ آن هم‌صدا باشد (وگرنه «مونته کارلو | Montale Monte Carlo» یا «پارادوکس | Prada Paradoxe» اشتباه برند می‌شد) */
+function alignW(fa, lat) {      // واژه‌های ربط (the/de/of، «د»، «آف») در هم‌ترازی حساب نمی‌شوند
+  // «اف» شاید حرفِ F باشد (جی اف اف = GFF)، پس فقط «د/دو» کنار می‌رود
+  var f = fa.filter(function (w) { return w !== 'د' && w !== 'دو' && !(w.length === 1 && HAS_FA.test(w)); }), l = lat.filter(function (w) { return !CONN_W[w] && !CANON_ANY[w] && !CANON_OF[w]; });
+  return { f: f, l: l };
+}
+function tailAlign(fa, lat) {      // واژه‌های لاتینِ نام به همان ترتیب در نامِ فارسی هستند («دریمز سانست» / Sunset؛ فارسی شاید واژه‌ی بیشتری داشته باشد)؛ در نامِ بلند یک واژه‌ی ناجور پذیرفته است
+  var a = alignW(fa, lat), f = a.f, l = a.l;
+  if (!l.length) return false;
+  var i = 0, hit = 0;
+  for (var j = 0; j < l.length; j++) {
+    for (var k = i; k < f.length; k++) {
+      var n = wordLike(f, k, l[j]); if (n) { hit++; i = k + n; break; }
+    }
+  }
+  return hit === l.length || (l.length >= 4 && hit === l.length - 1);
+}
+function wordLike(f, k, lw) {      // واژه‌ی فارسیِ f[k] (یا چند حرفِ الفبا از آنجا: «جی اف» = GFF) همان واژه‌ی لاتین است؟ خروجی: تعدادِ واژه‌های فارسی
+  if (wdSound(f[k], lw) || sameWord(f[k], lw)) return 1;
+  if (/^[bcdfghjklmnpqrstvwxz]{2,5}$/.test(lw)) { var sp = '', want = lw.replace(/(.)\1+/g, '$1'); for (var q = k; q < f.length && q < k + 5; q++) { var L = LETTER_FA[f[q]]; if (!L) break; sp += L; if (sp.replace(/(.)\1+/g, '$1') === want) return q - k + 1; } }
+  return 0;
+}
+function brandToks(ent) {      // نامِ برند برای کلید: نامِ فارسیِ بی‌حرفِ تک (حرفِ تک بعداً از عنوان می‌افتد)، وگرنه نامِ لاتین
+  var fa = (ent.al || []).filter(function (a) { return a.every(function (w) { return HAS_FA.test(w) && w.length > 1; }); });
+  if (ent.canFa && ent.canFa.every(function (w) { return w.length > 1; })) return ent.canFa.slice();
+  if (ent.weak && ent.weakN >= 4) return ent.weak.slice();      // نامِ کوتاه («کوچ») به‌تنهایی برند شناخته نمی‌شود: نامِ لاتین در کلید
+  if (fa.length) return fa[0].slice();
+  return (ent.canEn || (ent.al || []).filter(function (a) { return !a.some(function (w) { return HAS_FA.test(w); }); })[0] || brandNorm(ent.name)).slice();
+}
+function faBrandLen(fa, ent, latRest) {
+  var n = soundLead(fa, ent) || acroLead(fa, ent); if (!n) return 0;
+  var rest = fa.slice(n).filter(function (w) { return !(w.length === 1 && HAS_FA.test(w)); });
+  if (!rest.length) return latRest.length ? 0 : n;      // «کوچ زنانه | Coach for women»: نامِ عطر همان نامِ برند است
+  if (latRest.length && alignW(rest, latRest).l.length && !tailAlign(rest, latRest)) return 0;
+  return n;
 }
 function entAls(ent) { return ent.weak ? (ent.al || []).concat([ent.weak]) : (ent.al || []); }
 function stripBrand(toks, ent) {
@@ -1320,27 +1381,41 @@ function purify(name, EN, lex) {
   });
   return ch ? out.join(' ') : name;
 }
-/* پالایشِ نهاییِ نامِ نمایشی (بعد از واج‌نویسیِ واژه‌های لاتین): واژه‌ای که همان واژه‌ی قبلی با املای دیگر است («آکوا ... اکوا»، «اکسکلوسیو اکسکلوسیو») یک بار می‌ماند */
-function cleanShown(name, EN) {
-  if (EN || !name) return name;
-  var w = String(name).split(/\s+/).filter(Boolean), pm = protMask(w.map(bwKey)), seen = [], out = [];
-  w.forEach(function (x, i) { if (pm[i] || !isFa(x) || x.length < 3 || /^\d+$/.test(x)) { out.push(x); return; } var k = faKey(x); if (seen.indexOf(k) >= 0) return; seen.push(k); out.push(x); });
-  return out.length ? out.join(' ') : name;
+/* نامِ نمایشیِ فارسی: واژه‌ی لاتین واج‌نویسی می‌شود، مگر اینکه همان واژه به فارسی در نام باشد («آکوا ... aqua»، «اکسکلوسیو exclusive»)؛ واژه‌های فارسیِ خودِ سایت دست نمی‌خورند */
+function purifyFa(name, lex) {
+  var w = String(name).split(/\s+/).filter(Boolean), have = [], out = [];
+  w.forEach(function (x) { if (HAS_FA.test(x)) have.push(faKey(x)); });
+  w.forEach(function (x) {
+    if (!/[A-Za-z]/.test(x)) { out.push(x); return; }
+    var lt = x.toLowerCase().replace(/[^a-z0-9']/g, ''); if (!lt) { out.push(x); return; }
+    if (/\d/.test(lt)) { out.push(en2fa([lt], lex)); return; }      // «navid1»: واژه‌ی عدددار نامِ مدل است و حذف نمی‌شود
+    var f = en2fa([lt], lex), fk = faKey(f);
+    if (have.indexOf(fk) >= 0 || w.some(function (y) { return HAS_FA.test(y) && sameWord(y, lt); })) return;      // همان واژه که فارسی‌اش در نام هست
+    have.push(fk); out.push(f);
+  });
+  return out.length ? out.join(' ') : purify(name, false, lex);
 }
 /* بازرسیِ خودکارِ فهرستِ نهایی (بعد از همه‌ی پاک‌سازی‌ها): همان چیزهایی که کاربر با چشم می‌بیند.
    هر مورد شمرده می‌شود و چند نمونه نگه داشته می‌شود تا در گزارشِ «پالایش» دیده شود؛ آزمونِ t82 هم همین را روی داده‌ی واقعی می‌سنجد */
 function listAudit(brands) {
-  var Q = { dupBrand: { n: 0, ex: [] }, brandInName: { n: 0, ex: [] }, repeated: { n: 0, ex: [] }, dupModel: { n: 0, ex: [] }, latin: { n: 0, ex: [] } }, bn = {};      // شیء (نه آرایه) تا در حافظه‌ی درخت (JSON) شمارش گم نشود
+  var Q = { dupBrand: { n: 0, ex: [] }, brandInName: { n: 0, ex: [] }, repeated: { n: 0, ex: [] }, dupModel: { n: 0, ex: [] }, latin: { n: 0, ex: [] } };      // شیء (نه آرایه) تا در حافظه‌ی درخت (JSON) شمارش گم نشود
   function nk(w) { return faKey(String(w).toLowerCase()); }
   function add(a, x) { a.n++; if (a.ex.length < 12) a.ex.push(x); }
+  function bkey(n) { return String(n).split(/\s+/).filter(function (w) { return w.length > 1; }).map(nk).join(' '); }      // «ژولیت هو ا گان» = «ژولیت هو گان»
+  var seenB = [];
   brands.forEach(function (b) {
-    if (b.id !== 'other') { var k = b.name.split(/\s+/).map(nk).join(' '); if (bn[k]) add(Q.dupBrand, b.name); bn[k] = 1; }
-    var bw = b.id === 'other' ? [] : b.name.split(/\s+/).map(nk), seen = {};
+    if (b.id !== 'other') {
+      var k = bkey(b.name), w = k.split(' ');
+      var twin = seenB.filter(function (o) { return o.k === k || (o.w.length === w.length && o.w.every(function (x, i) { return x === w[i] || faKey(x) === faKey(w[i]); })); })[0];      // فقط املای «ا/آ/ی»؛ «امپر» و «امپایر» دو برندند
+      if (twin) add(Q.dupBrand, b.name + ' / ' + twin.n);
+      seenB.push({ k: k, w: w, n: b.name });
+    }
+    var bw = b.id === 'other' ? [] : b.name.split(/\s+/).filter(function (x) { return x.length > 1; }), names = [];
     b.models.forEach(function (m) {
-      var w = String(m.name).split(/\s+/).filter(Boolean), wk = w.map(nk), mk = wk.join(' ');
-      if (seen[mk]) add(Q.dupModel, b.name + ' :: ' + m.name); seen[mk] = 1;
-      var pm = protMask(w.map(bwKey));      // «میس دیور»، «بلو دو شنل»: نامِ برند جزوِ نامِ خودِ عطر است
-      if (bw.length && m.name !== b.name && ((bw.indexOf(wk[0]) >= 0 && !pm[0]) || (bw.indexOf(wk[wk.length - 1]) >= 0 && !pm[wk.length - 1])) && !EPON[b.name]) add(Q.brandInName, b.name + ' :: ' + m.name);
+      var w = String(m.name).split(/\s+/).filter(Boolean), wk = w.map(nk), pm = protMask(w.map(bwKey));      // «میس دیور»، «بلو دو شنل»: نامِ برند جزوِ نامِ خودِ عطر است
+      if (names.some(function (o) { return o === m.name || alefNear(o, m.name); })) add(Q.dupModel, b.name + ' :: ' + m.name); names.push(m.name);
+      function isB(x) { return bw.some(function (y) { return nk(x) === nk(y) || brandTypo(x, y); }); }
+      if (bw.length && m.name !== b.name && !EPON[b.name] && w.length && ((isB(w[0]) && !pm[0]) || (w.length > 1 && isB(w[w.length - 1]) && !pm[w.length - 1]))) add(Q.brandInName, b.name + ' :: ' + m.name);
       for (var i = 1; i < wk.length; i++) if (wk[i].length > 2 && !/^\d+$/.test(wk[i]) && wk.slice(0, i).indexOf(wk[i]) >= 0) { add(Q.repeated, b.name + ' :: ' + m.name); break; }
       if (/[a-z]/i.test(m.name)) add(Q.latin, b.name + ' :: ' + m.name);
     });
@@ -1392,12 +1467,18 @@ function tree(groups, lang, lex) {
     if (to.id !== e.id && AUD.brands.indexOf(e.name) < 0) AUD.brands.push(e.name + ' ← ' + (to.name || to.en));
     return to;
   });
+  /* نامِ سه‌حرفیِ برند («کوچ») که تنها آمده: اگر همین برند در فهرست هست (از عنوانِ دیگری تأیید شده)، همان عطرِ هم‌نامِ برند است */
+  var present = {}; ENT.forEach(function (e) { present[e.id] = e; });
+  groups.forEach(function (g, gi) {
+    if (ENT[gi].id !== 'other') return;
+    T.list.some(function (b) { if (b.weak && present[b.id] && g.key.join(' ') === b.weak.join(' ')) { ENT[gi] = b; return true; } return false; });
+  });
   var BN = {};
   groups.forEach(function (g, gi) {
     var ent = ENT[gi];
     var rest = ent.id === 'other' ? g.key.slice() : stripBrand(g.key, ent);
     /* پایش ۲: عطری که بعد از برداشتنِ نامِ برند چیزی از نامش نمی‌ماند، نام ندارد؛ نشان داده نمی‌شود */
-    if ((!rest.length || !rest.join('').length) && EPON[ent.name]) rest = g.key.slice();     // عطری که اسمش همان نام برند است (Chloé، Jimmy Choo، Nina Ricci…)
+    var epo = false; if ((!rest.length || !rest.join('').length) && (EPON[ent.name] || ent.weak || ent.id.charAt(0) === 'h')) { rest = g.key.slice(); epo = true; }     // عطری که اسمش همان نام برند است (Chloé، Jimmy Choo، Nina Ricci…، Coach، Repetto): حذف نمی‌شود
     if (!rest.length || !rest.join('').length) { if (AUD.bare.length < 40) AUD.bare.push(g.name); AUD.nb = (AUD.nb || 0) + 1; return; }
     var mk = rest.join(' ');
     var bnm = BN[ent.id] || (BN[ent.id] = brandName(ent, EN, lex));
@@ -1408,9 +1489,9 @@ function tree(groups, lang, lex) {
       b.models.push(m);
     }
     m.variants.push(g);
-    var raw = modelName(g, ent, EN, lex), shown = cleanShown(purify(raw, EN, lex), EN);
-    var shn = shown || (EPON[ent.name] ? b.name : g.name);      // عطری که اسمش همان نام برند است: با املای استانداردِ برند نشان داده شود
-    m.cnt[shn] = (m.cnt[shn] || 0) + g.sizes.length + (raw === shown ? 1000 : 0);      // نامی که سایت خودش به این خط نوشته بر نامِ واج‌نویسی‌شده از لاتین («تو ب بد گوی») مقدم است
+    var raw = modelName(g, ent, EN, lex), shown = EN ? purify(raw, EN, lex) : purifyFa(raw, lex);
+    var shn = epo ? b.name : shown || (EPON[ent.name] ? b.name : g.name);      // عطری که اسمش همان نام برند است: با املای استانداردِ برند نشان داده شود
+    m.cnt[shn] = (m.cnt[shn] || 0) + g.sizes.length;
   });
   var brands = Object.keys(B).map(function (k) { return B[k]; });
   /* پایشِ برند: دو برند با یک نام (مثلاً یکی از دسته‌بندیِ سایت و یکی از فهرستِ برندها: «پلیس» / Police) یک برندند */
@@ -1427,7 +1508,7 @@ function tree(groups, lang, lex) {
     mergeModels(b, AUD);
     b.models.forEach(function (m) {
       var best = ''; Object.keys(m.cnt).forEach(function (n) { if (!best || m.cnt[n] > m.cnt[best] || (m.cnt[n] === m.cnt[best] && (lead(n) < lead(best) || (lead(n) === lead(best) && n.length < best.length)))) best = n; });
-      m.name = best; m.org = m.cnt[best] >= 1000; m.L = letterOf(best, lang); m.z = zOf(m.L, EN); delete m.cnt;
+      m.name = best; m.L = letterOf(best, lang); m.z = zOf(m.L, EN); delete m.cnt;
       m.variants.sort(function (x, y) { return (GORD[x.gn] - GORD[y.gn]) || (CORD[x.conc] - CORD[y.conc]); });
       var first = m.variants.filter(function (v) { return v.img; })[0] || m.variants[0];
       m.img = first.img || ''; m.big = first.big || first.img || ''; m.imgId = first.id;
@@ -1516,6 +1597,10 @@ function modelsFit(A, B) {      // دو مدلِ هم‌نامِ متعارف (�
     });
   });
 }
+function shareShopSize(A, B) {
+  var s = {}; A.variants.forEach(function (v) { v.sizes.forEach(function (z) { z.srcs.forEach(function (x) { s[x.s + '|' + z.ml + '|' + v.gn + '|' + v.conc] = 1; }); }); });
+  return B.variants.some(function (v) { return v.sizes.some(function (z) { return z.srcs.some(function (x) { return s[x.s + '|' + z.ml + '|' + v.gn + '|' + v.conc]; }); }); });
+}
 function alefNear(a, b) {      // دو نامِ فارسی که واژه‌به‌واژه فقط در یک «ا»ی میانی فرق دارند
   var x = a.split(/\s+/), y = b.split(/\s+/); if (x.length !== y.length) return false;
   return x.every(function (w, i) { var n1 = (w.slice(1).match(/ا/g) || []).length, n2 = (y[i].slice(1).match(/ا/g) || []).length; return faKey(w) === faKey(y[i]) && Math.abs(n1 - n2) <= 1 && Math.min(w.length, y[i].length) >= 3; });
@@ -1528,7 +1613,8 @@ function mergeSameName(b, AUD) {
       if (at != null || by[k] == null || gone[by[k]]) return;
       var A0 = b.models[by[k]];
       if (k.charAt(0) === 'c' && !(A0.rk && phAlign(canonToks(A0.rk), canonToks(m.rk), 0, 0) && modelsFit(A0, m))) return;
-      if (k.charAt(0) === 'f' && !alefNear(A0.name, m.name)) return;      // «لیدی فاراشا» = «لیدی فراشا»، «پارفیوم» = «پرفیوم»؛ ولی «لایان» ≠ «لین»      // واژه‌به‌واژه هم جور باشد (Only The Brave ≠ … High)؛ و دست‌کم یک نسخه با جنسیت/غلظتِ سازگار و قیمتِ نه‌چندان دور (Acqua di Gio ≠ Gioia، Uomo ≠ Homme)
+      if (k.charAt(0) === 'f' && !alefNear(A0.name, m.name)) return;
+      if (k.charAt(0) !== 'c' && shareShopSize(A0, m) && !(k.charAt(0) === 'n' && A0.rk && A0.rk.length === m.rk.length)) return;      // یک سایت در یک اندازه هر دو را دارد = دو کالا؛ مگر همان نامِ نمایشی با همان تعداد واژه (سایت یک کالا را یک بار فارسی و یک بار لاتین گذاشته: «گارنت» / GARNET)      // یک سایت در یک اندازه هر دو را دارد: دو کالای جدا هستند (Montabaco Rio ≠ Ivoire)؛ مگر همان نام که سایت دو بار گذاشته («الحمبرا تورو» / «الحمبرا Toro»)      // «لیدی فاراشا» = «لیدی فراشا»، «پارفیوم» = «پرفیوم»؛ ولی «لایان» ≠ «لین»      // واژه‌به‌واژه هم جور باشد (Only The Brave ≠ … High)؛ و دست‌کم یک نسخه با جنسیت/غلظتِ سازگار و قیمتِ نه‌چندان دور (Acqua di Gio ≠ Gioia، Uomo ≠ Homme)
       at = by[k];
     });
     if (at == null) { ks.forEach(function (k) { if (by[k] == null) by[k] = i; }); return; }
@@ -1542,7 +1628,6 @@ function mergeSameName(b, AUD) {
     A.variants.sort(function (x, y) { return (GORD[x.gn] - GORD[y.gn]) || (CORD[x.conc] - CORD[y.conc]); });
     var gs2 = []; A.variants.forEach(function (v) { if (v.gn && gs2.indexOf(v.gn) < 0) gs2.push(v.gn); }); A.gset = gs2;
     if (!A.img && m.img) { A.img = m.img; A.big = m.big; A.imgId = m.imgId; }
-    if (!A.org && m.org) { A.name = m.name; A.L = m.L; A.z = m.z; A.org = true; }      // نامی که سایت به فارسی نوشته بر واج‌نویسیِ لاتین مقدم است
     AUD.nsame = (AUD.nsame | 0) + 1; AUD.nmod = (AUD.nmod || 0) + 1; if (AUD.models.length < 40) AUD.models.push(b.name + ': ' + m.name + ' ← ' + A.name);
     ks.forEach(function (k) { if (by[k] == null) by[k] = at; });
     gone[i] = 1;
@@ -1717,7 +1802,7 @@ function stripBrandEn(tk, ent) {
 }
 /* نام انگلیسیِ عطر (اگر سایت داده باشد) را به گروه اضافه می‌کند و جفتِ واژه‌ی فارسی/انگلیسی را یاد می‌گیرد */
 /* آیا واژه‌ی فارسیِ f با واژه‌ی لاتینِ e هم‌صداست؟ (برای یادگرفتنِ واژه‌نامه: ترجمه یا جابه‌جایی یاد گرفته نمی‌شود) */
-function wdNz(w) { return w.replace(/'/g, '').replace(/^x(?=[aeiouy])/, 'z').replace(/([aeiou])si(?=[aeou])/g, '$1ji').replace(/tch/g, 'ch').replace(/ch(?=[lr])/g, 'k').replace(/ch/g, 'sh').replace(/x/g, 'ks').replace(/c(?=[eiy])/g, 's').replace(/^y/, 'i').replace(/^kn/, 'n').replace(/^ps/, 's').replace(/zh/g, 'j'); }
+function wdNz(w) { return w.replace(/'/g, '').replace(/dj/g, 'j').replace(/^x(?=[aeiouy])/, 'z').replace(/([aeiou])si(?=[aeou])/g, '$1ji').replace(/tch/g, 'ch').replace(/ch(?=[lr])/g, 'k').replace(/ch/g, 'sh').replace(/x/g, 'ks').replace(/c(?=[eiy])/g, 's').replace(/^y/, 'i').replace(/^kn/, 'n').replace(/^ps/, 's').replace(/zh/g, 'j'); }
 function wdSk(w) { return skel(vNorm(w)).replace(/x/g, 's'); }
 function wdNear(t, l) {
   var a = wdSk(t), b = wdSk(l);
@@ -1727,7 +1812,7 @@ function wdNear(t, l) {
 }
 function wdSound(f, e) {
   var t = wdNz(String(translitFaWord(f) || '').toLowerCase()), l = wdNz(String(e).toLowerCase());
-  return wdNear(t, l) || (/^[ld][aeiou]/.test(l) && wdNear(t, l.slice(1))) || (/ks/.test(l) && wdNear(t, l.replace(/ks/g, 'gz'))) || (/gh/.test(t) && wdNear(t.replace(/gh/g, 'k'), l)) || (/[td]h/.test(l) && wdNear(t, l.replace(/th/g, 's').replace(/dh/g, 'z'))) || (/ill[aeiou]/.test(l) && wdNear(t, l.replace(/ill(?=[aeiou])/g, 'iy')));      // ill فرانسوی = «ی» (Sillage = سیاژ)      // ق = q، ث = th، ذ = dh      // L'Intense، D'Azur؛ x = گز (Exotic = اگزوتیک)
+  return wdNear(t, l) || (/ch/.test(e) && wdNear(t, wdNz(String(e).toLowerCase().replace(/ch/g, 'k')))) || (/^[ld][aeiou]/.test(l) && wdNear(t, l.slice(1))) || (/ks/.test(l) && wdNear(t, l.replace(/ks/g, 'gz'))) || (/gh/.test(t) && wdNear(t.replace(/gh/g, 'k'), l)) || (/[td]h/.test(l) && wdNear(t, l.replace(/th/g, 's').replace(/dh/g, 'z'))) || (/ill[aeiou]/.test(l) && wdNear(t, l.replace(/ill(?=[aeiou])/g, 'iy')));      // ill فرانسوی = «ی» (Sillage = سیاژ)      // ق = q، ث = th، ذ = dh      // L'Intense، D'Azur؛ x = گز (Exotic = اگزوتیک)
 }
 /* واژه‌نامه‌ی یادگرفته‌شده با قاعده‌ی قدیمی جفت‌های جابه‌جا هم دارد («برگ» = Fluid): آن‌ها پاک می‌شوند */
 function pruneLex(db) {

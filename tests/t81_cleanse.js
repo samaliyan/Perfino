@@ -127,8 +127,9 @@ var PT = buildH({
 });
 var PB = PT.filter(function (b) { return /پلیس/.test(b.name); });
 chk(PB.length === 1, 'one Police brand whatever the shop calls it', JSON.stringify(PT.map(function (b) { return b.name; })));
-chk(PB.length && PB[0].models.length === 2 && PB[0].models.every(function (m) { return !/پلیس|police/i.test(m.name) && m.variants.some(function (v) { return v.sizes.some(function (z) { return z.srcs.length >= 2; }); }); }), 'Police: two perfumes, «پلیس» not in their names, shops merged', JSON.stringify(PB.length && PB[0].models.map(function (m) { return m.name; })));
-chk(!PT.some(function (b) { return b.models.some(function (m) { return m.name === 'پلیس'; }); }), 'brand-only title «اورجینال پلیس» does not become a perfume row');
+var PM = PB.length ? PB[0].models.filter(function (m) { return m.name !== 'پلیس'; }) : [];
+chk(PM.length === 2 && PM.every(function (m) { return !/پلیس|police/i.test(m.name) && m.variants.some(function (v) { return v.sizes.some(function (z) { return z.srcs.length >= 2; }); }); }), 'Police: two perfumes, «پلیس» not in their names, shops merged', JSON.stringify(PB.length && PB[0].models.map(function (m) { return m.name; })));
+chk(PB.length && PB[0].models.some(function (m) { return m.name === 'پلیس'; }), 'brand-only title «اورجینال پلیس» (Police Original) is kept under Police, not deleted');
 // ۱۵) همان قاعده برای برندهای دیگر: نامِ کوتاهِ فارسیِ برند (فره = Gianfranco Ferre)، علامتِ برند («سی کی» = CK)، برندی که در فهرست نیست ولی سایت گفته (Baldessarini)
 var GT = buildH({
   liliome: [['عطر ادکلن فره آبی-آکوا آزورا | Gianfranco Ferre Acqua Azzurra 100 میل مردانه ادوتویلت', 3e6], ['عطر ادکلن سی کی آبسشن مردانه | CK Obsession EDT 100 میل', 3e6], ['عطر ادکلن بالدسارینی آمبر | Baldessarini Ambre 90 میل مردانه ادوتویلت', 4e6, ['Baldessarini']]],
@@ -138,4 +139,20 @@ var names = []; GT.forEach(function (b) { b.models.forEach(function (m) { names.
 chk(names.some(function (n) { return /^جیانفرانکو فره :: [^فgG]*آزورا$/.test(n); }), 'Ferre short Persian name → brand Gianfranco Ferre, name without brand or Latin repeat', JSON.stringify(names));
 chk(names.some(function (n) { return /^کالوین کلین :: آبسشن$/.test(n); }), '«سی کی آبسشن | CK Obsession» → Calvin Klein :: Obsession', JSON.stringify(names));
 chk(names.filter(function (n) { return /بالدسارینی/.test(n); }).length === 1 && names.some(function (n) { return /^بالدسارینی :: (آمبر|امبر)$/.test(n); }), 'brand from shop category (Baldessarini): name without brand, two shops one row', JSON.stringify(names));
+// ۱۶) یافته‌های بازبینیِ ۱.۵۰: هیچ عطری حذف نشود، دو عطرِ جدا یکی نشوند، واژه‌ی نامِ عطر برند حساب نشود
+var RV = buildH({
+  liliome: [['عطر ادکلن ژولیت هز ا گان اود تو دالنس | Juliette Has A Gun Ode To Dullness 100 میل یونیسکس ادوپرفیوم', 5e6], ['عطر ادکلن اورماندو جین مونتاباکو ریو | Ormonde Jayne Montabaco Rio 120 میل یونیسکس ادوپرفیوم', 9e6],
+    ['عطر ادکلن اورماندو جین مونتاباکو ایوویر | Ormonde Jayne Montabaco Ivoire 120 میل یونیسکس ادوپرفیوم', 9.1e6], ['عطر ادکلن سی کی من | CK Man 100 میل مردانه ادوتویلت', 2e6], ['عطر ادکلن جگوار مردانه-سبز | Jaguar for Men 100 میل ادوتویلت', 2e6],
+    ['عطر ادکلن کوچ زنانه | Coach for women 90 میل ادوپرفیوم', 4e6], ['عطر ادکلن پارادوکس | Prada Paradoxe 90 میل زنانه ادوپرفیوم', 8e6], ['عطر ادکلن مونته کارلو | Montale Monte Carlo 100 میل یونیسکس ادوپرفیوم', 5e6],
+    ['عطر ادکلن دریمز سانست | Coach Sunset 90 میل زنانه ادوپرفیوم', 4e6], ['عطر ادکلن مکس مارا گلد تاچ | Max Mara Gold Touch 100 میل زنانه ادوپرفیوم', 3e6], ['عطر ادکلن فرانک الیور بلک تاچ | Franck Olivier Black Touch 100 میل مردانه ادوتویلت', 1e6]],
+  hiland: [['ادوتویلت مردانه برات 100 میل', 1e6], ['ادوپرفیوم زنانه کوچ 90 میل', 4.1e6]]
+});
+var rvn = []; RV.forEach(function (b) { b.models.forEach(function (m) { rvn.push(b.name + ' :: ' + m.name); }); });
+var rvAll = 0; RV.forEach(function (b) { b.models.forEach(function (m) { m.variants.forEach(function (v) { v.sizes.forEach(function (z) { rvAll += z.srcs.length; }); }); }); });
+chk(rvAll === 13, 'no listing disappears (13 listings in, 13 out)', rvAll + ' ' + JSON.stringify(rvn));
+chk(rvn.some(function (n) { return /^ژولیت هو ا گان :: /.test(n) && /دالنس/.test(n); }), 'Juliette Has A Gun keeps its brand', JSON.stringify(rvn));
+chk(rvn.filter(function (n) { return /ریو|ایوویر/.test(n); }).length === 2, 'Montabaco Rio ≠ Montabaco Ivoire', JSON.stringify(rvn));
+chk(rvn.some(function (n) { return /پارادوکس/.test(n); }) && rvn.some(function (n) { return /مونته کارلو/.test(n); }) && rvn.some(function (n) { return /دریمز سانست/.test(n); }), 'Paradoxe / Monte Carlo / Dreams Sunset keep their names (not taken as brand)', JSON.stringify(rvn));
+chk(!rvn.some(function (n) { return /^مکس :: /.test(n); }), 'Max Mara is not Mexx', JSON.stringify(rvn));
+chk(rvn.some(function (n) { return /بلک تاچ/.test(n); }), 'a real repeated-looking word stays («بلک تاچ»)', JSON.stringify(rvn));
 console.log(ok + ' pass ' + bad + ' fail'); process.exit(bad ? 1 : 0);
