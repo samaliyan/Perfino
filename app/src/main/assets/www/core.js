@@ -181,7 +181,9 @@ function isCloneTitle(t) {
   var after = tk.slice(i + 1).filter(function (w) { return w && !STOP[w] && !CLONE_GEN[w] && !/^\d+(?:ml|cc|میل)?$/.test(w); }).map(nk);      // اندازه، غلظت و واژه‌های تبلیغاتی از آنچه بعد از «مدل» آمده کنار می‌رود
   if (!before.length || !after.length) return false;
   if (/^(pour (un )?(homme|femme|hom)|the one|homme|femme|پور (اون )?(هوم|فم))$/.test(after.join(' '))) return false;      // «Model Pour Homme» نامِ عمومی است، نه عطرِ یک برند
-  return brandOf(after, []).id !== 'other' && brandOf(before, [], true).id === 'other';
+  var ba = brandOf(after, []); if (ba.id === 'other') return false;
+  var bb = brandOf(before, [], true), fz = bb.id === 'other' ? fzFind(before, 2) : null; if (fz && fz.b.id === ba.id) return false;      // سازنده همان برند است با املای دیگر («هوگو باس مدل Boss Bottled»)
+  return bb.id === 'other';
 }
 /* توضیحِ تبلیغاتی داخل عنوان نامِ عطر نیست: «با رایحه‌ی خنک»، «با ساختار ترش»، «مناسب فصل بهار» ... تا اندازه/غلظت یا آخر عنوان */
 var DESC_END = '(?= \\d| ادو| دوپرفیوم| دوتویلت| ادکلن| ادوپرفیوم| edp| edt| parfum| eau|$)';
@@ -314,7 +316,7 @@ function parseTitle(raw) {
   shown = dedupeWords(shown, brandWords(shown)); if (!shown.length) return null;      // پاک‌سازی: «آکوا اکوا»، نامِ فارسی + همان نامِ لاتینِ واج‌نویسی‌شده، «د»ِ آویزانِ آخر      // «2004 ... 2004» (سالِ تکراری در بخشِ فارسی و انگلیسیِ عنوان)
   var lw = shown[shown.length - 1], pgn = '';
   if (shown.length > 2 && (lw === 'من' || lw === 'وومن' || lw === 'ومن')) {      // «... فور من» / «... من» آخرِ عنوان = جنسیت؛ مگر اینکه نامِ خودِ عطر باشد (سی کی من = CK Man)
-    var cut = shown[shown.length - 2] === 'فور' ? 2 : 1, tmpF = shown.slice(0, -cut), teF = brandOf(tmpF, []);
+    var cut = shown[shown.length - 2] === 'فور' ? 2 : 1, tmpF = shown.slice(0, -cut).map(function (w) { return w.replace(/آ/g, 'ا').replace(/ؤ/g, 'و').replace(/ئ/g, 'ی'); }), teF = brandOf(tmpF, []);      // نرمال‌شده، مثلِ کلید («آزارو» = «ازارو»)
     if (teF.id === 'other' || stripBrand(tmpF, teF).length || EPON[teF.name]) { pgn = lw === 'من' ? 'm' : 'w'; shown = tmpF; lw = shown[shown.length - 1]; }
   }
   if (shown.length > 2 && (lw === 'man' || lw === 'woman' || lw === 'مرد' || lw === 'زن')) {      // «Man/Woman» آخرِ عنوان = جنسیت؛ مگر اینکه نامِ خودِ عطر باشد (Jimmy Choo Man)
@@ -1478,14 +1480,14 @@ function tree(groups, lang, lex) {
     var ent = ENT[gi];
     var rest = ent.id === 'other' ? g.key.slice() : stripBrand(g.key, ent);
     /* پایش ۲: عطری که بعد از برداشتنِ نامِ برند چیزی از نامش نمی‌ماند، نام ندارد؛ نشان داده نمی‌شود */
-    var epo = false; if ((!rest.length || !rest.join('').length) && (EPON[ent.name] || ent.weak || ent.id.charAt(0) === 'h')) { rest = g.key.slice(); epo = true; }     // عطری که اسمش همان نام برند است (Chloé، Jimmy Choo، Nina Ricci…، Coach، Repetto): حذف نمی‌شود
+    var epo = false; if ((!rest.length || !rest.join('').length) && (EPON[ent.name] || ent.weak || ent.id.charAt(0) === 'h')) { rest = g.key.slice(); epo = true; }      // عطری که اسمش همان نامِ برند است (Chloé، Coach، Repetto…) می‌ماند؛ «Dior EDP» بی‌نام (کدام دیور؟) نشان داده نمی‌شود     // عطری که اسمش همان نام برند است (Chloé، Jimmy Choo، Nina Ricci…، Coach، Repetto): حذف نمی‌شود
     if (!rest.length || !rest.join('').length) { if (AUD.bare.length < 40) AUD.bare.push(g.name); AUD.nb = (AUD.nb || 0) + 1; return; }
     var mk = rest.join(' ');
     var bnm = BN[ent.id] || (BN[ent.id] = brandName(ent, EN, lex));
     var b = B[ent.id] = B[ent.id] || { id: ent.id, name: bnm, en: ent.id === 'other' ? '' : brandName(ent, true, lex), models: [], mm: {} };
     var m = b.mm[mk];
     if (!m) {
-      m = b.mm[mk] = { id: ent.id + '.' + hash(mk), name: '', variants: [], cnt: {}, brand: b.name, rk: rest };
+      m = b.mm[mk] = { id: ent.id + '.' + hash(mk), name: '', variants: [], cnt: {}, brand: b.name, rk: rest, epo: epo };
       b.models.push(m);
     }
     m.variants.push(g);
@@ -1503,6 +1505,8 @@ function tree(groups, lang, lex) {
     AUD.brands.push(b.name + ' ← ' + t.name);
   });
   brands = keepB;
+  rescueOrphans(brands, ENT);
+  brands = brands.filter(function (b) { return b.models.length; });      // «سایر برندها» شاید خالی شده باشد
   brands.forEach(function (b) {
     delete b.mm;
     mergeModels(b, AUD);
@@ -1595,6 +1599,41 @@ function modelsFit(A, B) {      // دو مدلِ هم‌نامِ متعارف (�
       var py = y.sizes.filter(function (z) { return z.price > 0; });
       return !py.length || py.some(function (z) { return priceSane(px, z.ml, z.price); });
     });
+  });
+}
+/* عطری که زیرِ «سایر برندها» مانده چون سایتش نامِ برند را با املایی نوشته که در فهرست نیست («کلوهه»، «دیسکوارد وود»، «میکس من»):
+   اگر اولِ نامش با نامِ لاتینِ برندی که در همین فهرست هست هم‌صداست و بقیه‌ی نامش دقیقاً همان عطرِ موجودِ آن برند است، به همان می‌پیوندد.
+   (فقط به عطرِ موجود؛ پس «مونته کارلو» بی‌لاتین زیرِ Montale نمی‌رود مگر خودِ «مونته کارلو» آنجا باشد) */
+function rescueOrphans(brands, ENT) {
+  var other = null; brands.forEach(function (b) { if (b.id === 'other') other = b; });
+  if (!other) return;
+  var byId = {}; ENT.forEach(function (e) { byId[e.id] = e; });
+  var C = [];
+  brands.forEach(function (b) {
+    var e = byId[b.id]; if (b.id === 'other' || !e) return;
+    var lead = {}; (e.al || []).concat(e.en ? [brandNorm(e.en)] : []).forEach(function (a) { if (a.length && !a.some(function (w) { return HAS_FA.test(w); })) a.forEach(function (w) { var k = wdSk(wdNz(w)).charAt(0); if (k) lead[k] = 1; }); });
+    var ck = {}, epo = null; Object.keys(b.mm).forEach(function (k) { var m = b.mm[k]; if (m.epo) epo = m; else ck[canonKey(m.rk)] = m; });
+    C.push({ b: b, e: e, lead: lead, ck: ck, epo: epo });
+  });
+  Object.keys(other.mm).forEach(function (k) {
+    var m = other.mm[k], f = m.rk[0]; if (!f || !HAS_FA.test(f)) return;
+    var fk = wdSk(wdNz(String(translitFaWord(f) || '').toLowerCase())).charAt(0);
+    for (var i = 0; i < C.length; i++) {
+      var c = C[i]; if (!c.lead[fk]) continue;
+      var n = soundLead(m.rk, c.e) || acroLead(m.rk, c.e); if (!n) continue;
+      var rest = m.rk.slice(n).filter(function (w) { return !(w.length === 1 && HAS_FA.test(w)); }), t = null;
+      if (!rest.length) t = c.epo;
+      else { t = c.ck[canonKey(rest)]; if (t && !phAlign(canonToks(rest), canonToks(t.rk), 0, 0)) t = null; }
+      if (!t || shareShopSize(t, m)) continue;
+      m.variants.forEach(function (v) {
+        var ti = -1; t.variants.forEach(function (x, q) { if (x.gn === v.gn && x.conc === v.conc) ti = q; });
+        if (ti < 0) { t.variants.push(v); return; }
+        var tv = t.variants[ti] = Object.assign({}, t.variants[ti], { sizes: t.variants[ti].sizes.slice() });
+        mergeVariant(tv, v);
+      });      // نامِ نمایشی همان نامِ عطرِ برند می‌ماند
+      delete other.mm[k]; other.models.splice(other.models.indexOf(m), 1);
+      break;
+    }
   });
 }
 function shareShopSize(A, B) {

@@ -155,4 +155,16 @@ chk(rvn.filter(function (n) { return /ریو|ایوویر/.test(n); }).length ==
 chk(rvn.some(function (n) { return /پارادوکس/.test(n); }) && rvn.some(function (n) { return /مونته کارلو/.test(n); }) && rvn.some(function (n) { return /دریمز سانست/.test(n); }), 'Paradoxe / Monte Carlo / Dreams Sunset keep their names (not taken as brand)', JSON.stringify(rvn));
 chk(!rvn.some(function (n) { return /^مکس :: /.test(n); }), 'Max Mara is not Mexx', JSON.stringify(rvn));
 chk(rvn.some(function (n) { return /بلک تاچ/.test(n); }), 'a real repeated-looking word stays («بلک تاچ»)', JSON.stringify(rvn));
+// ۱۷) بازبینیِ دومِ ۱.۵۰: املای فارسیِ برند که در فهرست نیست («کلوهه»، «دیسکوارد»، «مکس») از سایتِ دیگر هم به همان ردیف می‌آید
+var RB = buildH({
+  liliome: [['عطر ادکلن کلوهه ادو پرفیوم | Chloe Eau de Parfum 75 میل زنانه', 5e6], ['عطر ادکلن دسکوارد اورجینال وود | DSQUARED² Original Wood 100 میل مردانه ادوتویلت', 3e6], ['عطر ادکلن مکس من | Mexx Man 50 میل مردانه ادوتویلت', 1e6]],
+  hiland: [['ادوپرفیوم زنانه کلوهه 75 میل', 5.1e6], ['ادوتویلت مردانه مکس من 50 میل', 1.1e6], ['ادوتویلت مردانه آزارو فور من 100 میل', 2e6]],
+  digikala: [['ادو تویلت مردانه دیسکوارد مدل Wood حجم 100 میلی لیتر', 3.1e6], ['ادو تویلت مردانه مکس مدل Man حجم 50 میلی لیتر', 1.05e6], ['ادو تویلت مردانه هوگو باس مدل Boss Bottled Night حجم 100 میلی لیتر', 4e6]]
+});
+var rbn = []; RB.forEach(function (b) { b.models.forEach(function (m) { var s = {}; m.variants.forEach(function (v) { v.sizes.forEach(function (z) { z.srcs.forEach(function (x) { s[x.s] = 1; }); }); }); rbn.push(b.name + ' :: ' + m.name + ' [' + Object.keys(s).sort().join('+') + ']'); }); });
+chk(rbn.indexOf('کلوئه :: کلوئه [hiland+liliome]') >= 0, 'Chloé from liliome (with Latin) and hiland («کلوهه») is one row', JSON.stringify(rbn));
+chk(rbn.indexOf('دی اسکوئرد :: وود [digikala+liliome]') >= 0, 'DSQUARED Wood from liliome and digikala («دیسکوارد») is one row', JSON.stringify(rbn));
+chk(rbn.indexOf('مکس :: من [digikala+hiland+liliome]') >= 0, 'Mexx Man from three shops is one row', JSON.stringify(rbn));
+chk(rbn.some(function (n) { return /^آزارو :: /.test(n); }), '«آزارو فور من» is not dropped', JSON.stringify(rbn));
+chk(rbn.some(function (n) { return /^هوگو بوس :: /.test(n) && /باتلد|بتلد|بوتلد/.test(n); }), 'Hugo Boss «مدل Boss Bottled» is not taken as a copy of another brand', JSON.stringify(rbn));
 console.log(ok + ' pass ' + bad + ' fail'); process.exit(bad ? 1 : 0);
