@@ -113,4 +113,29 @@ one(Z, /باکارات/, 'hiland+liliome', '«کورکجان کرکجان» (bra
 chk(!/^(دو|پغفم|پرفیوم)/.test(C.parseTitle('اکستریت دو پغفم تیزیانا ترنزی دراکو 100 میل').name || '') && !/^دو/.test(C.parseTitle('دو پرفیوم ژیل کانتوئل وانیلا 100 میل').name || ''), '«دو پرفیوم» / «دو پغفم» is concentration, not name', [C.parseTitle('اکستریت دو پغفم تیزیانا ترنزی دراکو 100 میل').name, C.parseTitle('دو پرفیوم ژیل کانتوئل وانیلا 100 میل').name]);
 var F = build({ hiland: [['ادوتویلت مردانه سالواتور فراگامو اف بای فرگامو پورهوم 100 میل', 4e6]] });
 chk(find(F, /بای/).length === 1 && /فرگامو/.test(find(F, /بای/)[0].n.split(' :: ')[1]), '«F by Ferragamo» keeps «فرگامو» inside the name', JSON.stringify(F));
+// ۱۴) شکایتِ کاربر: دو برندِ «پلیس» و «پلیس» در نامِ همه‌ی عطرها (برندِ دسته‌بندیِ سایت با املاهای مختلف، نامِ فارسیِ برند که واژه‌ی رایج است، نیمه‌ی لاتینِ تکراری)
+function buildH(S) {
+  var db = C.newDb(), ix = C.dbIndex(db);
+  Object.keys(S).forEach(function (src) { C.ingest(db, ix, src, S[src].map(function (a, i) { return { id: i + 1, t: a[0], price: a[1], b: a[2] || [] }; }), true); });
+  C.reconcile(db, ix);
+  return C.tree(C.buildList(db, Object.keys(S), {}, 0), 'fa', db.wd);
+}
+var PT = buildH({
+  liliome: [['عطر ادکلن پلیس تو بی بد گای | Police To Be Bad Guy 125 میل مردانه ادوتویلت', 2e6, ['پلیس']], ['عطر ادکلن پلیس آیکون گلد-طلایی | Police Icon Gold 125 میل مردانه ادوپرفیوم', 3e6, ['پلیس Police']]],
+  digikala: [['ادو تویلت مردانه پلیس مدل To Be Bad Guy حجم 125 میلی لیتر', 2.2e6, ['پلیس']], ['ادو پرفیوم مردانه پلیس مدل Icon Gold حجم 125 میلی لیتر', 3.1e6, ['Police']]],
+  hiland: [['ادوتویلت مردانه پلیس توبی بد گای 125 میل', 2.1e6]], safir: [['ادو توالت مردانه اورجینال پلیس 100 میلی لیتر', 1.5e6]]
+});
+var PB = PT.filter(function (b) { return /پلیس/.test(b.name); });
+chk(PB.length === 1, 'one Police brand whatever the shop calls it', JSON.stringify(PT.map(function (b) { return b.name; })));
+chk(PB.length && PB[0].models.length === 2 && PB[0].models.every(function (m) { return !/پلیس|police/i.test(m.name) && m.variants.some(function (v) { return v.sizes.some(function (z) { return z.srcs.length >= 2; }); }); }), 'Police: two perfumes, «پلیس» not in their names, shops merged', JSON.stringify(PB.length && PB[0].models.map(function (m) { return m.name; })));
+chk(!PT.some(function (b) { return b.models.some(function (m) { return m.name === 'پلیس'; }); }), 'brand-only title «اورجینال پلیس» does not become a perfume row');
+// ۱۵) همان قاعده برای برندهای دیگر: نامِ کوتاهِ فارسیِ برند (فره = Gianfranco Ferre)، علامتِ برند («سی کی» = CK)، برندی که در فهرست نیست ولی سایت گفته (Baldessarini)
+var GT = buildH({
+  liliome: [['عطر ادکلن فره آبی-آکوا آزورا | Gianfranco Ferre Acqua Azzurra 100 میل مردانه ادوتویلت', 3e6], ['عطر ادکلن سی کی آبسشن مردانه | CK Obsession EDT 100 میل', 3e6], ['عطر ادکلن بالدسارینی آمبر | Baldessarini Ambre 90 میل مردانه ادوتویلت', 4e6, ['Baldessarini']]],
+  digikala: [['ادو تویلت مردانه بالدسارینی مدل Ambre حجم 90 میلی لیتر', 4.2e6, ['Baldessarini']]]
+});
+var names = []; GT.forEach(function (b) { b.models.forEach(function (m) { names.push(b.name + ' :: ' + m.name); }); });
+chk(names.some(function (n) { return /^جیانفرانکو فره :: [^فgG]*آزورا$/.test(n); }), 'Ferre short Persian name → brand Gianfranco Ferre, name without brand or Latin repeat', JSON.stringify(names));
+chk(names.some(function (n) { return /^کالوین کلین :: آبسشن$/.test(n); }), '«سی کی آبسشن | CK Obsession» → Calvin Klein :: Obsession', JSON.stringify(names));
+chk(names.filter(function (n) { return /بالدسارینی/.test(n); }).length === 1 && names.some(function (n) { return /^بالدسارینی :: (آمبر|امبر)$/.test(n); }), 'brand from shop category (Baldessarini): name without brand, two shops one row', JSON.stringify(names));
 console.log(ok + ' pass ' + bad + ' fail'); process.exit(bad ? 1 : 0);

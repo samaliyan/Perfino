@@ -1,7 +1,7 @@
 (function () {
 'use strict';
 var RM = !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
-var VERSION = '1.49';
+var VERSION = '1.50';
 var myCode = (function () { var m = /\/b(\d{1,10})\/index\.html$/.exec(String(location.pathname || '')); return m ? m[1] : '0'; })();      // نسخه‌ی این صفحه از روی آدرسش؛ در گزارش‌ها به جاوا فرستاده می‌شود تا صفحه‌ی کهنه نتواند نسخه‌ی تازه را «سالم» اعلام کند
 function otaCall(n) { try { if (window.Native && typeof window.Native[n] === 'function') window.Native[n](myCode); } catch (e) { } }
 otaCall('otaBoot');      // «جاوااسکریپتِ این صفحه شروع شد»: برنامه به صفحه‌ی بی‌نصب مهلتِ بیشتری برای ساختن فهرست می‌دهد
@@ -1477,6 +1477,9 @@ function renderReport() {
   if (rc.lexfix) P.push('ترجمه‌ی غلطِ یادگرفته‌شده که پاک شد: ' + B(rc.lexfix));
   if (au.nb) P.push('عطرِ بی‌نام که حذف شد: ' + B(au.nb));
   if (RUN && RUN.clean && RUN.clean.healed) P.push('عنوانِ بدون نامِ عطر که نامش از نشانیِ صفحه پیدا شد: ' + B(RUN.clean.healed));
+  var LQ = au.q || {}, lq = [['dupBrand', 'دو برند با یک نام'], ['brandInName', 'نامِ برند داخلِ نامِ عطر'], ['repeated', 'واژه‌ی تکراری در نامِ عطر'], ['dupModel', 'دو عطر با یک نام در یک برند'], ['latin', 'حروفِ لاتین در نامِ عطر']], lqN = 0;
+  lq.forEach(function (x) { lqN += (LQ[x[0]] && LQ[x[0]].n) | 0; });
+  if (au.q) P.push(lqN ? 'بازرسیِ خودکارِ فهرستِ نهایی: ' + B(lqN) + ' موردِ باقی‌مانده — ' + lq.filter(function (x) { return LQ[x[0]] && LQ[x[0]].n; }).map(function (x) { return x[1] + ' ' + fa(LQ[x[0]].n); }).join('، ') + '. نمونه‌ها را در «نمونه‌ها» ببینید.' : 'بازرسیِ خودکارِ فهرستِ نهایی: برندِ تکراری، نامِ برند در نامِ عطر، واژه‌ی تکراری، نامِ تکراری و حروفِ لاتین — هیچ موردی نماند.');
   if (P.length === 1) P.push('مورد تکراری یا ایرادداری پیدا نشد.');
   P.push('<button class="aud-t" type="button">نمونه‌ها</button>');
   if (audOpen) {
@@ -1485,6 +1488,7 @@ function renderReport() {
     ((RUN && RUN.clean && RUN.clean.nlS) || []).slice(0, 8).forEach(function (x) { ex.push('عنوانِ بی‌نامِ عطر: ' + x); });
     ((RUN && RUN.clean && RUN.clean.unkS) || []).slice(0, 10).forEach(function (x) { ex.push('برند ناشناخته: ' + x); });
     (au.sus || []).slice(0, 8).forEach(function (x) { ex.push('مشکوک: ' + x); });
+    lq.forEach(function (x) { ((LQ[x[0]] || {}).ex || []).slice(0, 5).forEach(function (y) { ex.push(x[1] + ': ' + y); }); });
     (au.junk || []).slice(0, 5).forEach(function (x) { ex.push('بی‌معنی: ' + x); });
     au.bare.slice(0, 6).forEach(function (x) { ex.push('حذف (بی‌نام): ' + x); });
     au.brands.slice(0, 6).forEach(function (x) { ex.push('برند: ' + x); });
