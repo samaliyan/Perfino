@@ -11,7 +11,7 @@ for (var i = 1; i <= 9000; i++) {
   var rial = i <= 3000 ? 300000 + i * 1000 : 6000000 + (i - 3000) * 90000 + (i % 7 === 0 ? 0 : Math.floor(rnd() * 50000));
   ALL.push({ id: i, pop: rnd(), title_fa: 'ادو پرفیوم مردانه برند' + i + ' مدل تست' + i + ' حجم 100 میلی لیتر', status: 'marketable', default_variant: { status: 'marketable', price: { selling_price: rial } }, images: {}, data_layer: {} });
 }
-ALL[5554].title_fa = 'ادو تویلت زنانه رولون مدل Charlie Blue حجم 100 میلی لیتر'; ALL[5554].pop = 0; ALL[5554].data_layer = { brand: 'رولون' };
+ALL[5554].title_fa = 'ادو پرفیوم زنانه آوند مدل رولون چارلی با رایحه معتدل حجم 50 میلی لیتر'; ALL[5554].pop = 0; ALL[5554].data_layer = { brand: 'متفرقه' };      // عنوانِ واقعیِ دیجی‌کالا (dkp-22804796)
 function server(o) {
   var n = { req: 0, urls: [] };
   return { n: n, get: async function (u) {
@@ -32,14 +32,15 @@ function server(o) {
   var ids = {}, dup = 0; r1.items.forEach(function (x) { if (ids[x.id]) dup++; ids[x.id] = 1; });
   var above = ALL.filter(function (x) { return x.default_variant.price.selling_price >= 2500000; }), miss = above.filter(function (x) { return !ids[x.id]; }).length;
   chk(miss === 0, 'every product above the floor is read (missing ' + miss + ' of ' + above.length + ')');
-  chk(!!ids[5555], 'the mid-priced, unpopular «رولون Charlie Blue» is read');
+  chk(!!ids[5555], 'the mid-priced, unpopular «آوند مدل رولون چارلی» is read');
   chk(dup === 0, 'no duplicates: ' + dup);
   chk(r1.complete === false && /بازه‌های قیمت/.test(r1.note) && /^ناقص: دیجی‌کالا فقط ۱۰۰ صفحه/.test(r1.note) && !/نرسید/.test(r1.note), 'note: ' + r1.note);
   chk(s1.n.req <= Math.ceil(above.length / 20) + 12, 'about one request per 20 products, no separate default pass: ' + s1.n.req + ' for ' + above.length);
   chk(!s1.n.urls.some(function (u) { return /sort=21/.test(u); }), 'old extra sort passes are not needed when the walk works');
   chk(ps.every(function (p, i) { return p >= 0 && p <= 1 && (i === 0 || p >= ps[i - 1] - 1e-9); }), 'progress in 0..1 and forward');
   var rev = r1.items.filter(function (x) { return x.id === 5555; })[0];
-  chk(rev && C.brandOf(C.parseTitle(rev.t).key, rev.b).name === 'رولون', 'Revlon is a known brand');
+  var pv = rev && C.parseTitle(rev.t);
+  chk(pv && pv.ml === 50 && pv.gn === 'w' && pv.key.join(' ') === 'اوند رولون چارلی' && rev.b.length === 0, 'the real title «آوند مدل رولون چارلی» is kept (۱.۵۲ آن را با افزودنِ «رولون» به فرهنگِ برندها تقلیدی حساب می‌کرد) and «متفرقه» is not a brand hint: ' + JSON.stringify([pv, rev && rev.b]));
   // سایت فیلترِ قیمت را نادیده می‌گیرد ← سنجش رد می‌کند و روشِ قبلی (ترتیب‌های دیگر) اجرا می‌شود
   var s2 = server({ ignore: true }), r2 = await C.digikalaSource(s2, function () {}, 'full');
   chk(/ترتیب‌های دیگر/.test(r2.note) && s2.n.urls.some(function (u) { return /sort=21/.test(u); }) && s2.n.urls.filter(function (u) { return /price%5Bmin/.test(u); }).length === 1, 'ignored filter: one probe, then fallback to sort passes: ' + r2.note);
