@@ -21,7 +21,8 @@ function hint(t, mode) {
   var T = C.tree(C.buildList(db, Object.keys(by), {}, 0), 'fa', db.wd), Q = T.audit.q;
   console.log(mode, 'brands', T.length, JSON.stringify(Object.keys(Q).map(function (k) { return k + ':' + Q[k].n; })));
   chk(Q.dupBrand.n === 0, mode + ': no two brands with the same name', JSON.stringify(Q.dupBrand.ex));
-  chk(Q.brandInName.n <= 2, mode + ': brand name is not inside perfume names', JSON.stringify(Q.brandInName.ex));
+  chk(Q.brandInName.n <= 4,      // با ۶۰ برندِ تازه‌ی فرهنگ (۱.۵۱) دو موردِ شناخته‌شده اضافه شد: «مارک آنتونی بی ۶۸۳» و «مارک جوسف مج من»
+   mode + ': brand name is not inside perfume names', JSON.stringify(Q.brandInName.ex));
   chk(Q.repeated.n <= 1, mode + ': no repeated word in a perfume name', JSON.stringify(Q.repeated.ex));
   chk(Q.latin.n === 0, mode + ': no Latin letters in Persian names', JSON.stringify(Q.latin.ex));
   chk(Q.dupModel.n <= 3, mode + ': almost no two rows with the same name in one brand', JSON.stringify(Q.dupModel.ex));

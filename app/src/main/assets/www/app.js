@@ -1,7 +1,7 @@
 (function () {
 'use strict';
 var RM = !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
-var VERSION = '1.50';
+var VERSION = '1.51';
 var myCode = (function () { var m = /\/b(\d{1,10})\/index\.html$/.exec(String(location.pathname || '')); return m ? m[1] : '0'; })();      // نسخه‌ی این صفحه از روی آدرسش؛ در گزارش‌ها به جاوا فرستاده می‌شود تا صفحه‌ی کهنه نتواند نسخه‌ی تازه را «سالم» اعلام کند
 function otaCall(n) { try { if (window.Native && typeof window.Native[n] === 'function') window.Native[n](myCode); } catch (e) { } }
 otaCall('otaBoot');      // «جاوااسکریپتِ این صفحه شروع شد»: برنامه به صفحه‌ی بی‌نصب مهلتِ بیشتری برای ساختن فهرست می‌دهد
@@ -621,8 +621,9 @@ function overlay() {
         + '<div id="gr1"><span>فهرست عطرها و قیمت‌ها</span><span id="gv1"></span></div><div id="gr2"><span>عکس‌ها</span><span id="gv2"></span></div></div><div id="gbt"></div></div>';
     }
     $('gsp').style.display = phase === 'fail' ? 'none' : '';
-    $('gtt').textContent = phase === 'fail' ? 'اطلاعاتی دریافت نشد' : 'در حال آماده‌سازی برنامه';
-    $('gts').textContent = phase === 'fail' ? 'هیچ سایتی جواب نداد. اینترنت را بررسی کنید؛ برنامه خودش دوباره تلاش می‌کند.' : 'بار اول چند دقیقه طول می‌کشد. لطفاً صبر کنید و برنامه را نبندید.';
+    var part = phase === 'fail' && sd > 0 && list.length > 0;      // بعضی سایت‌ها جواب دادند: «هیچ سایتی جواب نداد» دروغ است
+    $('gtt').textContent = part ? 'بعضی سایت‌ها جواب ندادند' : phase === 'fail' ? 'اطلاعاتی دریافت نشد' : 'در حال آماده‌سازی برنامه';
+    $('gts').textContent = part ? fa(sd) + ' سایت از ' + fa(N) + ' سایت جواب داد. برنامه یک بار دیگر امتحان می‌کند و بعد با همین اطلاعات باز می‌شود.' : phase === 'fail' ? 'هیچ سایتی جواب نداد. اینترنت را بررسی کنید؛ برنامه خودش دوباره تلاش می‌کند.' : 'بار اول چند دقیقه طول می‌کشد. لطفاً صبر کنید و برنامه را نبندید.';
     $('gpb').style.width = Math.round(all * 100) + '%';
     $('gr1').className = phase !== 'src' && sd > 0 ? 'ok' : '';
     $('gv1').innerHTML = '<bdi>' + fa(sd) + '</bdi> از <bdi>' + fa(N) + '</bdi> سایت' + (phase === 'src' && total() ? ' — <bdi>' + fa(total()) + '</bdi> محصول' : '');

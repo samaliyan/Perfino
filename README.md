@@ -49,7 +49,7 @@ False alarms are suppressed on purpose: an item is "gone" only after it is missi
 Online-shop titles are messy. A multi-stage pipeline keeps the list clean:
 - **Name vetting** rejects titles that contain phone numbers, prices, contact text (Instagram, WhatsApp …) or known clone-maker names.
 - **Persian ⇄ Latin merging** — "ورساچه اروس" and "Versace Eros" end up as one perfume.
-- **Brand recognition** for 180+ brands plus a *product line → brand* table (so "Pour Un Homme" lands under Caron, not under "Other brands").
+- **Brand recognition** for 240+ brands plus a *product line → brand* table (so "Pour Un Homme" lands under Caron, not under "Other brands").
 - **Concentration and gender** (EDP / EDT / Parfum, men / women / unisex) are detected and kept as variants.
 - **Your own control**: *blocked words* (anything containing them never enters the list and is removed immediately) and *hide this perfume* for single bad entries.
 
@@ -273,6 +273,7 @@ node tests/t79_dk_sorts.js # دیجی‌کالا: فیلترِ «موجود» و
 python3 tests/t80_busy.py # در طولِ دریافت صفحه روشن می‌ماند و بعد رها می‌شود
 node tests/t81_cleanse.js # پاک‌سازیِ نام: تکرار، فاصله، واژه‌ی ربط یکی می‌شوند؛ عطرهای جدا جدا می‌مانند
 node tests/t82_list_audit.js # بازرسِ خودکارِ فهرستِ نهایی روی داده‌ی واقعیِ گوشی: برندِ تکراری، نامِ برند در نام، تکرار، لاتین
+node tests/t83_en_anchor.js # نامِ لاتینِ سایت مرجع است: عطرهای جدا یکی نمی‌شوند، ردیف‌های تکراری یکی می‌شوند؛ برند از دسته‌بندی؛ نمونه‌ی واقعیِ دیجی‌کالا
 bash tests/run_node.sh           # همه‌ی آزمون‌های Node با هم (در CI هم اجرا می‌شود)
 python3 tests/t55_voice.py     # گفتن نام عطر، نوار پایین، آخرین‌ها
 python3 tests/t3_flow.py       # روند کامل بروزرسانی
