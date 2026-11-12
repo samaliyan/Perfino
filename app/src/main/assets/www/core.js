@@ -1067,6 +1067,7 @@ var BRAND_LIST = [
 ['بیوفورت لندن', 'بیوفورت لندن|بیوفورت لاندن|beaufort london'], ['پریس مونته کارلو', 'پریس مونته کارلو|پریس مونت کارلو|perris monte carlo'],
 ['روژه اند گله', 'روژه اند گله|راجر اند گالت|roger and gallet|roger gallet'], ['روبرت پیگه', 'روبرت پیگه|رابرت پیگه|robert piguet'], ['اسمیت اند وسون', 'اسمیت اند وسون|سمیت اند وسون|اسمیت وسون|سمیت وسون|smith and wesson|smith wesson'],
 ['نیکوس', 'نیکوس|نیکاس|nikos'], ['لارک', 'ل ارک|larc|l arc'],
+['رولون', 'رولون|revlon'],
 ['فرانک بوکله', 'فرانک بوکله|franck boclet'],
 ['ریان', 'reyane tradition'],
 ['جیاردینی دی توسکانا', 'جیاردینی دی توسکانا|giardini di toscana']
@@ -2542,6 +2543,7 @@ var DK_URLS = [
 ];
 /* دیجی‌کالا در هر ترتیب فقط ۱۰۰ صفحه می‌دهد؛ فهرستِ عطرش بیشتر است. بعد از ترتیبِ عادی، دو سرِ فهرست (ارزان‌ترین و گران‌ترین) هم
    خوانده می‌شود تا کالاهای بیشتری دیده شوند. اگر سایت ترتیبی را نپذیرد یا کالای تازه‌ای نیاورد، همان‌جا رها می‌شود. */
+var DK_FLOOR = 2500000, DK_WALK_MS = 480000;      // کفِ قیمت به ریال (۲۵۰ هزار تومان = همان کفِ «قیمتِ منطقی» برای ۱۰۰ میل؛ نمونه‌ی واقعی: ارزان‌ترین کالا ۱۹۹ هزار تومان)؛ سقفِ زمانِ پیمایش ۸ دقیقه
 var DK_SORTS = ['&sort=20', '&sort=21'];      // ارزان‌ترین و گران‌ترین: دو سرِ فهرست که در ترتیبِ عادی دیده نمی‌شوند
 async function digikalaSource(net, rep, mode) {
   var out = [], failed = 0, total = 1, vi = 0, err = '', nNew = 0;
@@ -2573,14 +2575,50 @@ async function digikalaSource(net, rep, mode) {
   if (!first) throw new Error(err || 'دیجی‌کالا جواب نداد');
   var d1 = first.d; eat(d1); rep(out.length, 0);
   var cap0 = !(d1.pager && d1.pager.total_pages > 0) || d1.pager.total_pages >= 100, fr = cap0 ? .5 : 1;      // سقف‌دار: نیمی از نوارِ پیشرفت برای ترتیب‌های دیگر
-  total = Math.min(100, (d1.pager && d1.pager.total_pages) || 1);
+  var extra = 0, tX = Date.now(), walked = false, wNote = '', wFull = false;
+  /* پوششِ کامل با بازه‌های قیمت: دیجی‌کالا برای هر ترتیب فقط ۱۰۰ صفحه (۲۰۰۰ کالا) می‌دهد، ولی بیش از ۱۶ هزار عطر دارد؛ عطرِ میان‌قیمتِ کم‌فروش
+     (مثلِ «چارلی رولون») در هیچ‌کدام از سه ترتیب نمی‌افتاد. حالا: ارزان‌ترین اول، از کفِ قیمت؛ هر بار ۱۰۰ صفحه و بعد از
+     گران‌ترین قیمتِ دیده‌شده ادامه، تا آخرِ فهرست. پیش از اعتماد، جوابِ سایت سنجیده می‌شود (همه‌ی قیمت‌ها از کف بالاتر و صعودی، و فهرست
+     کوچک‌تر از فهرستِ بی‌فیلتر)؛ اگر نخواند، همان روشِ قبلی (ترتیب‌های دیگر) اجرا می‌شود. */
+  if (cap0) {
+    var tot0 = (d1.pager && d1.pager.total_items) | 0;
+    var rialOf = function (p) { var dv = p && p.default_variant, pr = dv && dv.price; return (pr && +pr.selling_price) || 0; };
+    var WQ = [function (m) { return '&sort=20&price%5Bmin%5D=' + m; }];      // بدونِ فیلترِ «فقط موجود»: کالایی که تمام شده باید «ناموجود» برگردد، نه اینکه بی‌خبر با قیمتِ قبلی بماند
+    for (var wv = 0; wv < WQ.length && !walked; wv++) {
+      var cur = DK_FLOOR, rounds = 0, wn0 = nNew, wbad = 0, wOk = false, wEnd = false, wPages = 0, wEst = 0;
+      while (rounds++ < 60 && Date.now() - tX < DK_WALK_MS && wbad < 6) {
+        var q0 = WQ[wv](cur), f1 = await one(1, vi, q0);
+        if (f1.k !== 'ok') { if (wOk && f1.e === 'صفحه‌ی خالی') wEnd = true; break; }
+        var pr1 = f1.d.products.map(rialOf).filter(function (x) { return x > 0; }), tp = (f1.d.pager && f1.d.pager.total_pages) | 0, ti = (f1.d.pager && f1.d.pager.total_items) | 0;
+        if (!wOk) {      // سنجشِ فیلتر (فقط بارِ اول)
+          var asc = pr1.every(function (x, i) { return i === 0 || x >= pr1[i - 1] * 0.97; });
+          if (!(pr1.length >= 3 && pr1.every(function (x) { return x >= cur * 0.999; }) && asc && tp > 0 && tot0 > 0 && ti > 0 && ti < tot0)) break;      // فهرستِ فیلترشده باید واقعاً کوچک‌تر باشد؛ اگر سایت شمار نمی‌دهد یا فیلتر را نادیده گرفته، اعتماد نمی‌کنیم
+          wOk = true; wEst = Math.max(1, Math.ceil((ti || tp * 20) / 20));
+        }
+        eat(f1.d); wPages++;
+        var mx = Math.max.apply(null, pr1.concat([cur])), lim = Math.min(100, tp || 1), stop = false;
+        for (var wp = 2; wp <= lim && !stop && Date.now() - tX < DK_WALK_MS; wp += CFG.conc + 1) {
+          var ws = []; for (var wi = 0; wi < CFG.conc + 1 && wp + wi <= lim; wi++) ws.push(wp + wi);
+          var wr = await Promise.all(ws.map(function (p) { return one(p, vi, q0); })), nb = 0;
+          wr.forEach(function (r) { if (r.k === 'ok') { eat(r.d); wPages++; r.d.products.forEach(function (p) { var x = rialOf(p); if (x > mx) mx = x; }); } else nb++; });
+          rep(out.length, Math.min(.99, wPages / wEst));
+          if (nb) { wbad += nb; await sleep(CFG.retryMs * 2); if (nb === ws.length) stop = true; }
+        }
+        if (stop || Date.now() - tX >= DK_WALK_MS) break;
+        if (tp <= 100) { wEnd = true; break; }      // این بازه تا آخرِ فهرست خوانده شد
+        cur = mx > cur ? mx : cur + 1;      // ادامه از گران‌ترین قیمتِ دیده‌شده (کالاهای هم‌قیمتِ مرز دوباره می‌آیند و تکراری‌ها کنار می‌روند)
+      }
+      if (wOk) { walked = true; wFull = wEnd; extra += nNew - wn0; wNote = wEnd ? '' : ' (بازه‌های قیمت تا آخر نرسید)'; }
+    }
+  }
+  total = wFull ? 1 : Math.min(100, (d1.pager && d1.pager.total_pages) || 1);      // پیمایشِ قیمت تا آخر رفت: ۱۰۰ صفحه‌ی ترتیبِ پیش‌فرض دیگر لازم نیست
   var done = 1, dbad = [], unreq = 0;
   for (var page = 2; page <= total; page += CFG.conc + 1) {
     var ps = []; for (var i = 0; i < CFG.conc + 1 && page + i <= total; i++) ps.push(page + i);
     var rr = await Promise.all(ps.map(function (p) { return one(p, vi); }));
     var dn0 = dbad.length;
     rr.forEach(function (r, i) { if (r.k === 'ok') eat(r.d); else dbad.push(ps[i]); });
-    done += ps.length; rep(out.length, done / total * fr);
+    done += ps.length; rep(out.length, walked ? undefined : done / total * fr);
     if (dbad.length > dn0) await sleep(CFG.retryMs * 2);
     if (dbad.length >= 15) { unreq = Math.max(0, total - (page + ps.length - 1)); break; }      // سایت جواب نمی‌دهد/مسدود کرده؛ بیش از این فشار نیاور (صفحه‌های نخواسته‌شده ناقص حساب می‌شوند)
   }
@@ -2596,8 +2634,8 @@ async function digikalaSource(net, rep, mode) {
   failed += dbad.length + unreq;
   if (!out.length) throw new Error('محصولی پیدا نشد');
   var capped = !(d1.pager && d1.pager.total_pages > 0) || d1.pager.total_pages >= 100;      // ۱۰۰ = شاید سقفِ خودِ API است
-  var extra = 0, tX = Date.now();
-  if (capped && failed < 15) {      // چند صفحه‌ی خراب ترتیب‌های دیگر را لغو نمی‌کند؛ فقط وقتی سایت عملاً جواب نمی‌دهد      // در بروزرسانیِ «فقط قیمت» هم (دیجی‌کالا قیمت را فقط با همین فهرست می‌دهد): وگرنه کالاهایی که فقط از این راه دیده شده‌اند چند ساعت بعد «کهنه» می‌شوند
+  tX = Date.now();      // سقفِ زمانِ ترتیب‌های اضافه از همین‌جا
+  if (capped && failed < 15 && !walked) {      // چند صفحه‌ی خراب ترتیب‌های دیگر را لغو نمی‌کند؛ فقط وقتی سایت عملاً جواب نمی‌دهد      // در بروزرسانیِ «فقط قیمت» هم (دیجی‌کالا قیمت را فقط با همین فهرست می‌دهد): وگرنه کالاهایی که فقط از این راه دیده شده‌اند چند ساعت بعد «کهنه» می‌شوند
     for (var si = 0; si < DK_SORTS.length && Date.now() - tX < 360000; si++) {      // سقفِ ۶ دقیقه برای ترتیب‌های اضافه
       var q = DK_SORTS[si], dry = 0, n0 = nNew, xfail = 0;
       for (var pg = 1; pg <= 100 && dry < 3 && Date.now() - tX < 360000; pg += CFG.conc + 1) {
@@ -2613,7 +2651,7 @@ async function digikalaSource(net, rep, mode) {
       extra += nNew - n0;
     }
   }
-  return { items: out, complete: !failed && total > 0 && !capped, note: failed ? 'ناقص: ' + failed + ' صفحه' : (capped ? 'ناقص: دیجی‌کالا فقط ۱۰۰ صفحه می‌دهد' + (extra ? '؛ با ترتیب‌های دیگر ' + extra + ' کالای بیشتر خوانده شد' : '') : ''), dkCap: capped };
+  return { items: out, complete: !failed && total > 0 && !capped, note: failed ? 'ناقص: ' + failed + ' صفحه' : (capped ? 'ناقص: دیجی‌کالا فقط ۱۰۰ صفحه می‌دهد' + (extra ? (walked ? '؛ با بازه‌های قیمت ' : '؛ با ترتیب‌های دیگر ') + extra + ' کالای بیشتر خوانده شد' + wNote : (walked ? wNote : '')) : ''), dkCap: capped };
 }
 
 /* ---- HTML عمومی (برای سایت‌هایی که API ندارند) ---- */

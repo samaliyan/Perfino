@@ -35,7 +35,7 @@ function server(o) {
   chk(ps.every(function (p, i) { return p >= 0 && p <= 1 && (i === 0 || p >= ps[i - 1]); }), 'progress stays in 0..1 and moves forward');
   var s2 = server({ noSort: true }), r2 = await C.digikalaSource(s2, function () {}, 'full');
   chk(r2.items.length === 2000, 'site rejects the sort param: the plain list (2000) is kept: ' + r2.items.length);
-  chk(s2.n.urls.filter(function (u) { return /sort=/.test(u); }).length <= DK_SORTS_LEN() * 5, 'rejected sort param is not hammered: ' + s2.n.urls.filter(function (u) { return /sort=/.test(u); }).length);
+  chk(s2.n.urls.filter(function (u) { return /sort=/.test(u) && !/price%5Bmin/.test(u); }).length <= DK_SORTS_LEN() * 5, 'rejected sort param is not hammered: ' + s2.n.urls.filter(function (u) { return /sort=/.test(u); }).length);
   var s3 = server({}), r3 = await C.digikalaSource(s3, function () {}, 'price');
   chk(r3.items.length === N, 'price-only refresh also reads the other orders (else those items go stale in 4 hours): ' + r3.items.length);
   // فهرستِ زیرِ ۱۰۰ صفحه: کامل و بدونِ ترتیب‌های اضافه
