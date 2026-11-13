@@ -177,6 +177,12 @@ var CLONE_MAKERS = /نیوویش|new ?wish|اسمارت ?کالکشن|smart ?col
 var RE_PHONE = /(?:^|[^\d])(?:\+?98|0)?9\d{2}[ -]?\d{3}[ -]?\d{4}(?!\d)|(?:^|[^\d])0[1-8]\d[ -]?\d{8}(?!\d)/;
 var RE_PRICE = /\d[\d.,]*\s*(?:تومان|تومن|ریال|تومانی|هزار|دلار|درهم|\$|usd|aed|toman|rial)|(?:^|[^\d.,])(?:[2-9]|\d{2,})[\d.,]*\s*میلیون|\d+(?:[.,٫]\d+)?\s*میلیون\s*(?:تومان|تومن|ریال)|(?:قیمت|فقط|تنها|مبلغ)\s*:?\s*\d{3,}(?!\d)(?!\s*(?:میل|ml|cc|سی ?سی|گرم|oz|اونس))/;
 var RE_CONTACT = /https?:|www\.|\.(?:com|ir|net|org)\b|@[a-z0-9_.]{3,}|تلگرام|واتس ?اپ|واتساپ|اینستاگرام|instagram|telegram|whatsapp|دایرکت|شماره تماس|تماس بگیرید|\bdm\b/;
+/* کالای «طرحِ یک عطر» (سازنده‌ی دیگر با نامِ عطرِ معروف: «آوند مدل رولون چارلی»، «هارلینگن مدل ساواج دیور»): پیش‌فرض رد می‌شود؛
+   اگر برنامه بخواهد (setClones(true)) نگه داشته می‌شود ولی با نشانه‌ی CL_MARK در اولِ کلید، تا هرگز با عطرِ اصل یکی نشود و زیرِ گروهِ جدای «طرحِ عطرها (غیر اصل)» بیاید */
+var CL_MARK = 'طرحعطر', SHOW_CLONES = false;
+var CLONE_ENT = { id: 'clone', name: 'طرحِ عطرها (غیر اصل)', en: 'Inspired by (not original)', al: [[CL_MARK]] };
+function setClones(on) { SHOW_CLONES = !!on; BO_C = {}; BO_N = 0; }
+function isCloneKey(k) { return !!k && k[0] === CL_MARK; }
 function vetReason(t) {
   if (RE_PHONE.test(t)) return 'شماره‌ی تلفن در نام';
   if (RE_PRICE.test(t)) return 'قیمت داخل نام';
@@ -283,7 +289,9 @@ function parseTitle(raw) {
   t = t.replace(/[()\[\]{}]/g, ' ').replace(/[،؛؟٪٫٬٭]/g, ' ').replace(/\b(?:number|n ?°|n\.|no\.)\s*(\d)/g, 'no $1').replace(/(?:نامبر|نمبر|شماره)\s*(\d)/g, 'نامبر $1');
   if (!t) return null;
   if (EXCL.test(t)) { REJ.n++; return null; }
-  var vr = vetReason(t); if (vr) { REJ.n++; REJ.by[vr] = (REJ.by[vr] || 0) + 1; if (REJ.ex.length < 40 && vr !== 'clone') REJ.ex.push([vr, String(raw).slice(0, 90)]); return null; }
+  var vr = vetReason(t), isCl = false;
+  if (vr && SHOW_CLONES && (vr === 'clone' || vr === 'سازنده‌ی تقلیدی')) { isCl = true; vr = ''; }
+  if (vr) { REJ.n++; REJ.by[vr] = (REJ.by[vr] || 0) + 1; if (REJ.ex.length < 40 && vr !== 'clone') REJ.ex.push([vr, String(raw).slice(0, 90)]); return null; }
   var tailG = ''; t = t.replace(/(\d\s*(?:ml|میل))\s+([wmu])\s*$/i, function (_, a, g) { tailG = g.toLowerCase(); return a; });      // «... 100ml W» (هایلند): حرفِ آخر جنسیت است
   t = stripDesc(t);
   if (/(?:^|[^\d.])(?:25|30|35|40|45|50|60|75|80|90|100|110|120|125|150|175|200|250|300)\s*(?:ml|cc|میل|میلی)?\s*(?:[\/\-–|,،]|\s+و\s+|\s+and\s+)\s*\d{2,3}\s*(?:ml|cc|میل|میلی)/i.test(t)) return null;      // «60/100/200ml»، «۳۰ - ۵۰ - ۱۰۰ میل»: چند اندازه در یک عنوان؛ آخری را اندازه‌ی کالا نگیر
@@ -347,7 +355,8 @@ function parseTitle(raw) {
   }
   var key = canonBrand(shown.map(function (w) { return w.replace(/آ/g, 'ا').replace(/ؤ/g, 'و').replace(/ئ/g, 'ی'); }));
   var name = shown.map(function (w) { return hasFa ? w : cap(w); }).join(' ');
-  return { key: key, name: name, conc: conc, ml: ml, fa: hasFa, gn: genderOf(t) || pgn || (tailG === 'w' ? 'w' : tailG === 'm' ? 'm' : tailG === 'u' ? 'u' : '') };
+  if (isCl) key = [CL_MARK].concat(key.filter(function (w) { return w !== CL_MARK; }));
+  return { cl: isCl, key: key, name: name, conc: conc, ml: ml, fa: hasFa, gn: genderOf(t) || pgn || (tailG === 'w' ? 'w' : tailG === 'm' ? 'm' : tailG === 'u' ? 'u' : '') };
 }
 
 /* یک ویرایش (حذف/افزودن/جایگزینیِ یک حرف) بین a و b؛ خروجی: [حرف۱، حرف۲] یا null */
@@ -1240,6 +1249,7 @@ function cleanBrandName(h) {                      // نامِ برندِ گرف�
 }
 var BO_C = {}, BO_N = 0;
 function brandOf(key, hints, noLine) {      // بدون راهنمای سایت، تابعی خالص از کلید است (جدولِ برندها ثابت): نتیجه نگه داشته می‌شود
+  if (key && key[0] === CL_MARK) return CLONE_ENT;      // طرحِ یک عطر: برندِ سازنده یا برندِ اصل هیچ‌کدام؛ گروهِ جدا
   if (hints && hints.length) return brandOf0(key, hints, noLine);
   var ck = (noLine ? 1 : 0) + key.join(' '), r = BO_C[ck];
   if (r) return r;
@@ -1707,11 +1717,12 @@ function tree(groups, lang, lex) {
     b.models.forEach(function (m) { delete m.eks; delete m.ev; });
     inspectBrand(b, AUD);
     b.models.sort(cmpNm);
-    b.L = b.id === 'other' ? '#' : letterOf(b.name, lang); b.z = zOf(b.L, EN);
+    b.L = b.id === 'other' || b.id === 'clone' ? '#' : letterOf(b.name, lang); b.z = zOf(b.L, EN);
     var fm = b.models.filter(function (m) { return m.img; })[0] || b.models[0];
     b.img = fm.img; b.big = fm.big; b.imgId = fm.imgId;
   });
   brands.sort(function (a, b) {
+    if (a.id === 'clone') return 1; if (b.id === 'clone') return -1;      // «طرحِ عطرها» آخرِ آخر، بعد از «سایر برندها»
     if (a.id === 'other') return 1; if (b.id === 'other') return -1;
     return cmpNm(a, b);
   });
@@ -2180,7 +2191,8 @@ function purgeStored(db) {      // بیرون‌بردنِ کالاهای ذخی
   if (rk) { db.full = {}; db.fullGen = (db.fullGen | 0) + 1; }      // شمارنده: منبعی که وسطِ همین کار بود می‌فهمد باید همین حالا کامل بگیرد // «کامل» باشد تا عنوانِ پاک‌شده‌ها دوباره تحلیل شود
   return n;
 }
-var DEDUPE_V = 14;      // ۱۴ (نسخه‌ی ۱.۵۱): برندِ دسته‌بندی و عکسِ هایلند عوض شد ← یک‌بار دریافتِ کامل از همه‌ی سایت‌ها
+var DEDUPE_V = 15;      // ۱۵ (نسخه‌ی ۱.۵۵): طرحِ عطرها نگه داشته می‌شود ← یک‌بار دریافتِ کامل
+var DEDUPE_V_OLD = 14;      // ۱۴ (نسخه‌ی ۱.۵۱): برندِ دسته‌بندی و عکسِ هایلند عوض شد ← یک‌بار دریافتِ کامل از همه‌ی سایت‌ها
 function ingestEnd0(C, complete) {
   if (complete) {                                      // فهرستِ ناگهان خیلی کوچک‌تر شده (صفحه‌ی خطا/کپچا): پاک‌سازی نکن
     var live = Object.keys(C.M).filter(function (pid) { return C.M[pid][1] > 0; }), seenN = live.filter(function (pid) { return C.seen[pid]; }).length;      // فقط کالاهای قیمت‌دار شمرده می‌شوند: فروشگاهی که فقط موجودها را می‌دهد، ناموجودِ قبلی را «ندیده» حساب نکند
@@ -3755,7 +3767,7 @@ function searchRank(idx, alts, tools, opts) {
   return out;
 }
 
-root.Core = { probeShop: probeShop, fetchNews: fetchNews, newsMore: newsMore, newsFromWp: newsFromWp, newsFromRss: newsFromRss, newsPickImg: newsPickImg, newsExcerpt: newsExcerpt, NEWS_SRC: NEWS_SRC, liveSearch: liveSearch, liveTerms: liveTerms, liveHit: liveHit, liveScore: liveScore, digikalaLive: digikalaLive, wooLivePrice: wooLivePrice, searchIndex: searchIndex, searchRank: searchRank, searchSimilar: searchSimilar, simWord: simWord, simFold: simFold, srn: srn, fzKey: fzKey, explainTitle: explainTitle, useSz: useSz, sizeFromPage: sizeFromPage, nextDataCards: nextDataCards, RAWC: RAWC, stripPriceTail: stripPriceTail, marketStats: marketStats, marketView: marketView, histNew: histNew, histFix: histFix, histSnap: histSnap, histReport: histReport, purgeStored: purgeStored, setBlock: setBlock, REJ: REJ, vetReason: vetReason, reconcile: reconcile, reconcileAsync: reconcileAsync, CLEANSE: CLEANSE, cleanseText: cleanseText, cleanBrandName: cleanBrandName, itemUrl: itemUrl, STALE_MIN: STALE_MIN, fa2en: fa2en, en2fa: en2fa, enTokens: enTokens, titleEn: titleEn, tree: tree, brandOf: brandOf, specInfo: specInfo, enrichTitle: enrichTitle, genderOf: genderOf, nameCmp: nameCmp, CFG: CFG, newDb: newDb, dbIndex: dbIndex, ingest: ingest, ingestAsync: ingestAsync, buildList: buildList, normFa: normFa, parseTitle: parseTitle, aggregate: aggregate, SOURCES: SOURCES, extractCards: extractCards,
+root.Core = { probeShop: probeShop, fetchNews: fetchNews, newsMore: newsMore, newsFromWp: newsFromWp, newsFromRss: newsFromRss, newsPickImg: newsPickImg, newsExcerpt: newsExcerpt, NEWS_SRC: NEWS_SRC, liveSearch: liveSearch, setClones: setClones, isCloneKey: isCloneKey, CL_MARK: CL_MARK, liveTerms: liveTerms, liveHit: liveHit, liveScore: liveScore, digikalaLive: digikalaLive, wooLivePrice: wooLivePrice, searchIndex: searchIndex, searchRank: searchRank, searchSimilar: searchSimilar, simWord: simWord, simFold: simFold, srn: srn, fzKey: fzKey, explainTitle: explainTitle, useSz: useSz, sizeFromPage: sizeFromPage, nextDataCards: nextDataCards, RAWC: RAWC, stripPriceTail: stripPriceTail, marketStats: marketStats, marketView: marketView, histNew: histNew, histFix: histFix, histSnap: histSnap, histReport: histReport, purgeStored: purgeStored, setBlock: setBlock, REJ: REJ, vetReason: vetReason, reconcile: reconcile, reconcileAsync: reconcileAsync, CLEANSE: CLEANSE, cleanseText: cleanseText, cleanBrandName: cleanBrandName, itemUrl: itemUrl, STALE_MIN: STALE_MIN, fa2en: fa2en, en2fa: en2fa, enTokens: enTokens, titleEn: titleEn, tree: tree, brandOf: brandOf, specInfo: specInfo, enrichTitle: enrichTitle, genderOf: genderOf, nameCmp: nameCmp, CFG: CFG, newDb: newDb, dbIndex: dbIndex, ingest: ingest, ingestAsync: ingestAsync, buildList: buildList, normFa: normFa, parseTitle: parseTitle, aggregate: aggregate, SOURCES: SOURCES, extractCards: extractCards,
   wooSource: wooSource, digikalaSource: digikalaSource, htmlSource: htmlSource, letterOf: letterOf, median: median, priceFromText: priceFromText, similar: similar };
 if (typeof module !== 'undefined') module.exports = root.Core;
 })(typeof window !== 'undefined' ? window : globalThis);

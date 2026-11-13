@@ -505,6 +505,8 @@ if (!Array.isArray(set.block)) set.block = [];                                  
 set.block = set.block.filter(function (x) { return typeof x === 'string' && x.trim().length >= 2; }).slice(0, 60);
 if (!(set.fs >= 0 && set.fs <= 3)) set.fs = 0;
 Core.setBlock(set.block);
+Core.setClones(true);      // «طرحِ عطرها» (غیر اصل) نشان داده می‌شوند، ولی جدا از عطرهای اصل: گروهِ خودشان در آخرِ فهرستِ برندها و بخشِ جدا در جستجو
+function flatOrig() { return FLAT.filter(function (g) { return !Core.isCloneKey(g.key); }); }      // خبر و گزارشِ بازار فقط درباره‌ی عطرهای اصل است
 if (!Object.prototype.hasOwnProperty.call(MODELS, set.model)) set.model = 'a';
 var db = ls.get('pp.db', null);
 function dbSane(d) {      // حافظه‌ی نیمه‌خراب (مثلاً یک ردیفِ null) نباید برنامه را برای همیشه در بوت‌لوپ نگه دارد؛ خراب = از نو دریافت
@@ -674,7 +676,7 @@ function curEntries() {
 }
 function titleOf() {
   var b = nav.brand && BR_BY[nav.brand];
-  return b ? { t: b.name, s: fa(b.models.length) + ' عطر', c: b.name, w: b.id === 'other' ? '' : (b.en || '') } : { t: 'برندها', s: fa(TREE.length) + ' برند', c: '', w: '' };
+  return b ? { t: b.name, s: fa(b.models.length) + ' عطر', c: b.name, w: b.id === 'other' || b.id === 'clone' ? '' : (b.en || '') } : { t: 'برندها', s: fa(TREE.length) + ' برند', c: '', w: '' };
 }
 function structOf(l) { return l.length + '|' + l.map(function (p) { return p.id + ':' + p.name + ':' + p.tag; }).join(';'); }
 function priceMap(l) { var o = {}; l.forEach(function (g) { o[g.id] = g.sizes.map(function (z) { return z.ml + ':' + z.price; }).join(','); }); return o; }
@@ -688,7 +690,7 @@ function histTake() {
   try {
     var now = Date.now(), a = actv();
     if (!db.ready || !a.length || !a.every(function (s) { return db.t[s.id] && now - db.t[s.id] < 12 * 3600e3; })) return;   // همه‌ی سایت‌های روشن باید تازه باشند؛ وگرنه کالاهای یک سایتِ خراب «ناموجود» دیده می‌شوند
-    Core.histSnap(hist, FLAT, order().join(','), now, function (g) { return [GN[g.gn], g.conc].filter(Boolean).join(' · '); }, set.block.join(','), function (g) { var a = VA[g.id]; return a ? { b: a.b, m: a.m } : null; });
+    Core.histSnap(hist, flatOrig(), order().join(','), now, function (g) { return [GN[g.gn], g.conc].filter(Boolean).join(' · '); }, set.block.join(','), function (g) { var a = VA[g.id]; return a ? { b: a.b, m: a.m } : null; });
     if (!ls.set('pp.hist', hist)) {
       Object.keys(hist.d).forEach(function (k) { var e = hist.d[k]; if (e.p && e.p.length > 2) e.p = [e.p[0], e.p[e.p.length - 1]]; });
       if (!ls.set('pp.hist', hist)) { hist = Core.histNew(); ls.set('pp.hist', hist); }
@@ -734,7 +736,7 @@ function mkView() {
   var lab = function (g) { return [GN[g.gn], g.conc].filter(Boolean).join(' · '); };
   var key = FLAT.length + ':' + treeStamp + ':' + Object.keys(set.hide).sort().join(',') + ':' + Object.keys(set.off || {}).sort().join(',');      // نه فقط تعداد؛ عوض کردنِ یک برند با برندِ دیگر هم دیده شود
   if (mkView.k === key && mkView.v) return mkView.v;
-  var V = Core.marketView(FLAT.filter(vis), { lab: lab, brand: function (gid) { var a = VA[gid]; return a ? { id: a.b, name: a.bn } : null; } });
+  var V = Core.marketView(flatOrig().filter(vis), { lab: lab, brand: function (gid) { var a = VA[gid]; return a ? { id: a.b, name: a.bn } : null; } });
   mkView.k = key; mkView.v = V; return V;
 }
 /* ---- خبرِ سایت‌ها (مجلهٔ همان فروشگاه‌ها): ذخیره می‌شود، هر چند ساعت یک بار خودش تازه می‌شود، نقطهٔ قرمزِ کنارِ دکمه یعنی خبرِ نادیده ---- */
@@ -837,7 +839,7 @@ function mkRender() {
   var vis = function (r) { var a = VA[r.gid] || (r.b ? { m: r.hm, b: r.b } : null); return !(a && ((a.m && set.hide[a.m]) || (set.off || {})[a.b])); };      // پنهان‌شده‌ها و برندهای خاموش در گزارش نیایند (حتی وقتی عطر دیگر در فهرست نیست)
   Array.prototype.forEach.call($('mkt2').children, function (b) { b.classList.toggle('on', b.dataset.t === mkTab); });
   var h = '', V = mkView(), hs = mkTab === 'news' || mkTab === 'chg';
-  var R = hs ? Core.histReport(hist, FLAT, Date.now(), { thr: 0.08, sig: order().join(','), lab: function (g) { return [GN[g.gn], g.conc].filter(Boolean).join(' · '); } }) : null;
+  var R = hs ? Core.histReport(hist, flatOrig(), Date.now(), { thr: 0.08, sig: order().join(','), lab: function (g) { return [GN[g.gn], g.conc].filter(Boolean).join(' · '); } }) : null;
   if (R) {
     ['up', 'down', 'gone', 'back', 'low', 'fresh'].forEach(function (k) { R[k] = R[k].filter(vis); });
     /* شمارنده‌ی تبِ «قیمت‌ها» = تعدادِ تغییرهایی که هنوز ندیده‌ای. با باز کردنِ تبِ «قیمت‌ها» دیده حساب می‌شوند و عدد محو می‌شود؛ فقط تغییرِ تازه دوباره عدد می‌آورد */
@@ -856,7 +858,7 @@ function mkRender() {
     /* خبرِ سایت‌ها: یک فیدِ اسکرولی مثل اینستاگرام. تغییرِ قیمت‌ها و مقایسه در دو تبِ بالا هستند (روی تبِ «قیمت‌ها» شمارنده می‌آید) */
     h += mkNewsSec();
   } else if (mkTab === 'cmp') {
-    var MS = Core.marketStats(FLAT.filter(function (g) { return vis({ gid: g.id }); })), lo = lastOk();
+    var MS = Core.marketStats(flatOrig().filter(function (g) { return vis({ gid: g.id }); })), lo = lastOk();
     h += '<div class="mkh first">' + (lo ? 'قیمت‌ها ' + esc(agoText(Date.now() - lo)) + ' بروز شد. ' : '') + fa(V.nPerf) + ' عطر از ' + fa(TREE.length) + ' برند.</div>';
     /* نتیجه‌گیری‌های آماده: بدون نیاز به تاریخچه */
     var best = null, worst = null;
@@ -1859,8 +1861,10 @@ function srRender() {
   var hasFull = list.some(function (r) { return !r.sim && r.k >= 1; });
   if (hasFull) list = list.map(function (r) { return !r.sim && r.k < 1 ? { x: r.x, sim: true, k: r.k } : r; });
   var main = list.filter(function (r) { return !r.sim; }), sim = list.filter(function (r) { return r.sim; });
+  var cln = main.filter(function (r) { return r.x.b.id === 'clone'; }); main = main.filter(function (r) { return r.x.b.id !== 'clone'; });      // طرحِ عطرها جدا از اصل‌ها، زیرِ سرتیترِ خودش
   srShown = {}; list.forEach(function (r) { srShown[r.x.m.id] = 1; });
   box.innerHTML = head + (main.length ? srCards(main, best) : '') + '<div id="srlv" class="srlive"></div>'
+    + (cln.length ? '<div class="srvh">طرحِ عطرها (غیر اصل)<small>ساختِ برندِ دیگر با نامِ این عطر؛ عطرِ اصل نیست.</small></div>' + srCards(cln, false) : '')
     + (sim.length ? srCards(sim, false) : '')      // srCards خودش سرتیترِ «نام‌های شبیه» را می‌گذارد
     + (isVoice ? '<button type="button" class="srbtn pri" id="srAgain">دوباره بگویید</button>' : '');
   fitPz(box);
