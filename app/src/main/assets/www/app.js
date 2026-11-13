@@ -1,7 +1,7 @@
 (function () {
 'use strict';
 var RM = !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
-var VERSION = '1.53';
+var VERSION = '1.54';
 var myCode = (function () { var m = /\/b(\d{1,10})\/index\.html$/.exec(String(location.pathname || '')); return m ? m[1] : '0'; })();      // نسخه‌ی این صفحه از روی آدرسش؛ در گزارش‌ها به جاوا فرستاده می‌شود تا صفحه‌ی کهنه نتواند نسخه‌ی تازه را «سالم» اعلام کند
 function otaCall(n) { try { if (window.Native && typeof window.Native[n] === 'function') window.Native[n](myCode); } catch (e) { } }
 otaCall('otaBoot');      // «جاوااسکریپتِ این صفحه شروع شد»: برنامه به صفحه‌ی بی‌نصب مهلتِ بیشتری برای ساختن فهرست می‌دهد
@@ -1536,7 +1536,7 @@ var sheet = $('sheet'), scm = $('scm'), sSp = new Spring(1, function (y) { sheet
 sSp.eps = .002;
 function pageFix() { [$('app'), document.body, document.documentElement].forEach(function (e) { if (e && (e.scrollTop || e.scrollLeft)) { e.scrollTop = 0; e.scrollLeft = 0; } }); }
 $('app').addEventListener('scroll', pageFix);
-function openSheet() { layerMark(); open = true; if (!window.__forceAdv) $('sAdv').style.display = 'none'; $('sAdvBtn').setAttribute('aria-expanded', 'false'); $('sAdvBtn').firstChild.textContent = 'تنظیمات پیشرفته'; renderSheet(); sheet.scrollTop = 0; sSp.x = sheetY; sSp.to(0, { response: .42, damping: .85 }); layerMark(); }
+function openSheet() { layerMark(); open = true; if (!window.__forceAdv) $('sAdv').style.display = 'none'; $('sAdvBtn').setAttribute('aria-expanded', 'false'); $('sAdvBtn').firstChild.textContent = 'تنظیمات بیشتر'; renderSheet(); sheet.scrollTop = 0; sSp.x = sheetY; sSp.to(0, { response: .42, damping: .85 }); layerMark(); }
 function closeSheet() { layerMark(); open = false; sSp.x = sheetY; sSp.to(1, { response: .36, damping: 1 }); }
 sSp.cb(1);
 $('sVer').onclick = function () { if (++advN >= 5 && !adv) { adv = true; renderSheet(); toast('گزینه‌های سازنده نشان داده شد', 2200); } };
@@ -1583,7 +1583,7 @@ $('sCopy').onclick = function () {
 $('sAdvBtn').onclick = function () {
   var box = $('sAdv'), on = box.style.display === 'none';
   box.style.display = on ? '' : 'none'; $('sAdvBtn').setAttribute('aria-expanded', on ? 'true' : 'false');
-  $('sAdvBtn').firstChild.textContent = on ? 'بستن تنظیمات پیشرفته' : 'تنظیمات پیشرفته';
+  $('sAdvBtn').firstChild.textContent = on ? 'بستن تنظیمات بیشتر' : 'تنظیمات بیشتر';
   if (on) setTimeout(function () {      // فقط خودِ برگه اسکرول شود؛ scrollIntoView کل صفحه (#app) را هم بالا می‌کشید و عکس‌ها از صفحه‌ی اصلی می‌رفتند
     try { var top = box.getBoundingClientRect().top - sheet.getBoundingClientRect().top + sheet.scrollTop - 36; sheet.scrollTo({ top: Math.max(0, top), behavior: 'smooth' }); } catch (e) { }
     pageFix();
@@ -1822,73 +1822,95 @@ function srCards(list, bestFirst) {
   return h + '</div>';
 }
 function srQuery() { return srVoice && $('srq').value === srVoice.text ? srVoice.text : $('srq').value; }
+var srShown = {};      // عطرهایی که همین حالا در نتیجه‌های گوشی دیده می‌شوند (جستجوی سایت‌ها آن‌ها را دوباره نشان نمی‌دهد)
 function srRender() {
-  var raw = $('srq').value, q = srNorm(raw), box = $('srr'), html = '', strong = 99, typed = false;
+  var raw = $('srq').value, q = srNorm(raw), box = $('srr'), head = '', list = [], best = false, isVoice = false;
   srBuild();
   if (raw !== srLastRaw) { srLastRaw = raw; box.scrollTop = 0; }      // نوشته (یا متنِ گفتار) عوض شد: نتیجه‌ها از بالا
   if (srVoice && raw === srVoice.text) {      // نتیجه‌ی گفتار: چند کارتِ نزدیک؛ نه حدسِ بی‌صدا
-    html = '<div class="srvh">شنیدم: «' + esc(srVoice.text) + '»<small>' + (srVoice.ranks.length ? 'روی عکسِ عطرِ مورد نظر بزنید تا قیمت‌ها را ببینید.' : 'چیزی شبیه آن در فهرست پیدا نشد.') + '</small></div>' + srCards(srVoice.ranks, srVoice.best) + '<button type="button" class="srbtn pri" id="srAgain">دوباره بگویید</button>';
-    strong = srVoice.strong;
+    isVoice = true; list = srVoice.ranks; best = srVoice.best;
+    head = '<div class="srvh">شنیدم: «' + esc(srVoice.text) + '»' + (list.length ? '<small>روی عکسِ عطرِ مورد نظر بزنید تا قیمت‌ها را ببینید.</small>' : '') + '</div>';
   } else if (!q) {
     var rc = set.rec.filter(function (x) { return x && MD_BY[x[0]]; }).slice(0, 8);
-    html = (rc.length ? '<div class="srvh">آخرین‌هایی که دیدید</div><div class="pcs">' + rc.map(function (x) { var m = MD_BY[x[0]]; return pcard(m, BR_BY[m.brandId]); }).join('') + '</div>' : '')
+    srShown = {};
+    box.innerHTML = (rc.length ? '<div class="srvh">آخرین‌هایی که دیدید</div><div class="pcs">' + rc.map(function (x) { var m = MD_BY[x[0]]; return pcard(m, BR_BY[m.brandId]); }).join('') + '</div>' : '')
       + '<div class="sremp">نام عطر یا برند را بنویسید، یا با دکمه‌ی میکروفون بگویید.<br>مثلاً «ساواج» یا «sauvage» یا «ورساچه».</div>';
-    box.innerHTML = html; fitPz(box); return;
+    fitPz(box); srLvUi(); return;
   } else {
-    typed = true;
     var out = Core.searchRank(srIdx, [raw], srTools, { prefixLast: true, similar: 8 });
-    strong = out.filter(function (r) { return !r.sim && !r.miss && r.k >= 1; }).length;
-    var more = out.length > 40; out = out.slice(0, 40);
-    html = out.length ? srCards(out.map(function (r) { return { x: srIdx[r.i], sim: !!r.sim }; }), false) + (more ? '<div class="sremp">فقط ۴۰ مورد اول نشان داده شد؛ دقیق‌تر بنویسید.</div>' : '')
-      : '<div class="sremp">در فهرستِ گوشی چیزی پیدا نشد.</div>';
+    list = out.slice(0, 40).map(function (r) { return { x: srIdx[r.i], sim: !!r.sim, k: r.k }; });
+    if (out.length > 40) head = '';
   }
-  box.innerHTML = html + '<div id="srlv" class="srlive"></div>'; fitPz(box);
-  if (!srLv && typed && q.length >= 3 && strong === 0) { clearTimeout(srLvT); srLvT = setTimeout(function () { if (srOn && !srLv && $('srq').value === raw) srLvStart(raw); }, 900); }      // چیزی پیدا نشد: بعد از مکثِ تایپ، از خودِ سایت‌ها هم می‌پرسد
-  srLvUi(strong);
+  /* وقتی نتیجه‌ی کامل هست، حدس‌های ضعیف (مثلاً «مارلی» برای «چارلی») قاطیِ آن‌ها نمی‌شوند و زیرِ «نام‌های شبیه» می‌روند */
+  var hasFull = list.some(function (r) { return !r.sim && r.k >= 1; });
+  if (hasFull) list = list.map(function (r) { return !r.sim && r.k < 1 ? { x: r.x, sim: true, k: r.k } : r; });
+  var main = list.filter(function (r) { return !r.sim; }), sim = list.filter(function (r) { return r.sim; });
+  srShown = {}; list.forEach(function (r) { srShown[r.x.m.id] = 1; });
+  box.innerHTML = head + (main.length ? srCards(main, best) : '') + '<div id="srlv" class="srlive"></div>'
+    + (sim.length ? srCards(sim, false) : '')      // srCards خودش سرتیترِ «نام‌های شبیه» را می‌گذارد
+    + (isVoice ? '<button type="button" class="srbtn pri" id="srAgain">دوباره بگویید</button>' : '');
+  fitPz(box);
+  /* همیشه و خودش از سایت‌ها هم می‌پرسد (دکمه‌ای در کار نیست): بعد از مکثِ کوتاهِ تایپ؛ برای گفتار همان لحظه */
+  var key = raw.trim();
+  if (q.length >= 3 && (!srLv || srLv.q !== key) && Core.liveTerms(raw).length) { clearTimeout(srLvT); srLvT = setTimeout(function () { if (srOn && $('srq').value === raw && (!srLv || srLv.q !== key)) srLvStart(raw); }, isVoice ? 0 : main.length ? 1000 : 500); }
+  srLvUi();
 }
-/* ---- پرسیدن از خودِ سایت‌ها ---- */
+/* ---- پرسیدن از خودِ سایت‌ها (خودکار، در پس‌زمینه) ---- */
 function srLvStart(text) {
   text = String(text || '').trim(); if (!text) return;
-  clearTimeout(srLvT); var tok = ++srLvTok; srLv = { q: text, busy: true }; srLvUi();
-  var ids = actv().map(function (s) { return s.id; });
-  Core.liveSearch(text, net, ids, srTools).then(function (res) {
+  clearTimeout(srLvT); var tok = ++srLvTok, ids = actv().map(function (s) { return s.id; });
+  var L = srLv = { q: text, busy: true, done: 0, total: ids.length, fail: 0, mapped: [], other: [], seen: {}, oseen: {}, queue: [], run: false, fin: false };
+  srLvUi();
+  function pump() {      // هر عنوانِ سایت با فهرستِ خودمان سنجیده می‌شود؛ تکه‌تکه تا صفحه نایستد
     if (tok !== srLvTok) return;
-    srLv = { q: text, busy: true, res: res }; srLvUi();
-    return srLvMap(res.items, tok).then(function (m) { if (tok !== srLvTok) return; srLv = { q: text, busy: false, res: res, mapped: m.mapped, other: m.other }; srLvUi(); });
-  }).then(null, function () { if (tok !== srLvTok) return; srLv = { q: text, busy: false, err: 1 }; srLvUi(); });
+    var it = L.queue.shift();
+    if (!it) { L.run = false; if (L.fin) L.busy = false; srLvUi(); return; }
+    var t = null, mine = null, drop = false;
+    /* ۱) همین کالا را از قبل می‌شناسیم؟ (شناسه‌ی خودِ سایت): اگر در فهرست است همان کارتِ خودمان؛ اگر قبلاً کنار گذاشته شده (سمپل، تقلیدی…) دوباره نشان داده نمی‌شود */
+    var known = it.pid && db.it[it.s] ? db.it[it.s][it.pid] : null;
+    if (known) { var mid = known[2] ? VM[known[2]] : null; if (mid && MD_BY[mid]) mine = { m: MD_BY[mid], b: BR_BY[MD_BY[mid].brandId] }; else if (!known[2]) drop = true; }
+    /* ۲) کالای تازه: با همان قاعده‌های فهرست سنجیده می‌شود (سمپل، تستر، «مشابهِ…» و تقلیدی نمی‌آید)؛ نبودنِ اندازه در عنوان عیب نیست */
+    if (!mine && !drop) { try { var ex = Core.explainTitle(it.t); if (!ex.ok && !/اندازه \(میل\)/.test(ex.why || '')) drop = true; } catch (e) { } }
+    if (!mine && !drop) {
+      try { t = Core.searchRank(srIdx, [it.t], srTools, { prefixLast: false })[0]; } catch (e) { }
+      if (t && !t.sim && (t.ex || (t.s >= 1.1 && t.cnt >= 2))) mine = srIdx[t.i];
+    }
+    if (drop) { }
+    else if (mine) {      // همان عطر در فهرستِ خودمان هست
+      var x = mine;
+      if (!srShown[x.m.id] && !L.seen[x.m.id]) { L.seen[x.m.id] = 1; L.mapped.push({ x: x, sim: false }); }      // اگر بالاتر دیده می‌شود، دوباره نشان داده نمی‌شود
+    } else {
+      var k = srNorm(it.t);
+      if (k && !L.oseen[k]) { L.oseen[k] = 1; L.other.push(it); L.other.sort(function (a, b) { return (b.k | 0) - (a.k | 0); }); }
+    }
+    setTimeout(pump, 0);
+  }
+  Core.liveSearch(text, net, ids, srTools, function (id, items, note) {
+    if (tok !== srLvTok) return;
+    L.done++; if (note === 'fail') L.fail++;
+    items.slice(0, 6).forEach(function (it) { L.queue.push(it); });
+    if (!L.run) { L.run = true; setTimeout(pump, 0); }
+    srLvUi();
+  }).then(function () { if (tok !== srLvTok) return; L.fin = true; if (!L.run) { L.busy = false; srLvUi(); } },
+    function () { if (tok !== srLvTok) return; L.fin = true; L.busy = false; L.err = 1; srLvUi(); });
 }
 function srLvReset() { srLvTok++; clearTimeout(srLvT); srLv = null; }
-/* عنوانِ هر کالای سایت با فهرستِ خودمان سنجیده می‌شود: اگر همان عطر در فهرست هست، کارتِ خودمان (با قیمتِ همه‌ی سایت‌ها) نشان داده می‌شود؛ وگرنه کارتِ خودِ سایت */
-function srLvMap(items, tok) {
-  return new Promise(function (resolve) {
-    var seen = {}, mapped = [], other = [], per = {}, todo = [];
-    items.forEach(function (it) { per[it.s] = (per[it.s] || 0) + 1; if (per[it.s] <= 5) todo.push(it); });
-    (function next(i) {
-      if (tok !== srLvTok || i >= todo.length) { resolve({ mapped: mapped, other: other }); return; }
-      var it = todo[i], t = null;
-      try { var rk = Core.searchRank(srIdx, [it.t], srTools, { prefixLast: false }); t = rk[0]; } catch (e) { }
-      if (t && !t.sim && (t.ex || (t.s >= 1.1 && t.cnt >= 2))) { var x = srIdx[t.i]; if (!seen[x.m.id]) { seen[x.m.id] = 1; mapped.push({ x: x, sim: false }); } }
-      else other.push(it);
-      setTimeout(function () { next(i + 1); }, 0);      // کارِ سنگین تکه‌تکه؛ صفحه نایستد
-    })(0);
-  });
-}
 function lvCard(it) {
-  return '<button type="button" class="pc live" data-u="' + esc(it.u || '') + '"' + (it.u ? '' : ' disabled') + '><span class="pph">' + tile({ loc: '', img: it.img, k: (String(it.t).length * 7) % 64 }) + '</span><span class="pin"><b>' + esc(String(it.t).length > 70 ? String(it.t).slice(0, 70) + '…' : it.t) + '</b><small>' + esc(srcName(it.s)) + '</small><span class="pcp">' + (it.price > 0 ? pzh(it.price) : it.price < 0 ? '<span class="pz nu"><b>قیمت در سایت</b></span>' : '<span class="pz no"><b>ناموجود</b></span>') + '</span><small>فقط در سایت است؛ برای دیدن بزنید</small></span><span class="pgo" aria-hidden="true">‹</span></button>';
+  return '<button type="button" class="pc live" data-u="' + esc(it.u || '') + '"' + (it.u ? '' : ' disabled') + '><span class="pph">' + tile({ loc: '', img: it.img, k: (String(it.t).length * 7) % 64 }) + '</span><span class="pin"><b>' + esc(String(it.t).length > 70 ? String(it.t).slice(0, 70) + '…' : it.t) + '</b><small>' + esc(srcName(it.s)) + '</small><span class="pcp">' + (it.price > 0 ? pzh(it.price) : it.price < 0 ? '<span class="pz nu"><b>قیمت در سایت</b></span>' : '<span class="pz no"><b>ناموجود</b></span>') + '</span><small>فقط در خودِ سایت · بزنید تا باز شود</small></span><span class="pgo">‹</span></button>';
 }
-function srLvUi(strong) {
-  var el = $('srlv'); if (!el || !srOn) return;
-  var h = '';
-  if (srLv && srLv.busy && !srLv.res) h = '<div class="srvh"><span class="spn"></span>در سایت‌ها هم می‌گردم…</div>';
-  else if (srLv && srLv.busy) h = '<div class="srvh"><span class="spn"></span>در حال بررسیِ نتیجه‌ی سایت‌ها…</div>';
-  else if (srLv && srLv.err) h = '<div class="sremp">جستجو در سایت‌ها نشد؛ اینترنت را ببینید.</div><button type="button" class="srbtn" id="srLvBtn">دوباره امتحان کن</button>';
-  else if (srLv && srLv.res) {
-    var n = (srLv.mapped || []).length + (srLv.other || []).length, ns = srLv.res.notes || {}, allFail = Object.keys(ns).length && Object.keys(ns).every(function (k) { return ns[k] === 'fail'; });
-    if (n) h = '<div class="srvh">در سایت‌ها پیدا شد<small>روی عکس بزنید.</small></div>' + (srLv.mapped.length ? srCards(srLv.mapped, false) : '') + (srLv.other.length ? '<div class="pcs">' + srLv.other.map(lvCard).join('') + '</div>' : '');
-    else h = '<div class="sremp">' + (allFail ? 'سایت‌ها جواب ندادند؛ اینترنت را ببینید.' : 'در سایت‌ها هم چیزی شبیه آن پیدا نشد.<br>املای دیگری را امتحان کنید.') + '</div>' + (allFail ? '<button type="button" class="srbtn" id="srLvBtn">دوباره امتحان کن</button>' : '');
-  } else if (strong !== 99 && ($('srq').value || '').trim().length >= 2 && !(srVoice && $('srq').value === srVoice.text && !srVoice.ranks.length)) h = '<button type="button" class="srbtn" id="srLvBtn">اینها نبود؟ در سایت‌ها هم بگرد</button>';
-  el.className = 'srlive' + (srLv && !srLv.err ? ' has' : '');
-  el.innerHTML = h; fitPz(el);
+/* نوارِ باریکِ زیرِ کادرِ جستجو می‌گوید چه خبر است («دارم می‌گردم»، «۳ موردِ تازه»، «چیزِ تازه‌ای نبود»)؛ کارت‌های تازه زیرِ نتیجه‌های گوشی می‌آیند */
+function srLvUi() {
+  var st = $('srst'), el = $('srlv'); if (!st || !srOn) return;
+  var L = srLv, h = '', sh = '', cls = '';
+  if (!L || !srNorm($('srq').value)) { st.className = ''; st.innerHTML = ''; if (el) { el.className = 'srlive'; el.innerHTML = ''; } return; }
+  var n = L.mapped.length + L.other.length, none = !Object.keys(srShown).length;
+  if (n) h = '<div class="srvh">تازه از سایت‌ها<small>این‌ها در نتیجه‌های بالا نبودند.</small></div>' + (L.mapped.length ? srCards(L.mapped, false) : '') + (L.other.length ? '<div class="pcs">' + L.other.map(lvCard).join('') + '</div>' : '');
+  if (L.busy) { cls = 'on busy'; sh = '<span class="spn"></span>' + (none ? 'در گوشی نبود؛ ' : '') + 'در سایت‌ها هم می‌گردم… <bdi>' + fa(L.done) + ' از ' + fa(L.total) + '</bdi>' + (n ? ' · ' + fa(n) + ' موردِ تازه' : ''); }
+  else if (L.err || (L.total && L.fail >= L.total)) { cls = 'on bad'; sh = 'سایت‌ها جواب ندادند · برای تلاشِ دوباره بزنید'; }
+  else if (n) { cls = 'on new'; sh = '<b>' + fa(n) + '</b> موردِ تازه از سایت‌ها پیدا شد ↓'; }
+  else { cls = 'on'; sh = none ? 'در گوشی و سایت‌ها چیزی پیدا نشد؛ املای دیگری بگویید یا بنویسید' : 'در سایت‌ها چیزِ تازه‌ای نبود'; }
+  if (st._h !== cls + sh) { st._h = cls + sh; st.className = cls; st.innerHTML = sh; }
+  if (el) { var eh = 'srlive' + (n ? ' has' : ''); if (el._h !== h) { el._h = h; el.className = eh; el.innerHTML = h; fitPz(el); } }
 }
 function openSearch(q) {
   var was = srOn; if (!was) layerMark(); srOn = true; $('srch').classList.add('on');
@@ -1911,7 +1933,11 @@ $('srr').addEventListener('click', function (e) {
     return;
   }
   if (e.target.closest('#srAgain')) { startVoice(); return; }
-  if (e.target.closest('#srLvBtn')) srLvStart(srQuery());
+});
+$('srst').addEventListener('click', function () {
+  if (ghosted() || !srLv) return;
+  if (!srLv.busy && (srLv.err || (srLv.total && srLv.fail >= srLv.total))) { var q0 = srLv.q; srLvReset(); srLvStart(q0); return; }
+  var el = $('srlv'); if (el && el.firstChild) try { $('srr').scrollTop = Math.max(0, el.offsetTop - $('srr').offsetTop - 6); } catch (e) { }
 });
 /* ---------- لیست مغازه (جدا از جستجو) ---------- */
 function favRender() {
@@ -1962,10 +1988,10 @@ function voiceGo(alts) {
   /* «بهترین حدس» فقط وقتی نوشته می‌شود که نام کامل و بی‌رقیب باشد: نه فقط برند، نه واژه‌ی بی‌جواب، نه دو املای هم‌امتیاز */
   var near = rk.length > 1 && top.s - rk[1].s < .03 - 1e-9;      // دو املای تقریباً هم‌امتیاز (مثلاً «تامین» و «تمین» که هر دو در فهرست‌اند)
   var sure = !!top && !top.sim && !top.bo && !top.miss && !top.dupc && !near && (top.ex ? gap >= .12 - 1e-9 : (top.cnt >= 2 && top.s >= 1.15 && top.mn >= .7 && gap >= .15 - 1e-9));
-  srVoice = { text: said, strong: strong, best: sure, ranks: rk.slice(0, 12).map(function (r) { return { x: srIdx[r.i], sim: !!r.sim }; }) };
+  srVoice = { text: said, strong: strong, best: sure, ranks: rk.slice(0, 12).map(function (r) { return { x: srIdx[r.i], sim: !!r.sim, k: r.k }; }) };
   if (vwId) closeViewer(); if (dtId) closeDetail(); if (fvOn) closeFav(); if (mkOn) closeReport();      // هرچه باز بود بسته شود تا لیست دیده شود
   openSearch(said);
-  var live = strong < 2; if (live) srLvStart(said);
+  var live = true;      // همیشه از سایت‌ها هم پرسیده می‌شود (srRender خودش شروع می‌کند)
   return { kind: rk.length ? 'list' : 'none', said: said, n: srVoice.ranks.length, best: sure ? srIdx[top.i].m.id : null, live: live };
 }
 window.__voiceRes = function (arr) {

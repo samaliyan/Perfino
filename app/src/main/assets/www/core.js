@@ -2930,7 +2930,7 @@ function liveHit(title, terms, tools) {      // عنوان با دست‌کم ی
   function near(v) {
     if (t.indexOf(v) >= 0) return true;
     var fv = simFold(v);
-    return v.length >= 3 && tw.some(function (u) { return u.length >= 3 && (simWord(u, v) >= .75 || simWord(simFold(u), fv) >= .75); });
+    return v.length >= 3 && tw.some(function (u) { return u.length >= 3 && faKey(u).charAt(0) === faKey(v).charAt(0) && (simWord(u, v) >= .75 || simWord(simFold(u), fv) >= .75); });      // حرفِ اول یکی باشد: «مارلی» همان «چارلی» نیست
   }
   return ws.some(function (x) {
     if (near(x)) return true;
@@ -2996,7 +2996,7 @@ async function wooLive(srcId, base, terms, net, tools) {
           var h = await getR(net, base + tpls[ti].replace('{q}', encodeURIComponent(qs[qi])), { Accept: 'text/html' }, 2);
           if (h.status === 200 && typeof DOMParser !== 'undefined') {
             var doc = new DOMParser().parseFromString(h.body, 'text/html'), cards = nextDataCards(doc, base + '/'); if (!cards.length) cards = extractCards(doc, base + '/');
-            var o2 = cards.filter(function (c) { return c && c.t && titleLooksPerfume(c.t) && liveHit(c.t, terms, tools); }).slice(0, 12).map(function (c) { return { s: srcId, t: c.t, price: c.price > 0 ? c.price : (c.st === 1 && !c.np ? 0 : -1), img: c.img || '', u: itemUrl(srcId, c.u) || '' }; });      // وقتی چیزی پیدا نشود بعضی سایت‌ها «پرفروش‌ها» را نشان می‌دهند؛ فقط ردیف‌هایی که واژه‌ی گفته‌شده را دارند
+            var o2 = cards.filter(function (c) { return c && c.t && titleLooksPerfume(c.t) && liveHit(c.t, terms, tools); }).slice(0, 12).map(function (c) { return { s: srcId, pid: String(c.u || ''), t: c.t, price: c.price > 0 ? c.price : (c.st === 1 && !c.np ? 0 : -1), img: c.img || '', u: itemUrl(srcId, c.u) || '' }; });      // وقتی چیزی پیدا نشود بعضی سایت‌ها «پرفروش‌ها» را نشان می‌دهند؛ فقط ردیف‌هایی که واژه‌ی گفته‌شده را دارند
             if (o2.length) return { items: o2, note: 'ok' };
             gotAny = true;
           }
@@ -3011,42 +3011,58 @@ async function wooLive(srcId, base, terms, net, tools) {
       var cats = (it.categories || []).map(function (c) { return c && c.name || ''; }).join(' ');
       if (!titleLooksPerfume(it.name + ' ' + cats)) return;
       var im = it.images && it.images[0];
-      out.push({ s: srcId, t: stripTags(it.name), price: wooLivePrice(it), img: im ? (im.thumbnail || im.src || '') : '', u: itemUrl(srcId, it.permalink) || '' });
+      out.push({ s: srcId, pid: it.id != null ? String(it.id) : '', t: stripTags(it.name), price: wooLivePrice(it), img: im ? (im.thumbnail || im.src || '') : '', u: itemUrl(srcId, it.permalink) || '' });
     });
     if (out.length) return { items: out, note: 'ok' };
   }
   return { items: [], note: gotAny ? 'none' : 'fail' };
 }
-async function digikalaLive(terms, net) {
-  var q = terms.join(' '), urls = ['https://api.digikala.com/v1/categories/perfume/search/?page=1&q=' + encodeURIComponent(q), 'https://api.digikala.com/v1/search/?page=1&q=' + encodeURIComponent(q)];
-  var gotAny = false;
-  for (var i = 0; i < urls.length; i++) {
-    var r = await getR(net, urls[i], { Accept: 'application/json' }, 2), j = r.status === 200 ? parseJson(r.body) : undefined, d = j && j.data;
-    if (!d || !Array.isArray(d.products)) continue;
-    gotAny = true;
-    var out = [];
+/* امتیازِ ربط: چند واژه‌ی اصلیِ پرسش در عنوان هست (املای نزدیک و برگردانِ فارسی/لاتین هم قبول) */
+function liveScore(title, terms, tools) { var n = 0; terms.forEach(function (w) { if (liveHit(title, [w], tools)) n++; }); return n; }
+/* جستجوی دیجی‌کالا «تقریبی» است و برای «چارلی رولون» بیست عطرِ «مارلی» می‌آورد؛ پس: همه‌ی واژه‌ها + هر واژه‌ی اصلی جدا (هم‌زمان)،
+   فقط عنوان‌هایی که دست‌کم یک واژه را دارند، و آن‌هایی که واژه‌های بیشتری دارند جلوتر */
+async function digikalaLive(terms, net, tools) {
+  var q = terms.join(' '), cat = 'https://api.digikala.com/v1/categories/perfume/search/?page=1&q=', qs = [q];
+  if (terms.length > 1) terms.filter(function (w) { return !srNum(w) && w.length >= 3; }).sort(function (a, b) { return b.length - a.length; }).slice(0, 2).forEach(function (w) { if (qs.indexOf(w) < 0) qs.push(w); });
+  var urls = qs.map(function (x) { return cat + encodeURIComponent(x); }), gotAny = false, seen = {}, out = [];
+  function eat(d, general) {
     d.products.forEach(function (p) {
-      if (!p || typeof p !== 'object') return;
-      var title = p.title_fa || p.title_en || ''; if (!title || (i > 0 && !titleLooksPerfume(title))) return;
+      if (!p || typeof p !== 'object' || seen[p.id]) return;
+      var title = p.title_fa || p.title_en || ''; if (!title || (general && !titleLooksPerfume(title))) return;
+      var k = liveScore(title + ' ' + (p.title_en || ''), terms, tools); if (!k) return;
+      seen[p.id] = 1;
       var dv = p.default_variant, rial = dv && dv.price && dv.price.selling_price, avail = !(p.status && p.status !== 'marketable') && !!dv && typeof dv === 'object' && !Array.isArray(dv) && !(dv.status && !/marketable|available/i.test(String(dv.status)));
       var img = p.images && p.images.main && p.images.main.url && p.images.main.url[0] || '';
-      out.push({ s: 'digikala', t: title, price: !avail ? 0 : (rial > 0 && rial / 10 <= 4e8) ? Math.round(rial / 10) : -1, img: img ? img.replace(/h_\d+,w_\d+/, 'h_360,w_360') : '', u: itemUrl('digikala', p.id) || '' });
+      out.push({ s: 'digikala', pid: String(p.id), t: title, k: k, price: !avail ? 0 : (rial > 0 && rial / 10 <= 4e8) ? Math.round(rial / 10) : -1, img: img ? img.replace(/h_\d+,w_\d+/, 'h_360,w_360') : '', u: itemUrl('digikala', p.id) || '' });
     });
-    if (out.length) return { items: out.slice(0, 12), note: 'ok' };
   }
-  return { items: [], note: gotAny ? 'none' : 'fail' };
+  var rs = await Promise.all(urls.map(function (u) { return getR(net, u, { Accept: 'application/json' }, 2).catch(function () { return { status: 0 }; }); }));
+  rs.forEach(function (r) { var j = r.status === 200 ? parseJson(r.body) : undefined, d = j && j.data; if (d && Array.isArray(d.products)) { gotAny = true; eat(d, false); } });
+  if (!out.length) {      // دسته‌ی عطر چیزی نداشت: جستجوی کلِ سایت (فقط عنوان‌هایی که عطرند)
+    var r2 = await getR(net, 'https://api.digikala.com/v1/search/?page=1&q=' + encodeURIComponent(q), { Accept: 'application/json' }, 2), j2 = r2.status === 200 ? parseJson(r2.body) : undefined, d2 = j2 && j2.data;
+    if (d2 && Array.isArray(d2.products)) { gotAny = true; eat(d2, true); }
+  }
+  out.sort(function (a, b) { return (b.k - a.k) || ((b.price > 0) - (a.price > 0)); });
+  return out.length ? { items: out.slice(0, 12), note: 'ok' } : { items: [], note: gotAny ? 'none' : 'fail' };
 }
-async function liveSearch(text, net, srcIds, tools) {
+async function liveSearch(text, net, srcIds, tools, onPart) {      // onPart(id, items, note): هر سایت که جواب داد همان لحظه (صفحه منتظرِ کندترین سایت نماند)
   var terms = liveTerms(String(text || '').slice(0, 120)), notes = {}, items = [];
   if (!terms.length) return { items: [], notes: {}, terms: terms };
   function lim(pr) { var tm; return Promise.race([pr, new Promise(function (res) { tm = setTimeout(function () { res({ items: [], note: 'fail' }); }, 20000); })]).then(function (r) { clearTimeout(tm); return r; }); }      // مهلتِ ۲۰ ثانیه؛ بعد از جواب پاک می‌شود
   var ids = (srcIds && srcIds.length ? srcIds : Object.keys(LIVE_BASE).concat(['digikala']));
   var jobs = ids.map(function (id) {
-    var pr = id === 'digikala' ? digikalaLive(terms, net) : (LIVE_BASE[id] ? wooLive(id, LIVE_BASE[id], terms, net, tools) : Promise.resolve({ items: [], note: 'none' }));
-    return lim(pr.catch(function () { return { items: [], note: 'fail' }; })).then(function (r) { notes[id] = r.note; return r.items; });
+    var pr = id === 'digikala' ? digikalaLive(terms, net, tools) : (LIVE_BASE[id] ? wooLive(id, LIVE_BASE[id], terms, net, tools) : Promise.resolve({ items: [], note: 'none' }));
+    return lim(pr.catch(function () { return { items: [], note: 'fail' }; })).then(function (r) {
+      notes[id] = r.note;
+      var a = (r.items || []).map(function (it) { if (it.k == null) it.k = liveScore(it.t, terms, tools); return it; });
+      a.sort(function (x, y) { return (y.k - x.k) || ((y.price > 0) - (x.price > 0)); });
+      if (onPart) try { onPart(id, a, r.note); } catch (e) { }
+      return a;
+    });
   });
   var res = await Promise.all(jobs);
   res.forEach(function (a) { items = items.concat(a); });
+  items.sort(function (x, y) { return y.k - x.k; });
   return { items: items, notes: notes, terms: terms };
 }
 
@@ -3378,7 +3394,7 @@ function marketView(list, o) {
    هر واژه‌ی جستجو با چند روش سنجیده می‌شود: دقیق، شروع‌شدن با آن (هنگام تایپ)، املای نزدیک (همان حروفِ بی‌صدا یا همان تلفظ انگلیسی) و یک غلطِ تایپی.
    اول عطرهایی می‌آیند که همه‌ی واژه‌هایشان «دقیقاً» در نامِ عطر یا برند هست؛ بعد بقیه به ترتیبِ نزدیکی به «نامِ مدل». */
 function srMap() { return Object.create(null); }      // «constructor» و «toString» هم می‌توانند واژه باشند؛ شیء ساده نباید با آن‌ها قاطی شود
-var SR_STOP = srMap(); ('عطر ادکلن ادکلون ادو ادوپرفیوم پرفیوم پارفوم تویلت میل میلی لیتر قیمت بده بدید نشون نشان بگو بگید پیدا کن کنید برام برای من یه یک می خوام خواهم خوایم دنبال رو را از و با فقط لطفا مردانه زنانه مردونه زنونه یونیسکس اورجینال اوریجینال ارجینال اصل اصلی ml cc oz edp edt edc eau parfum perfume cologne toilette ادوتویلت ادوکلن ادوپرفوم ادوتوالت توالت اکستریت اسپری تستر').split(' ').forEach(function (w) { SR_STOP[w] = 1; });
+var SR_STOP = srMap(); ('عطر ادکلن ادکلون ادو ادوپرفیوم پرفیوم پارفوم تویلت میل میلی لیتر قیمت بده بدید نشون نشان بگو بگید پیدا کن کنید برام برای من یه یک می خوام خواهم خوایم دنبال رو را از و با فقط لطفا مردانه زنانه مردونه زنونه یونیسکس اورجینال اوریجینال ارجینال اصل اصلی ml cc oz edp edt edc eau parfum perfume cologne toilette ادوتویلت ادوکلن ادوپرفوم ادوتوالت توالت اکستریت اسپری تستر هستم هستش که اسمش اسمشو اسمش‌و اسم نامش نام بنام عطری عطرو ادکلنی چنده چند چقدره چقدر داری دارید دارین میخوام میخواهم میخواستم خواستم میگردم گردم بگرد ببینم ببین چیه بیار بیاور بهم به اون این رو رو‌ ی').split(' ').forEach(function (w) { SR_STOP[w] = 1; });      // جمله‌ی گفتاری: «من دنبال عطری هستم که اسمش چارلی هستش» ← «چارلی»
 var SR_CONN = srMap(); ('de du di la le the of by and for pour with دو دی د لا لو لی ال بای پور ان اند').split(' ').forEach(function (w) { SR_CONN[w] = 1; });      // واژه‌های ربطیِ نام‌ها؛ اگر در ردیفی نبودند، رد کردنِ آن ردیف دلیل نمی‌شود
 var SR_NUM = srMap(); ('صد دویست سیصد پانصد پنجاه شصت هفتاد هشتاد نود بیست سی چهل لیتر لیتری سی‌سی اونس گرم گرمی میلی‌لیتر mg ccm fl').split(' ').forEach(function (w) { SR_NUM[w] = 1; });      // اندازه‌های رایج («ساواج صد میل»)؛ فقط وقتی دقیق در نام باشند حساب می‌شوند
 ('چنده چقدره چقدر چند موجوده موجود دارید داری دارین دارم میخوام میخواستم میخرم بخرم خرید فروش موجودی ارزان ارزون گرون گران جدید تازه خوب بهترین بهتر').split(' ').forEach(function (w) { SR_STOP[w] = 1; });      // حرف‌های روزمره‌ی «ساواج چنده؟»؛ نبودنشان در نام دلیلِ رد کردنِ عطر نیست
@@ -3725,7 +3741,7 @@ function searchRank(idx, alts, tools, opts) {
   return out;
 }
 
-root.Core = { probeShop: probeShop, fetchNews: fetchNews, newsMore: newsMore, newsFromWp: newsFromWp, newsFromRss: newsFromRss, newsPickImg: newsPickImg, newsExcerpt: newsExcerpt, NEWS_SRC: NEWS_SRC, liveSearch: liveSearch, liveTerms: liveTerms, liveHit: liveHit, wooLivePrice: wooLivePrice, searchIndex: searchIndex, searchRank: searchRank, searchSimilar: searchSimilar, simWord: simWord, simFold: simFold, srn: srn, fzKey: fzKey, explainTitle: explainTitle, useSz: useSz, sizeFromPage: sizeFromPage, nextDataCards: nextDataCards, RAWC: RAWC, stripPriceTail: stripPriceTail, marketStats: marketStats, marketView: marketView, histNew: histNew, histFix: histFix, histSnap: histSnap, histReport: histReport, purgeStored: purgeStored, setBlock: setBlock, REJ: REJ, vetReason: vetReason, reconcile: reconcile, reconcileAsync: reconcileAsync, CLEANSE: CLEANSE, cleanseText: cleanseText, cleanBrandName: cleanBrandName, itemUrl: itemUrl, STALE_MIN: STALE_MIN, fa2en: fa2en, en2fa: en2fa, enTokens: enTokens, titleEn: titleEn, tree: tree, brandOf: brandOf, specInfo: specInfo, enrichTitle: enrichTitle, genderOf: genderOf, nameCmp: nameCmp, CFG: CFG, newDb: newDb, dbIndex: dbIndex, ingest: ingest, ingestAsync: ingestAsync, buildList: buildList, normFa: normFa, parseTitle: parseTitle, aggregate: aggregate, SOURCES: SOURCES, extractCards: extractCards,
+root.Core = { probeShop: probeShop, fetchNews: fetchNews, newsMore: newsMore, newsFromWp: newsFromWp, newsFromRss: newsFromRss, newsPickImg: newsPickImg, newsExcerpt: newsExcerpt, NEWS_SRC: NEWS_SRC, liveSearch: liveSearch, liveTerms: liveTerms, liveHit: liveHit, liveScore: liveScore, digikalaLive: digikalaLive, wooLivePrice: wooLivePrice, searchIndex: searchIndex, searchRank: searchRank, searchSimilar: searchSimilar, simWord: simWord, simFold: simFold, srn: srn, fzKey: fzKey, explainTitle: explainTitle, useSz: useSz, sizeFromPage: sizeFromPage, nextDataCards: nextDataCards, RAWC: RAWC, stripPriceTail: stripPriceTail, marketStats: marketStats, marketView: marketView, histNew: histNew, histFix: histFix, histSnap: histSnap, histReport: histReport, purgeStored: purgeStored, setBlock: setBlock, REJ: REJ, vetReason: vetReason, reconcile: reconcile, reconcileAsync: reconcileAsync, CLEANSE: CLEANSE, cleanseText: cleanseText, cleanBrandName: cleanBrandName, itemUrl: itemUrl, STALE_MIN: STALE_MIN, fa2en: fa2en, en2fa: en2fa, enTokens: enTokens, titleEn: titleEn, tree: tree, brandOf: brandOf, specInfo: specInfo, enrichTitle: enrichTitle, genderOf: genderOf, nameCmp: nameCmp, CFG: CFG, newDb: newDb, dbIndex: dbIndex, ingest: ingest, ingestAsync: ingestAsync, buildList: buildList, normFa: normFa, parseTitle: parseTitle, aggregate: aggregate, SOURCES: SOURCES, extractCards: extractCards,
   wooSource: wooSource, digikalaSource: digikalaSource, htmlSource: htmlSource, letterOf: letterOf, median: median, priceFromText: priceFromText, similar: similar };
 if (typeof module !== 'undefined') module.exports = root.Core;
 })(typeof window !== 'undefined' ? window : globalThis);

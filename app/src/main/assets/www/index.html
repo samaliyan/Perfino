@@ -275,14 +275,14 @@ body.dk #nw.on{display:flex}
 #fv{position:absolute;top:0;left:0;right:0;bottom:0;z-index:47;background:var(--bg);display:none;flex-direction:column;padding:calc(8px + env(safe-area-inset-top,0px)) 14px 0}
 #fv.on{display:flex}
 #fvx{height:48px;min-width:64px;padding:0 14px;border-radius:24px;border:1px solid var(--gb);background:var(--pill);color:var(--tx);font:inherit;font-size:14px;font-weight:700;cursor:pointer}
-.pcs{display:flex;flex-direction:column;gap:10px;padding:2px 0 14px}
-.pc{position:relative;display:flex;align-items:center;gap:12px;width:100%;min-height:112px;padding:8px 10px 8px 6px;border-radius:20px;border:1.5px solid var(--cb);background:var(--card);color:var(--tx);font:inherit;text-align:right;cursor:pointer;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+.pcs{display:flex;flex-direction:column;gap:7px;padding:2px 0 12px}
+.pc{position:relative;display:flex;align-items:center;gap:10px;width:100%;min-height:90px;padding:6px 10px 6px 6px;border-radius:20px;border:1.5px solid var(--cb);background:var(--card);color:var(--tx);font:inherit;text-align:right;cursor:pointer;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
 .pc:active{transform:scale(.985)}
-.pc .pph{flex:0 0 clamp(92px,28vw,112px);height:clamp(92px,28vw,112px)}
+.pc .pph{flex:0 0 clamp(74px,22vw,90px);height:clamp(74px,22vw,90px)}
 .pc .pph .tile{width:100%;height:100%;border-radius:16px}
 .pc .pin{flex:1 1 0;min-width:0}
-.pc .pin b{display:block;font-size:19px;line-height:1.55;overflow-wrap:anywhere;unicode-bidi:plaintext}
-.pc .pin small{display:block;color:var(--mu);font-size:14px;line-height:1.7;margin-top:1px;unicode-bidi:plaintext}
+.pc .pin b{display:block;font-size:18px;line-height:1.45;overflow-wrap:anywhere;unicode-bidi:plaintext}
+.pc .pin small{display:block;color:var(--mu);font-size:13.5px;line-height:1.55;margin-top:1px;unicode-bidi:plaintext}
 .pc .pgo{flex:none;color:var(--mu);font-size:28px;line-height:1;padding:0 2px}
 .pc.best{border-color:var(--act);box-shadow:inset 0 0 0 1.5px var(--ac)}
 .pc .pbest{display:inline-block;margin-bottom:3px;padding:1px 10px;border-radius:12px;background:var(--ac);color:#0c0f1f;font-size:12px;font-weight:700}
@@ -294,7 +294,22 @@ body.dk #nw.on{display:flex}
 .srvh{padding:12px 4px 6px;font-weight:700;line-height:1.9;color:var(--tx)}
 .srvh small{display:block;font-weight:400;color:var(--mu);font-size:13px}
 .srsim{padding:14px 4px 4px;font-weight:700;color:var(--mu);font-size:14px}
+details.fold{margin:10px 0 0;border:1.5px solid var(--cb);border-radius:18px;background:var(--card);overflow:hidden}
+details.fold>summary{list-style:none;cursor:pointer;padding:14px 16px;font-weight:700;font-size:16px;line-height:1.7;position:relative;padding-inline-end:40px;-webkit-tap-highlight-color:transparent}
+details.fold>summary::-webkit-details-marker{display:none}
+details.fold>summary small{display:block;font-weight:400;font-size:13px;color:var(--mu)}
+details.fold>summary::after{content:'‹';position:absolute;inset-inline-end:16px;top:50%;transform:translateY(-50%) rotate(-90deg);font-size:24px;color:var(--mu);transition:transform .15s}
+details.fold[open]>summary::after{transform:translateY(-50%) rotate(90deg)}
+details.fold[open]>summary{border-bottom:1.5px solid var(--cb)}
+details.fold>*:not(summary){margin-inline:14px}
+details.fold>*:last-child{margin-bottom:14px}
 .srlive.has{margin-top:10px;border-top:1.5px dashed var(--gb);padding-top:4px}
+#srst{display:none;flex:none;margin:0 2px 8px;padding:9px 14px;border-radius:14px;background:var(--card);border:1.5px solid var(--cb);color:var(--mu);font-size:14px;line-height:1.7;zoom:var(--zs)}
+#srst.on{display:block}
+#srst.new{color:var(--tx);border-color:var(--act);cursor:pointer}
+#srst.new b{font-size:16px}
+#srst.bad{color:var(--tx);border-color:#d9534f;cursor:pointer}
+#srst .spn{width:15px;height:15px;border-width:2.5px}
 .srbtn{display:block;width:100%;min-height:56px;margin:10px 0 6px;border-radius:18px;border:1.5px solid var(--act);background:none;color:var(--tx);font:inherit;font-size:16px;font-weight:700;cursor:pointer}
 .srbtn.pri{background:var(--ac);color:#0c0f1f;border-color:var(--act)}
 .spn{display:inline-block;width:18px;height:18px;border-radius:50%;border:3px solid var(--cb);border-top-color:var(--act);animation:spn .8s linear infinite;vertical-align:-3px;margin-inline-end:8px}
@@ -499,7 +514,7 @@ body.dk #nw.on{display:flex}
   <button id="sr" aria-label="جستجو"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg></button>
   <button id="bk" aria-label="بازگشت"><svg width="13" height="20" viewBox="0 0 10 16" aria-hidden="true" style="transform:scaleX(-1)"><path d="M8 1L2 8l6 7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
   <div id="dock"><button id="dkM" type="button" aria-label="گفتن نام عطر"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="2.5" width="6" height="12" rx="3"/><path d="M5 11.5a7 7 0 0 0 14 0M12 18.5V22"/></svg><span>بگویید</span></button><button id="dkS" type="button" aria-label="جستجوی عطر"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><span>جستجو</span></button><button id="dkF" type="button" aria-label="لیست مغازه"><svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2.6l2.9 6 6.6.9-4.8 4.6 1.2 6.5L12 17.4l-5.9 3.2 1.2-6.5L2.5 9.5l6.6-.9z"/></svg><span>مغازه</span></button></div>
-  <div id="srch" role="dialog" aria-label="جستجو"><div class="srh"><input id="srq" type="search" placeholder="نام عطر یا برند" autocomplete="off" enterkeyhint="search"><button id="srm" type="button" aria-label="گفتن نام عطر"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="2.5" width="6" height="12" rx="3"/><path d="M5 11.5a7 7 0 0 0 14 0M12 18.5V22"/></svg></button><button id="srx">بستن</button></div><div id="srr"></div></div>
+  <div id="srch" role="dialog" aria-label="جستجو"><div class="srh"><input id="srq" type="search" placeholder="نام عطر یا برند" autocomplete="off" enterkeyhint="search"><button id="srm" type="button" aria-label="گفتن نام عطر"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="2.5" width="6" height="12" rx="3"/><path d="M5 11.5a7 7 0 0 0 14 0M12 18.5V22"/></svg></button><button id="srx">بستن</button></div><div id="srst" role="status" aria-live="polite"></div><div id="srr"></div></div>
   <div id="fv" role="dialog" aria-label="لیست مغازه"><div class="srh"><h2 class="mkt">لیست مغازه ★</h2><button id="fvx">بستن</button></div><div id="fvr"></div></div>
   <div id="mk" role="dialog" aria-label="خبر و گزارش بازار"><div class="srh"><h2 class="mkt">خبر و گزارش بازار</h2><button id="mkx">بستن</button></div><div class="mkt2" id="mkt2"><button type="button" data-t="news">خبر</button><button type="button" data-t="chg">قیمت‌ها</button><button type="button" data-t="cmp">مقایسه</button></div><div id="mkr"></div></div>
   <div id="dt" role="dialog" aria-label="جزئیات"><button id="dtx">برگشت</button><div id="dtc"></div></div>
@@ -518,6 +533,23 @@ body.dk #nw.on{display:flex}
     <div class="hint2">روی همه‌ی صفحه‌ها اثر می‌کند: فهرست، حروف کنار صفحه، جزئیات، جستجو و تنظیمات.</div>
     <h3>رنگ صفحه</h3>
     <div class="seg" id="sTheme"><button data-v="light">روشن</button><button data-v="dark">تاریک</button><button data-v="auto">خودکار</button></div>
+    <h3>نسخه‌ی برنامه</h3>
+    <div class="hint2" id="sUpdT"></div>
+    <button class="btn ghost" id="sAdvBtn" aria-expanded="false"><span>تنظیمات بیشتر</span></button>
+    <div id="sAdv" style="display:none">
+    <div class="hint2">این بخش برای کارِ هرروزه لازم نیست. هر ردیف را بزنید تا باز شود.</div>
+    <details class="fold"><summary>سایت‌های قیمت<small>کدام فروشگاه‌ها خوانده شوند</small></summary>
+    <div class="srcs" id="sSrc"></div>
+    </details>
+    <details class="fold"><summary>بروزرسانی خودکار قیمت‌ها<small>هر چند وقت یک‌بار، وقتی برنامه باز است</small></summary>
+    <div class="seg mods" id="sAuto"><button data-m="0">خاموش<small>دستی</small></button><button data-m="15">۱۵<small>دقیقه</small></button><button data-m="30">۳۰<small>دقیقه</small></button><button data-m="60">۱<small>ساعت</small></button><button data-m="180">۳<small>ساعت</small></button></div>
+    </details>
+    <details class="fold"><summary>برندها<small>برندهایی که نمی‌فروشید را خاموش کنید</small></summary>
+    <button class="btn ghost" id="sBrBtn" style="margin-top:0"></button>
+    <div id="sBrList" style="display:none"></div>
+    <div class="hint2">برندی که خاموش کنید در فهرست دیده نمی‌شود و عکسش دانلود نمی‌شود.</div>
+    </details>
+    <details class="fold"><summary>شکل لیست و زبان<small>ظاهرِ صفحه‌ی اول</small></summary>
     <h3>شکل لیست</h3>
     <div class="seg mods" id="sModel">
       <button data-v="a">چرخ<small>چرخ نیم‌دایره</small></button>
@@ -528,24 +560,8 @@ body.dk #nw.on{display:flex}
     <h3>زبان نام‌ها و حروف</h3>
     <div class="seg mods" id="sLang"><button data-l="fa">فارسی<small>الف ب پ</small></button><button data-l="en">English<small>A B C</small></button></div>
     <div class="hint2">نام عطرها و حروف کنار فهرست به همین زبان نشان داده می‌شود. اگر سایت‌ها نام انگلیسی نداشته باشند، برنامه خودش از روی فارسی می‌سازد.</div>
-    <h3>نسخه‌ی برنامه</h3>
-    <div class="hint2" id="sUpdT"></div>
-    <button class="btn ghost" id="sAdvBtn" aria-expanded="false"><span>تنظیمات پیشرفته</span></button>
-    <div id="sAdv" style="display:none">
-    <h3>چرا یک عطر نیست؟</h3>
-    <div class="hint2">نام عطر را بنویسید تا ببینید برنامه آن را از فروشگاه‌ها گرفته یا چرا کنار گذاشته است.</div>
-    <div class="bkrow"><input id="whyIn" type="text" placeholder="مثلاً کلینیک هپی" autocomplete="off"><button id="whyGo">بررسی</button></div>
-    <div id="whyOut"></div>
-    <button class="btn ghost" id="whyCovB"><span>آمار دریافت از هر فروشگاه</span></button>
-    <div id="whyCov"></div>
-    <h3>ارسالِ گزارش برای سازنده</h3>
-    <div class="hint2">اگر عطری در سایت هست ولی در برنامه نیست، یا دو سایت یک عطر را جدا نشان می‌دهند: نامش را بنویسید (اختیاری) و دکمه را بزنید. برنامه از خودِ سایت‌ها می‌پرسد، همه‌چیز را در یک فایل می‌گذارد و برگه‌ی «ارسال» را باز می‌کند تا آن را برای سازنده بفرستید.</div>
-    <div class="bkrow"><input id="dgIn" type="text" placeholder="مثلاً کلینیک هپی" autocomplete="off"></div>
-    <button class="btn" id="dgGo">ساخت گزارش و ارسال</button>
-    <h3>گزارش به‌روز</h3>
-    <div id="sRep"></div>
-    <button class="btn ghost" id="sFull" style="display:none">دریافت کامل از اول</button>
-    <button class="btn ghost" id="sCopy" style="display:none">کپی گزارش خطا برای ارسال به سازنده</button>
+    </details>
+    <details class="fold"><summary>چیزهایی که نمی‌خواهم ببینم<small>واژه‌های ممنوع و عطرهای پنهان‌شده</small></summary>
     <h3>واژه‌های ممنوع</h3>
     <div class="bkrow"><input id="bkIn" type="text" placeholder="مثلاً نام یک فروشنده یا برندِ تقلیدی" autocomplete="off"><button id="bkAdd">اضافه</button></div>
     <div class="chips" id="bkList"></div>
@@ -555,17 +571,27 @@ body.dk #nw.on{display:flex}
     <div class="chips" id="hdList"></div>
     <div class="hint2" id="hdHint"></div>
     </div>
-    <h3>برندها</h3>
-    <button class="btn ghost" id="sBrBtn" style="margin-top:0"></button>
-    <div id="sBrList" style="display:none"></div>
-    <div class="hint2">برندی که خاموش کنید در فهرست دیده نمی‌شود و عکسش دانلود نمی‌شود.</div>
-    <h3>بروزرسانی خودکار قیمت‌ها</h3>
-    <div class="seg mods" id="sAuto"><button data-m="0">خاموش<small>دستی</small></button><button data-m="15">۱۵<small>دقیقه</small></button><button data-m="30">۳۰<small>دقیقه</small></button><button data-m="60">۱<small>ساعت</small></button><button data-m="180">۳<small>ساعت</small></button></div>
-    <h3>سایت‌های قیمت</h3>
-    <div class="srcs" id="sSrc"></div>
+    </details>
+    <details class="fold"><summary>چرا یک عطر نیست؟<small>ببینید برنامه یک عطر را گرفته یا چرا کنار گذاشته</small></summary>
+    <div class="hint2">نام عطر را بنویسید تا ببینید برنامه آن را از فروشگاه‌ها گرفته یا چرا کنار گذاشته است.</div>
+    <div class="bkrow"><input id="whyIn" type="text" placeholder="مثلاً کلینیک هپی" autocomplete="off"><button id="whyGo">بررسی</button></div>
+    <div id="whyOut"></div>
+    <button class="btn ghost" id="whyCovB"><span>آمار دریافت از هر فروشگاه</span></button>
+    <div id="whyCov"></div>
+    </details>
+    <details class="fold"><summary>عیب‌یابی و گزارش برای سازنده<small>فقط وقتی سازنده خواست</small></summary>
+    <h3>ارسالِ گزارش برای سازنده</h3>
+    <div class="hint2">اگر عطری در سایت هست ولی در برنامه نیست، یا دو سایت یک عطر را جدا نشان می‌دهند: نامش را بنویسید (اختیاری) و دکمه را بزنید. برنامه از خودِ سایت‌ها می‌پرسد، همه‌چیز را در یک فایل می‌گذارد و برگه‌ی «ارسال» را باز می‌کند تا آن را برای سازنده بفرستید.</div>
+    <div class="bkrow"><input id="dgIn" type="text" placeholder="مثلاً کلینیک هپی" autocomplete="off"></div>
+    <button class="btn" id="dgGo">ساخت گزارش و ارسال</button>
+    <h3>گزارش به‌روز</h3>
+    <div id="sRep"></div>
+    <button class="btn ghost" id="sFull" style="display:none">دریافت کامل از اول</button>
+    <button class="btn ghost" id="sCopy" style="display:none">کپی گزارش خطا برای ارسال به سازنده</button>
     <h3>بروزرسانی خودِ برنامه</h3>
     <div class="seg mods" id="sUpdA"><button data-v="1">خودکار<small>خودش پیدا و نصب می‌کند</small></button><button data-v="0">خاموش<small>فقط برای آزمایش</small></button></div>
     <button class="btn ghost" id="sUpd"><span>همین حالا بپرس</span></button>
+    </details>
     </div>
     <div class="ver" id="sVer"></div>
   </div>
