@@ -1312,7 +1312,7 @@ async function doSource(s) {
   var opt = null;
   if (s.id === 'digikala') {
     db.ck = db.ck || {}; var ck = db.ck[s.id];
-    opt = { conc: BG ? 2 : 8, from: ck && ck.cur > 0 && Date.now() - ck.t < 3 * 3600e3 && Date.now() >= ck.t ? ck.cur : 0,
+    opt = { conc: BG || (bgRun && document.hidden) ? 2 : 8, from: ck && ck.cur > 0 && Date.now() - ck.t < 3 * 3600e3 && Date.now() >= ck.t ? ck.cur : 0,
       onRound: async function (items, cur) {
         await Core.ingestAsync(db, idx, s.id, items, false);
         if (cur) db.ck[s.id] = { cur: cur, t: Date.now() }; else delete db.ck[s.id];
@@ -2225,6 +2225,17 @@ var okTries = 0, okT = setInterval(function () {
 }, 500);
 /* پس‌زمینه: اگر قیمت‌ها ۲۰ ساعت یا بیشتر کهنه‌اند یک بروزرسانی (فقط قیمت؛ عکس و بروزرسانیِ خودِ برنامه نه) و بعد خبر به اندروید. نیمه‌کاره ماند = دفعه‌ی بعد از همان‌جا */
 function bgDone(ok, more) { try { if (hasN('bgDone')) window.Native.bgDone(!!ok, !!more); } catch (e) { } }
+/* برنامه باز مانده ولی پشتِ برنامه‌های دیگر است و نوبتِ بروزرسانیِ پس‌زمینه رسیده: همین صفحه انجامش می‌دهد */
+var bgRun = false;
+window.__bgStart = function () {
+  try {
+    if (bgRun) return;
+    var last = oldestOk();
+    if (busy || !db.ready || (!halfDone() && last && Date.now() - last < 20 * 3600e3)) { bgDone(true, false); return; }
+    bgRun = true;
+    refresh(false).then(function () { bgRun = false; bgDone(true, halfDone()); }, function () { bgRun = false; bgDone(false, true); });
+  } catch (e) { bgRun = false; bgDone(false, false); }
+};
 if (BG) {
   try { Core.CFG.conc = 2; } catch (e) { }      // پس‌زمینه: آرام
   setTimeout(function () {

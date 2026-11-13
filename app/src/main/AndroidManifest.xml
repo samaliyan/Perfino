@@ -5,6 +5,8 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+    <!-- نوبتِ بروزرسانیِ پس‌زمینه بعد از خاموش و روشن شدنِ گوشی هم بماند -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
     <!-- اندروید ۱۱ به بالا: دیدنِ برنامه‌ی تشخیص گفتار و Play Store -->
     <queries>
@@ -30,5 +32,10 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+        <!-- بروزرسانیِ قیمت‌ها وقتی برنامه بسته است (فقط خودِ اندروید می‌تواند صدایش بزند) -->
+        <service
+            android:name=".BgJob"
+            android:exported="false"
+            android:permission="android.permission.BIND_JOB_SERVICE" />
     </application>
 </manifest>

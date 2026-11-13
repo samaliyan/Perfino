@@ -130,7 +130,7 @@ public class OtaTest {
         Ota.Info i157 = info(z157, 157, "1.33", 2);
         chk("state: new", o.state(i157).equals("new"));
         chk("state: همان نسخه = same", o.state(info(z157, 156, "1.33", 2)).equals("same"));
-        chk("state: api بالاتر = apk", o.state(info(z157, 157, "1.33", 3)).equals("apk"));
+        chk("state: api بالاتر = apk", o.state(info(z157, 157, "1.33", Ota.NATIVE_API + 1)).equals("apk"));
         chk("state: شماره‌ی خیلی جلوتر از APK (دروغین) = same، نه نصبِ دائمی", o.state(info(z157, 156 + Ota.MAX_AHEAD + 1, "1.33", 2)).equals("same") && o.state(info(z157, 156 + Ota.MAX_AHEAD, "1.33", 2)).equals("new"));
         net.infoJson = "{\"code\":157,\"v\":\"1.33\",\"api\":2,\"size\":" + z157.length + ",\"sha\":\"" + sha(z157) + "\"}";
         Ota.Info f = o.fetchInfo(net);
@@ -148,7 +148,10 @@ public class OtaTest {
         chk("آدرس به فایل واقعی اشاره می‌کند", u != null && new File(URI.create(u)).isFile());
         chk("پس از نصب، state همان نسخه = same", o.state(i157).equals("same"));
         // تلاش‌ها
+        chk("peekUrl: بسته‌ای که هنوز «زنده‌ام» نگفته در پس‌زمینه اجرا نمی‌شود", o.peekUrl() == null, o.peekUrl());
         o.ok(157);
+        String pk = null; for (int q = 0; q < 6; q++) pk = new Ota(fd, 156).peekUrl();
+        chk("peekUrl: همان آدرسِ بسته، و شش بار نگاه‌کردن «تلاش» نمی‌شمارد", u != null && u.equals(pk), pk);
         chk("ok() شمارنده را صفر می‌کند", o.startUrl() != null);
         Ota o2 = new Ota(fd, 156);
         chk("نمونه‌ی تازه (بازشدن مجدد) همان بسته را می‌بیند", o2.webCode() == 157 && o2.startUrl() != null);
@@ -191,9 +194,9 @@ public class OtaTest {
         chk("اندازه‌ی اشتباه رد", msg(() -> e0.install(net, bz, null)).equals("size"));
         Ota.Info bv = info(g2, 201, "1.99", 2);
         chk("نسخه‌ی داخل بسته با اطلاعات نمی‌خواند → رد", msg(() -> e0.install(net, bv, null)).equals("version"));
-        byte[] g3 = good("1.41", 3, ""); net.zip = g3; Ota.Info ig3 = info(g3, 201, "1.41", 2);
+        byte[] g3 = good("1.41", Ota.NATIVE_API + 1, ""); net.zip = g3; Ota.Info ig3 = info(g3, 201, "1.41", 2);
         chk("api داخل بسته بالاتر از برنامه → رد", msg(() -> e0.install(net, ig3, null)).equals("api"));
-        Ota.Info ig4 = info(g3, 201, "1.41", 3);
+        Ota.Info ig4 = info(g3, 201, "1.41", Ota.NATIVE_API + 1);
         chk("api بالاتر در اطلاعات → نیازی نیست (apk)", msg(() -> e0.install(net, ig4, null)).equals("not needed"));
         net.zip = g2; net.fails = 1;
         chk("خطای شبکه در دانلود", throwsIO(() -> e0.install(net, info(g2, 201, "1.41", 2), null)));

@@ -74,8 +74,20 @@ public class MainActivity extends Activity {
         if (guard != null) guard.start(u); else web.loadUrl(ASSET_URL);
     }
     private static final int REQ_VOICE = 7411;
-    private static final int MAX_BYTES = 12 * 1024 * 1024;
-    private static final String[] ALLOW_HOSTS = {"liliome.com", "digikala.com", "safirstores.com", "hilandbeauty.com", "hesperfume.ir", "flower-perfume.com", "khalifechi.com", "redmag.ir"};
+    static final int MAX_BYTES = 12 * 1024 * 1024;
+    static final String[] ALLOW_HOSTS = {"liliome.com", "digikala.com", "safirstores.com", "hilandbeauty.com", "atrafshan.ir", "hesperfume.ir", "flower-perfume.com", "khalifechi.com", "redmag.ir"};
+    /** برنامه روی صفحه باز است؟ (بروزرسانیِ پس‌زمینه در این حال شروع نمی‌شود؛ خودِ صفحه بروز می‌کند) */
+    static volatile boolean alive = false;
+    /** برنامه همین حالا جلوی چشم است؟ */
+    static volatile boolean front = false;
+    private static MainActivity inst;      // فقط روی رشته‌ی اصلی
+
+    /** صفحه‌ی برنامه که باز مانده ولی پشتِ برنامه‌های دیگر است، خودش بروزرسانیِ پس‌زمینه را انجام می‌دهد (دو صفحه روی یک حافظه ننویسند). false = صفحه‌ای نیست */
+    static boolean bgRunInPage() {
+        MainActivity a = inst;
+        if (a == null || a.web == null) return false;
+        try { a.web.evaluateJavascript("window.__bgStart?window.__bgStart():(window.Native&&window.Native.bgDone&&window.Native.bgDone(true,false))", null); return true; } catch (Throwable e) { return false; }
+    }
 
     /** فقط سایت‌های خودِ برنامه (و زیردامنه‌هایشان) */
     private static boolean allowedHost(String h) {
@@ -112,6 +124,8 @@ public class MainActivity extends Activity {
     @Override
     protected void onCreate(Bundle b) {
         super.onCreate(b);
+        alive = true; inst = this;
+        try { BgJob.abortRunning(); BgJob.schedule(getApplicationContext()); } catch (Throwable ignore) { }      // کارِ پس‌زمینه‌ی در جریان کنار می‌رود (صفحه از همان‌جا ادامه می‌دهد) و نوبتِ روزانه ثبت می‌شود
         // کوکی‌ها نگه داشته شوند تا ریدایرکت‌های وابسته به کوکی (مثل دیجی‌کالا) حلقه نزنند
         if (CookieHandler.getDefault() == null) CookieHandler.setDefault(new CookieManager());
         imgDir = new File(getFilesDir(), "img");
@@ -335,6 +349,8 @@ public class MainActivity extends Activity {
             } catch (Exception e) { return false; }
         }
 
+        /** بروزرسانیِ پس‌زمینه که همین صفحه انجامش داد تمام شد */
+        @JavascriptInterface public void bgDone(final boolean ok, final boolean more) { runOnUiThread(new Runnable() { @Override public void run() { BgJob.pageDone(more); } }); }
         @JavascriptInterface public int appCode() { return upd == null ? 0 : upd.appCode(); }
         @JavascriptInterface public void updCheck() { if (upd != null) upd.check(); }
         @JavascriptInterface public void updDownload() { if (upd != null) upd.download(); }
@@ -622,6 +638,7 @@ public class MainActivity extends Activity {
 
     @Override
     protected void onPause() {
+        front = false;
         if (guard != null) guard.pause();
         super.onPause();
     }
@@ -629,6 +646,7 @@ public class MainActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
+        front = true;
         if (guard != null) guard.resume();      // صفحه‌ی در پس‌زمینه کند یا متوقف بوده؛ مهلتِ کاملش را از نو دارد
         if (web != null) web.evaluateJavascript("window.__resume&&window.__resume()", null);
     }
@@ -645,6 +663,7 @@ public class MainActivity extends Activity {
 
     @Override
     protected void onDestroy() {
+        alive = false; front = false; if (inst == this) inst = null;
         setBusy(false);
         ui.removeCallbacks(otaDog);
         if (guard != null) guard.cancel();

@@ -36,7 +36,7 @@ final class Ota {
      * هر بار که کلاس‌های جاوا طوری عوض شوند که صفحه‌ی تازه به آن نیاز دارد، این عدد و api در version.json با هم بالا می‌روند.
      * هر تغییری در نام یا ورودی‌های متدهای پل (otaBoot، otaErr، otaOk، …) هم همین‌طور است؛ وگرنه صفحه‌ی تازه با جاوای قدیمی ناسازگار می‌ماند.
      */
-    static final int NATIVE_API = 2;
+    static final int NATIVE_API = 3;      // ۳: بروزرسانیِ پس‌زمینه (BgJob) و سایتِ عطرافشان در فهرستِ سایت‌های مجاز
 
     static final String BASE = "https://github.com/samaliyan/Perfino/releases/latest/download/";      // فایل‌های آخرین نسخه‌ی رسمی
     static final String INFO_URL = BASE + "ota.json";
@@ -163,6 +163,23 @@ final class Ota {
 
     private boolean usable(int[] m) {
         return m != null && apkCode > 0 && m[0] > apkCode && m[1] <= NATIVE_API && new File(dirOf(m[0]), "index.html").isFile();
+    }
+
+    /**
+     * همان صفحه‌ای که برنامه الان باز می‌کند، ولی فقط «نگاه»: چیزی نوشته یا پاک نمی‌شود و «تلاش» شمرده نمی‌شود
+     * (برای بروزرسانیِ پس‌زمینه؛ وگرنه چند اجرای پس‌زمینه بسته‌ی سالم را «خراب» نشان می‌داد). null = صفحه‌ی داخل APK.
+     */
+    String peekUrl() {
+        synchronized (LOCK) {
+            try {
+                if (apkCode <= 0 || !marker.exists()) return null;
+                int[] m = readMarker();
+                if (m == null || !usable(m) || m[2] >= MAX_TRIES || m[3] == 0) return null;      // بسته‌ای که هنوز «زنده‌ام» نگفته در پس‌زمینه اجرا نمی‌شود
+                return fileUrl(new File(dirOf(m[0]), "index.html"));
+            } catch (Exception e) {
+                return null;
+            }
+        }
     }
 
     /** شمارنده‌ی نسخه‌ای که الان در صفحه اجرا می‌شود: بزرگ‌ترینِ «نسخه‌ی APK» و «بسته‌ی بی‌نصبِ معتبر» */
