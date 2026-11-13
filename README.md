@@ -26,7 +26,8 @@ There is **no server and no account**. Everything — fetching, cleaning, matchi
 
 ### Prices
 - **One price per perfume and size**, merged from several stores, with outlier prices (wrong units, ×10 errors, mismatched sizes) detected and discarded.
-- **Four sources**, each of which can be switched on or off in Settings: Liliome, Digikala, Safir Stores and Hiland Beauty.
+- **Five sources**, each of which can be switched on or off in Settings: Liliome, Digikala, Safir Stores, Atrafshan and Hiland Beauty.
+- **Background refresh**: when the app is closed, Android wakes it about every 6 hours on Wi-Fi; if prices are 20+ hours old they are refreshed quietly, and an interrupted refresh continues from where it stopped.
 - **Automatic refresh** (off / 15 min / 30 min / 1 h / …), a light "prices only" mode for quick updates and a full mode that re-reads titles and images.
 - **Stale data is never shown as fresh**: the top indicator turns red and the list says how old the prices are.
 
@@ -276,6 +277,8 @@ node tests/t82_list_audit.js # بازرسِ خودکارِ فهرستِ نهای
 node tests/t83_en_anchor.js # نامِ لاتینِ سایت مرجع است: عطرهای جدا یکی نمی‌شوند، ردیف‌های تکراری یکی می‌شوند؛ برند از دسته‌بندی؛ نمونه‌ی واقعیِ دیجی‌کالا
 node tests/t84_dk_walk.js # دیجی‌کالا: پوششِ کامل با بازه‌های قیمت؛ برگشت به روشِ قبلی اگر فیلتر کار نکند
 node tests/t85_live_search.js # جستجوی سایت‌ها: خلاصه‌ی جمله‌ی گفتاری، ربطِ نتیجه‌ی دیجی‌کالا، رسیدنِ تکه‌تکه‌ی جواب‌ها
+node tests/t86_clones.js # «طرحِ عطرها» (غیر اصل): نگه داشته می‌شوند ولی جدا از عطرِ اصل
+node tests/t87_atrafshan.js # عطرافشان: کارت‌ها، حجم‌ها، موجودی و فهرست به تفکیکِ غلظت (صفحه‌ی واقعی)
 bash tests/run_node.sh           # همه‌ی آزمون‌های Node با هم (در CI هم اجرا می‌شود)
 python3 tests/t55_voice.py     # گفتن نام عطر، نوار پایین، آخرین‌ها
 python3 tests/t3_flow.py       # روند کامل بروزرسانی

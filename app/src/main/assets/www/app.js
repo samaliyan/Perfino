@@ -1321,6 +1321,7 @@ async function doSource(s) {
         saveDb();
       } };
   }
+  if (s.id === 'atrafshan') opt = { conc: BG || (bgRun && document.hidden) ? 1 : 3 };      // هر صفحه‌ی این سایت حدودِ ۷ مگابایت است
   var r = await s.run(net, rep, mode, opt), Gi = db.fullGen | 0, st = await Core.ingestAsync(db, idx, s.id, r.items, r.complete);
   if (opt && r.walkEnd && db.ck) delete db.ck[s.id];
   if (mode === 'full' && (db.fullGen | 0) !== Gi) st = await Core.ingestAsync(db, idx, s.id, r.items, r.complete);      // قاعده‌ها وسطِ همین کار عوض شد: همان فهرستِ کاملِ دریافت‌شده یک بار دیگر ثبت شود (بدونِ دانلودِ دوباره)

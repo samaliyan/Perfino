@@ -81,6 +81,7 @@ jobs:
             ${{ runner.temp }}/ota/www.zip
             ${{ runner.temp }}/ota/ota.json
       - name: Publish release
+        if: github.ref == 'refs/heads/main'      # اجرای دستی روی شاخه‌ی دیگر فقط می‌سازد و می‌آزماید؛ چیزی منتشر نمی‌شود
         env:
           GH_TOKEN: ${{ github.token }}
         run: |

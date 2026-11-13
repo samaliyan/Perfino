@@ -693,7 +693,7 @@ function pickEntry(arr) {   // چند قیمت از یک سایت برای یک 
   var cl = s.filter(function (v) { return v.p >= top / 1.35; });   // قیمت‌های نزدیک به بالاترین؛ خیلی ارزان‌تر = احتمالاً اشتباه یا کالای دیگر
   return cl[cl.length - 1];                                        // در همان خوشه، قیمتِ با تخفیف
 }
-var SRC_BASE = { liliome: 'https://liliome.com', digikala: 'https://www.digikala.com', safir: 'https://www.safirstores.com', hiland: 'https://hilandbeauty.com',
+var SRC_BASE = { liliome: 'https://liliome.com', digikala: 'https://www.digikala.com', safir: 'https://www.safirstores.com', hiland: 'https://hilandbeauty.com', atrafshan: 'https://www.atrafshan.ir',
   hes: 'https://hesperfume.ir', flower: 'https://flower-perfume.com', khalife: 'https://khalifechi.com', redmag: 'https://redmag.ir' };      // چهار سایتِ آخر فقط برای خبر هستند
 /* آدرسِ صفحه‌ی محصول در سایت؛ از روی شناسه ساخته می‌شود (ذخیره‌ی آدرس‌های بلند حافظه را پر می‌کند) */
 function itemUrl(src, pid) {
@@ -1520,15 +1520,15 @@ function eksClash(A, B, ent) {      // هر دو مدل نامِ لاتین دا
 }
 var FA_NOISE = {}; ('طلایی نقره ای سفید مشکی سیاه قرمز ابی سبز صورتی بنفش زرد نارنجی قهوه رنگ فرانسه فرانسوی اسپانیا اسپانیایی امریکا امریکایی ایتالیا ایتالیایی اصل اورجینال د دو دی ده او').split(' ').forEach(function (w) { FA_NOISE[w] = 1; });
 function sndKey(w) { var t = faKey(String(w)); return t.length < 4 ? t : (t.charAt(0) + t.slice(1).replace(/[اوی]/g, '')).replace(/(.)\1+/g, '$1'); }      // «پرپس» = «پورپس»، «نویر» = «نوآر»
-function faCore(rk, ent) {      // واژه‌های اصلیِ نامِ فارسی: بدونِ رنگ، کشور، واژه‌ی ربط، سال، نامِ برند و املای دومِ همان واژه
+function faCore(rk, ent, glued) {      // glued: به ترتیبِ خودِ نام و چسبیده («پوران هوم» = «پور ان هوم»)      // واژه‌های اصلیِ نامِ فارسی: بدونِ رنگ، کشور، واژه‌ی ربط، سال، نامِ برند و املای دومِ همان واژه
   var bw = []; if (ent && ent.id !== 'other') entAls(ent).forEach(function (al) { al.forEach(function (x) { if (HAS_FA.test(x) && bw.indexOf(x) < 0) bw.push(x); }); });
-  var o = {};
+  var o = {}, seq = [];
   rk.forEach(function (w) {
     var k = bwKey(w);
     if (FA_NOISE[faKey(k)] || YEAR_RE.test(k) || bw.some(function (b) { return b === k || brandTypo(k, b); })) return;
-    o[sndKey(k)] = 1;
+    if (!o[sndKey(k)]) seq.push(faKey(k)); o[sndKey(k)] = 1;
   });
-  return Object.keys(o).sort().join(' ');
+  return glued ? seq.join('') : Object.keys(o).sort().join(' ');
 }
 function absorbModel(A, C) {      // C در A حل می‌شود (نوع و جنسیتِ یکسان = اندازه‌ها یکی)
   C.variants.forEach(function (v) {
@@ -1548,7 +1548,7 @@ function mergeByEn(b, ent, AUD) {
   function sizesN(m) { var n = 0; m.variants.forEach(function (v) { n += v.sizes.length; }); return n; }
   b.models.forEach(function (m, i) {
     if (m.epo || !m.eks || !m.eks.length || !HAS_FA.test(m.rk.join(' '))) return;
-    var core = faCore(m.rk, ent), ks = {}; m.eks.forEach(function (e) { if (e.length) ks[e.join(' ') + '#' + core] = 1; });
+    var core = faCore(m.rk, ent), glue = faCore(m.rk, ent, true), ks = {}; m.eks.forEach(function (e) { if (e.length) { ks[e.join(' ') + '#' + core] = 1; if (glue.length >= 5) ks[e.join(' ') + '#g#' + glue] = 1; } });
     var at = null; Object.keys(ks).forEach(function (k) { if (at == null && by[k] != null && !gone[by[k]]) at = by[k]; });
     if (at != null) {
       var A = b.models[at];
@@ -2679,6 +2679,96 @@ async function digikalaSource(net, rep, mode, opt) {
   return { items: out, n: all, walked: walked, walkEnd: wFull, complete: !failed && total > 0 && !capped, note: failed ? 'ناقص: ' + failed + ' صفحه' : (capped ? 'ناقص: دیجی‌کالا فقط ۱۰۰ صفحه می‌دهد' + (extra ? (walked ? '؛ با بازه‌های قیمت ' : '؛ با ترتیب‌های دیگر ') + extra + ' کالای بیشتر خوانده شد' + wNote : (walked ? wNote : '')) : ''), dkCap: capped };
 }
 
+/* ---------- عطرافشان (سایتِ اختصاصی، نه ووکامرس) ----------
+   فهرستِ /products هر صفحه ۲۴ عطر دارد و برای هر عطر همه‌ی حجم‌هایش را با قیمت می‌نویسد:
+     <div class="product-item" data-id="689"> … <a href="/brands/azzaro">AZZARO</a> <a class="… product-url" href="/perfume/689-315/chrome">Chrome</a> <span class='men'></span>
+       <div class="variants"><a data-product-id='689' data-id='315' data-price='19,700,000' data-discount-price='14,700,000' data-type='perfume' data-url='/perfume/689-315/chrome'> 100 میل<br /> عطر </a>…
+   موجود بودن فقط در JSON-LD همان صفحه است (offers با ?priceId=…، InStock/OutOfStock، قیمت به ریال)؛ حجمی که آن‌جا نیست قابلِ خرید نیست.
+   هر صفحه حدودِ ۷ مگابایت است (فیلترهای سایت در هر صفحه تکرار می‌شود)، پس با عبارتِ منظم خوانده می‌شود، نه با ساختنِ درختِ صفحه.
+   با فیلترِ «نوع = عطر» و «قیمت‌دار» فقط فروشی‌ها می‌آیند؛ غلظت (ادو پرفیوم/تویلت…) در کارت نیست، پس فهرست یک بار برای هر غلظت خوانده می‌شود (جمعِ صفحه‌ها همان است). */
+var ATR_BASE = 'https://www.atrafshan.ir', ATR_Q = '/products?types%5B%5D=1138&minPrice=1';
+var ATR_DENS = [[3, 'ادو پرفیوم'], [4, 'ادو تویلت'], [2, 'پرفیوم'], [5, 'ادو کلن'], [7, 'اکستریت د پرفیوم'], [6, '']];      // شناسه‌های خودِ سایت
+function atrAttr(tag, name) { var m = new RegExp('\\b' + name + "=(?:'([^']*)'|\"([^\"]*)\")").exec(tag); return m ? decodeEnt(m[1] != null ? m[1] : m[2]) : ''; }
+function atrOffers(html) {      // priceId → { p: تومان, ok: موجود }
+  var o = {}, re = /<script type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/g, m;
+  while ((m = re.exec(html))) {
+    if (m[1].indexOf('ItemList') < 0) continue;
+    var j = parseJson(m[1]); if (!j || !Array.isArray(j.itemListElement)) continue;
+    j.itemListElement.forEach(function (e) {
+      var of = e && e.offers; if (!of) return;
+      (Array.isArray(of.offers) ? of.offers : [of]).forEach(function (x) {
+        var pm = /[?&]priceId=(\d+)/.exec(String(x && x.url || '')); if (!pm) return;
+        var v = +x.price; if (/IRR|ریال/i.test(String(x.priceCurrency || 'IRR'))) v = v / 10;
+        o[pm[1]] = { p: v > 0 ? Math.round(v) : 0, ok: /InStock/i.test(String(x.availability || '')) };
+      });
+    });
+  }
+  return o;
+}
+function atrCards(html, concWord) {
+  var out = [], offers = atrOffers(html), parts = String(html).split('class="product-item'), i;
+  for (i = 1; i < parts.length; i++) {
+    var c = parts[i], end = c.indexOf('class="vol"'); if (end > 0) c = c.slice(0, end);
+    var en = (/class="[^"]*product-url[^"]*"[^>]*>\s*([^<]+?)\s*<\/a>/.exec(c) || [])[1] || '', br = (/href="\/brands\/[^"]*"[^>]*>\s*([^<]+?)\s*<\/a>/.exec(c) || [])[1] || '';
+    var alt = (/<img[^>]*\balt="([^"]*)"/.exec(c) || [])[1] || '', img = (/<img[^>]*\bdata-src="([^"]*)"/.exec(c) || [])[1] || '';
+    en = decodeEnt(en); br = decodeEnt(br); alt = decodeEnt(alt);
+    var fa = alt.indexOf(en + '-') === 0 ? alt.slice(en.length + 1) : (alt.split('-').slice(1).join('-') || alt);      // «Chrome-آزارو کروم»
+    fa = fa.replace(/\([^)]*\)/g, ' ').replace(/\s+/g, ' ').trim();      // «(پورانوم)»، «(مشکی)»: املا و توضیحِ دوم
+    var gc = (/<span class='([^']*)'><\/span>/.exec(c) || [])[1] || '', gn = /women/.test(gc) && /(^|[^o])men/.test(gc.replace(/women/g, '')) ? 'یونیسکس' : /women/.test(gc) ? 'زنانه' : /men/.test(gc) ? 'مردانه' : /uni/.test(gc) ? 'یونیسکس' : '';
+    var vr = /<a\b[^>]*\bdata-product-id=[^>]*>([\s\S]*?)<\/a>/g, vm;
+    while ((vm = vr.exec(c))) {
+      var tag = vm[0].slice(0, vm[0].indexOf('>') + 1), type = atrAttr(tag, 'data-type'), pid = atrAttr(tag, 'data-id'), url = atrAttr(tag, 'data-url');
+      var txt = normFa(stripTags(vm[1]), true), mm = /(\d+(?:\.\d+)?)\s*میل/.exec(txt);
+      if (type !== 'perfume' || !pid || !mm || !url || /تستر|سمپل|مینیاتور|گیفت|ست\b|tester|sample/i.test(txt)) continue;      // فقط خودِ عطر
+      var of = offers[pid], price = of && of.ok && of.p > 0 ? of.p : 0;
+      var title = (fa || en) + ' | ' + (br ? br + ' ' : '') + en + ' ' + mm[1] + ' میل' + (gn ? ' ' + gn : '') + (concWord ? ' ' + concWord : '');
+      out.push({ id: ATR_BASE + url, t: title, e: ((br ? br + ' ' : '') + en).trim(), price: price, st: price > 0 ? 0 : 1, img: img, big: img.replace(/\/w\d+\//, '/w445/'), b: br ? [br] : [] });
+    }
+  }
+  return out;
+}
+function atrLastPage(html) { var mx = 1, re = /[?&;]page=(\d+)/g, m; while ((m = re.exec(html))) if (+m[1] > mx && +m[1] < 2000) mx = +m[1]; return mx; }
+async function atrafshanSource(net, rep, mode, opt) {
+  opt = opt || {};
+  var out = [], seen = {}, failed = 0, pages = 0, conc = Math.max(1, Math.min(4, opt.conc | 0)) || 2, t0 = Date.now(), cut = false;
+  function eat(html, cw) { atrCards(html, cw).forEach(function (x) { if (!seen[x.id]) { seen[x.id] = 1; out.push(x); } }); pages++; rep(out.length); }
+  async function get(q, p) { var r = await getR(net, ATR_BASE + ATR_Q + q + '&page=' + p, { Accept: 'text/html' }); return r.status === 200 && r.body.indexOf('class="product-item') >= 0 ? r.body : (r.status === 200 ? '' : null); }
+  var first = await get('', 1);
+  if (first == null) throw new Error('عطرافشان جواب نداد');
+  if (!first) throw new Error('ساختار ناشناخته');
+  var allN = atrLastPage(first), passes = ATR_DENS, byDens = false;
+  /* فیلترِ غلظت سنجیده می‌شود: فهرستِ «ادو پرفیوم» باید کوتاه‌تر از فهرستِ کل باشد؛ اگر نبود (سایت فیلتر را نپذیرفت) همان فهرستِ کل یک بار خوانده می‌شود و غلظت از نام درمی‌آید */
+  var d1 = await get('&density%5B%5D=' + passes[0][0], 1);
+  if (d1 && allN > 1 && atrLastPage(d1) < allN) byDens = true;
+  var plan = byDens ? passes.map(function (d, i) { return { q: '&density%5B%5D=' + d[0], cw: d[1], first: i === 0 ? d1 : null }; }) : [{ q: '', cw: '', first: first }];
+  for (var pi = 0; pi < plan.length && !cut; pi++) {
+    var P = plan[pi], h1 = P.first || await get(P.q, 1);
+    if (h1 == null) { failed++; continue; }
+    if (!h1) continue;      // این غلظت کالایی ندارد
+    eat(h1, P.cw);
+    var last = Math.min(atrLastPage(h1), 400);
+    for (var p = 2; p <= last && !cut; p += conc) {
+      var ps = []; for (var k = 0; k < conc && p + k <= last; k++) ps.push(p + k);
+      var rs = await Promise.all(ps.map(function (n) { return get(P.q, n); }));
+      rs.forEach(function (h) { if (h) eat(h, P.cw); else if (h == null) failed++; });
+      if (failed >= 8 || Date.now() - t0 > 600000) cut = true;      // سایت جواب نمی‌دهد یا ده دقیقه گذشت
+    }
+  }
+  if (!out.length) throw new Error('محصولی پیدا نشد');
+  return { items: out, complete: !failed && !cut ? 'soft' : false, note: (failed || cut ? 'ناقص: ' + (failed ? failed + ' صفحه نشد' : 'وقت تمام شد') + '؛ ' : '') + pages + ' صفحه' + (byDens ? '' : ' (بی‌فیلترِ غلظت)') };
+}
+async function atrafshanLive(terms, net, tools) {
+  var r = await getR(net, ATR_BASE + '/products?q=' + encodeURIComponent(terms.join(' ')), { Accept: 'text/html' }, 2);
+  if (r.status !== 200) return { items: [], note: 'fail' };
+  var seenP = {}, out = [];
+  atrCards(r.body, '').forEach(function (x) {
+    var k = liveScore(x.t, terms, tools); if (!k || seenP[x.id]) return; seenP[x.id] = 1;
+    out.push({ s: 'atrafshan', pid: x.id, t: x.t.replace(/\s*\|\s*/, ' · '), k: k, price: x.price > 0 ? x.price : 0, img: x.img, u: itemUrl('atrafshan', x.id) || '' });
+  });
+  out.sort(function (a, b) { return (b.k - a.k) || ((b.price > 0) - (a.price > 0)); });
+  return { items: out.slice(0, 12), note: out.length ? 'ok' : 'none' };
+}
+
 /* ---- HTML عمومی (برای سایت‌هایی که API ندارند) ---- */
 function priceFromText(txt) {
   var res = [], rial = false;
@@ -2941,6 +3031,7 @@ var SOURCES = [
   { id: 'liliome', name: 'لیلیوم', trusted: true, run: function (net, rep, mode) { return wooSource('https://liliome.com', net, rep, mode); } },
   { id: 'digikala', name: 'دیجی‌کالا', trusted: true, run: function (net, rep, mode, opt) { return digikalaSource(net, rep, mode, opt); } },
   { id: 'safir', name: 'سفیر', run: function (net, rep, mode) { return wooOrHtml('https://www.safirstores.com', 'https://www.safirstores.com/category/perfume', net, rep, mode); } },
+  { id: 'atrafshan', name: 'عطرافشان', run: function (net, rep, mode, opt) { return atrafshanSource(net, rep, mode, opt); } },
   { id: 'hiland', name: 'هایلند', run: function (net, rep, mode) { return wooOrHtml('https://hilandbeauty.com', 'https://hilandbeauty.com/fa/%D8%B9%D8%B7%D8%B1-%D9%88-%D8%A7%D8%AF%DA%A9%D9%84%D9%86', net, rep, mode); } }
 ];
 
@@ -3077,7 +3168,7 @@ async function liveSearch(text, net, srcIds, tools, onPart) {      // onPart(id,
   function lim(pr) { var tm; return Promise.race([pr, new Promise(function (res) { tm = setTimeout(function () { res({ items: [], note: 'fail' }); }, 20000); })]).then(function (r) { clearTimeout(tm); return r; }); }      // مهلتِ ۲۰ ثانیه؛ بعد از جواب پاک می‌شود
   var ids = (srcIds && srcIds.length ? srcIds : Object.keys(LIVE_BASE).concat(['digikala']));
   var jobs = ids.map(function (id) {
-    var pr = id === 'digikala' ? digikalaLive(terms, net, tools) : (LIVE_BASE[id] ? wooLive(id, LIVE_BASE[id], terms, net, tools) : Promise.resolve({ items: [], note: 'none' }));
+    var pr = id === 'digikala' ? digikalaLive(terms, net, tools) : id === 'atrafshan' ? atrafshanLive(terms, net, tools) : (LIVE_BASE[id] ? wooLive(id, LIVE_BASE[id], terms, net, tools) : Promise.resolve({ items: [], note: 'none' }));
     return lim(pr.catch(function () { return { items: [], note: 'fail' }; })).then(function (r) {
       notes[id] = r.note;
       var a = (r.items || []).map(function (it) { if (it.k == null) it.k = liveScore(it.t, terms, tools); return it; });
@@ -3767,7 +3858,7 @@ function searchRank(idx, alts, tools, opts) {
   return out;
 }
 
-root.Core = { probeShop: probeShop, fetchNews: fetchNews, newsMore: newsMore, newsFromWp: newsFromWp, newsFromRss: newsFromRss, newsPickImg: newsPickImg, newsExcerpt: newsExcerpt, NEWS_SRC: NEWS_SRC, liveSearch: liveSearch, setClones: setClones, isCloneKey: isCloneKey, CL_MARK: CL_MARK, liveTerms: liveTerms, liveHit: liveHit, liveScore: liveScore, digikalaLive: digikalaLive, wooLivePrice: wooLivePrice, searchIndex: searchIndex, searchRank: searchRank, searchSimilar: searchSimilar, simWord: simWord, simFold: simFold, srn: srn, fzKey: fzKey, explainTitle: explainTitle, useSz: useSz, sizeFromPage: sizeFromPage, nextDataCards: nextDataCards, RAWC: RAWC, stripPriceTail: stripPriceTail, marketStats: marketStats, marketView: marketView, histNew: histNew, histFix: histFix, histSnap: histSnap, histReport: histReport, purgeStored: purgeStored, setBlock: setBlock, REJ: REJ, vetReason: vetReason, reconcile: reconcile, reconcileAsync: reconcileAsync, CLEANSE: CLEANSE, cleanseText: cleanseText, cleanBrandName: cleanBrandName, itemUrl: itemUrl, STALE_MIN: STALE_MIN, fa2en: fa2en, en2fa: en2fa, enTokens: enTokens, titleEn: titleEn, tree: tree, brandOf: brandOf, specInfo: specInfo, enrichTitle: enrichTitle, genderOf: genderOf, nameCmp: nameCmp, CFG: CFG, newDb: newDb, dbIndex: dbIndex, ingest: ingest, ingestAsync: ingestAsync, buildList: buildList, normFa: normFa, parseTitle: parseTitle, aggregate: aggregate, SOURCES: SOURCES, extractCards: extractCards,
+root.Core = { probeShop: probeShop, fetchNews: fetchNews, newsMore: newsMore, newsFromWp: newsFromWp, newsFromRss: newsFromRss, newsPickImg: newsPickImg, newsExcerpt: newsExcerpt, NEWS_SRC: NEWS_SRC, liveSearch: liveSearch, atrafshanSource: atrafshanSource, atrCards: atrCards, atrafshanLive: atrafshanLive, setClones: setClones, isCloneKey: isCloneKey, CL_MARK: CL_MARK, liveTerms: liveTerms, liveHit: liveHit, liveScore: liveScore, digikalaLive: digikalaLive, wooLivePrice: wooLivePrice, searchIndex: searchIndex, searchRank: searchRank, searchSimilar: searchSimilar, simWord: simWord, simFold: simFold, srn: srn, fzKey: fzKey, explainTitle: explainTitle, useSz: useSz, sizeFromPage: sizeFromPage, nextDataCards: nextDataCards, RAWC: RAWC, stripPriceTail: stripPriceTail, marketStats: marketStats, marketView: marketView, histNew: histNew, histFix: histFix, histSnap: histSnap, histReport: histReport, purgeStored: purgeStored, setBlock: setBlock, REJ: REJ, vetReason: vetReason, reconcile: reconcile, reconcileAsync: reconcileAsync, CLEANSE: CLEANSE, cleanseText: cleanseText, cleanBrandName: cleanBrandName, itemUrl: itemUrl, STALE_MIN: STALE_MIN, fa2en: fa2en, en2fa: en2fa, enTokens: enTokens, titleEn: titleEn, tree: tree, brandOf: brandOf, specInfo: specInfo, enrichTitle: enrichTitle, genderOf: genderOf, nameCmp: nameCmp, CFG: CFG, newDb: newDb, dbIndex: dbIndex, ingest: ingest, ingestAsync: ingestAsync, buildList: buildList, normFa: normFa, parseTitle: parseTitle, aggregate: aggregate, SOURCES: SOURCES, extractCards: extractCards,
   wooSource: wooSource, digikalaSource: digikalaSource, htmlSource: htmlSource, letterOf: letterOf, median: median, priceFromText: priceFromText, similar: similar };
 if (typeof module !== 'undefined') module.exports = root.Core;
 })(typeof window !== 'undefined' ? window : globalThis);
