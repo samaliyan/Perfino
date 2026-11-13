@@ -2544,8 +2544,12 @@ var DK_URLS = [
    خوانده می‌شود تا کالاهای بیشتری دیده شوند. اگر سایت ترتیبی را نپذیرد یا کالای تازه‌ای نیاورد، همان‌جا رها می‌شود. */
 var DK_FLOOR = 2500000, DK_WALK_MS = 480000;      // کفِ قیمت به ریال (۲۵۰ هزار تومان = همان کفِ «قیمتِ منطقی» برای ۱۰۰ میل؛ نمونه‌ی واقعی: ارزان‌ترین کالا ۱۹۹ هزار تومان)؛ سقفِ زمانِ پیمایش ۸ دقیقه
 var DK_SORTS = ['&sort=20', '&sort=21'];      // ارزان‌ترین و گران‌ترین: دو سرِ فهرست که در ترتیبِ عادی دیده نمی‌شوند
-async function digikalaSource(net, rep, mode) {
-  var out = [], failed = 0, total = 1, vi = 0, err = '', nNew = 0;
+async function digikalaSource(net, rep, mode, opt) {
+  /* opt (اختیاری): from = قیمتی که دفعه‌ی قبل تا آن‌جا خوانده شده (ادامه از همان‌جا، نه از اول)؛ onRound(items, cur) = بعد از هر ۱۰۰ صفحه، کالاهای همان دور
+     (برنامه همان لحظه ثبتشان می‌کند تا با قطعِ اینترنت یا بسته‌شدنِ برنامه از دست نروند)؛ conc = تعدادِ درخواستِ هم‌زمان (برنامه‌ی باز: بیشتر، پس‌زمینه: کم) */
+  opt = opt || {};
+  var out = [], failed = 0, total = 1, vi = 0, err = '', nNew = 0, flushed = 0, WC = Math.max(1, Math.min(10, opt.conc | 0)) || (CFG.conc + 1);
+  async function flush(cur) { if (!opt.onRound || out.length <= flushed) return; var part = out.slice(flushed); flushed = out.length; try { await opt.onRound(part, cur); } catch (e) { } }
   function small(u) { return u ? u.replace(/h_\d+,w_\d+/, 'h_360,w_360') : ''; }
   function eat(d) {
     d.products.forEach(function (p) {
@@ -2584,29 +2588,38 @@ async function digikalaSource(net, rep, mode) {
     var rialOf = function (p) { var dv = p && p.default_variant, pr = dv && dv.price; return (pr && +pr.selling_price) || 0; };
     var WQ = [function (m) { return '&sort=20&price%5Bmin%5D=' + m; }];      // بدونِ فیلترِ «فقط موجود»: کالایی که تمام شده باید «ناموجود» برگردد، نه اینکه بی‌خبر با قیمتِ قبلی بماند
     for (var wv = 0; wv < WQ.length && !walked; wv++) {
-      var cur = DK_FLOOR, rounds = 0, wn0 = nNew, wbad = 0, wOk = false, wEnd = false, wPages = 0, wEst = 0;
-      while (rounds++ < 60 && Date.now() - tX < DK_WALK_MS && wbad < 6) {
-        var q0 = WQ[wv](cur), f1 = await one(1, vi, q0);
-        if (f1.k !== 'ok') { if (wOk && f1.e === 'صفحه‌ی خالی') wEnd = true; break; }
-        var pr1 = f1.d.products.map(rialOf).filter(function (x) { return x > 0; }), tp = (f1.d.pager && f1.d.pager.total_pages) | 0, ti = (f1.d.pager && f1.d.pager.total_items) | 0;
-        if (!wOk) {      // سنجشِ فیلتر (فقط بارِ اول)
-          var asc = pr1.every(function (x, i) { return i === 0 || x >= pr1[i - 1] * 0.97; });
-          if (!(pr1.length >= 3 && pr1.every(function (x) { return x >= cur * 0.999; }) && asc && tp > 0 && tot0 > 0 && ti > 0 && ti < tot0)) break;      // فهرستِ فیلترشده باید واقعاً کوچک‌تر باشد؛ اگر سایت شمار نمی‌دهد یا فیلتر را نادیده گرفته، اعتماد نمی‌کنیم
-          wOk = true; wEst = Math.max(1, Math.ceil((ti || tp * 20) / 20));
+      var wn0 = nNew, wbad = 0, wOk = false, wEnd = false, wPages = 0, wEst = 0, rounds = 0;
+      var from = opt.from > DK_FLOOR ? Math.floor(opt.from) : DK_FLOOR, segs = from > DK_FLOOR ? [[from, 0], [DK_FLOOR, from]] : [[DK_FLOOR, 0]];      // ادامه از نیمه‌راه: اول از همان‌جا تا آخر، بعد از کف تا همان‌جا
+      var segDone = 0, broke = false;
+      for (var sg = 0; sg < segs.length && !broke; sg++) {
+        var cur = segs[sg][0], until = segs[sg][1], segEnd = false;
+        while (rounds++ < 80 && Date.now() - tX < DK_WALK_MS && wbad < 6) {
+          var q0 = WQ[wv](cur), f1 = await one(1, vi, q0);
+          if (f1.k !== 'ok') { if (wOk && f1.e === 'صفحه‌ی خالی') segEnd = true; else broke = true; break; }
+          var pr1 = f1.d.products.map(rialOf).filter(function (x) { return x > 0; }), tp = (f1.d.pager && f1.d.pager.total_pages) | 0, ti = (f1.d.pager && f1.d.pager.total_items) | 0;
+          if (!wOk) {      // سنجشِ فیلتر (فقط بارِ اول)
+            var asc = pr1.every(function (x, i) { return i === 0 || x >= pr1[i - 1] * 0.97; });
+            if (!(pr1.length >= 3 && pr1.every(function (x) { return x >= cur * 0.999; }) && asc && tp > 0 && tot0 > 0 && ti > 0 && ti < tot0)) { broke = true; break; }      // فهرستِ فیلترشده باید واقعاً کوچک‌تر باشد؛ اگر سایت شمار نمی‌دهد یا فیلتر را نادیده گرفته، اعتماد نمی‌کنیم
+            wOk = true; wEst = Math.max(1, Math.ceil((ti || tp * 20) / 20));
+          }
+          eat(f1.d); wPages++;
+          var mx = Math.max.apply(null, pr1.concat([cur])), lim = Math.min(100, tp || 1), stop = false, past = until && mx >= until;
+          for (var wp = 2; wp <= lim && !stop && !past && Date.now() - tX < DK_WALK_MS; wp += WC) {
+            var ws = []; for (var wi = 0; wi < WC && wp + wi <= lim; wi++) ws.push(wp + wi);
+            var wr = await Promise.all(ws.map(function (p) { return one(p, vi, q0); })), nb = 0;
+            wr.forEach(function (r) { if (r.k === 'ok') { eat(r.d); wPages++; r.d.products.forEach(function (p) { var x = rialOf(p); if (x > mx) mx = x; }); } else nb++; });
+            rep(out.length, Math.min(.99, wPages / wEst));
+            if (until && mx >= until) past = true;      // به جایی رسیدیم که دفعه‌ی قبل از آن شروع شده بود
+            if (nb) { wbad += nb; await sleep(CFG.retryMs * 2); if (nb === ws.length) stop = true; }
+          }
+          if (stop || (!past && Date.now() - tX >= DK_WALK_MS)) { broke = true; await flush(cur); break; }
+          if (past || tp <= 100) { segEnd = true; await flush(until ? 0 : mx); break; }      // این بخش تا آخر خوانده شد
+          cur = mx > cur ? mx : cur + 1;      // ادامه از گران‌ترین قیمتِ دیده‌شده (کالاهای هم‌قیمتِ مرز دوباره می‌آیند و تکراری‌ها کنار می‌روند)
+          await flush(cur);
         }
-        eat(f1.d); wPages++;
-        var mx = Math.max.apply(null, pr1.concat([cur])), lim = Math.min(100, tp || 1), stop = false;
-        for (var wp = 2; wp <= lim && !stop && Date.now() - tX < DK_WALK_MS; wp += CFG.conc + 1) {
-          var ws = []; for (var wi = 0; wi < CFG.conc + 1 && wp + wi <= lim; wi++) ws.push(wp + wi);
-          var wr = await Promise.all(ws.map(function (p) { return one(p, vi, q0); })), nb = 0;
-          wr.forEach(function (r) { if (r.k === 'ok') { eat(r.d); wPages++; r.d.products.forEach(function (p) { var x = rialOf(p); if (x > mx) mx = x; }); } else nb++; });
-          rep(out.length, Math.min(.99, wPages / wEst));
-          if (nb) { wbad += nb; await sleep(CFG.retryMs * 2); if (nb === ws.length) stop = true; }
-        }
-        if (stop || Date.now() - tX >= DK_WALK_MS) break;
-        if (tp <= 100) { wEnd = true; break; }      // این بازه تا آخرِ فهرست خوانده شد
-        cur = mx > cur ? mx : cur + 1;      // ادامه از گران‌ترین قیمتِ دیده‌شده (کالاهای هم‌قیمتِ مرز دوباره می‌آیند و تکراری‌ها کنار می‌روند)
+        if (segEnd) segDone++; else broke = true;
       }
+      wEnd = segDone === segs.length;
       if (wOk) { walked = true; wFull = wEnd; extra += nNew - wn0; wNote = wEnd ? '' : ' (بازه‌های قیمت تا آخر نرسید)'; }
     }
   }
@@ -2650,7 +2663,8 @@ async function digikalaSource(net, rep, mode) {
       extra += nNew - n0;
     }
   }
-  return { items: out, complete: !failed && total > 0 && !capped, note: failed ? 'ناقص: ' + failed + ' صفحه' : (capped ? 'ناقص: دیجی‌کالا فقط ۱۰۰ صفحه می‌دهد' + (extra ? (walked ? '؛ با بازه‌های قیمت ' : '؛ با ترتیب‌های دیگر ') + extra + ' کالای بیشتر خوانده شد' + wNote : (walked ? wNote : '')) : ''), dkCap: capped };
+  var all = out.length; if (opt.onRound && flushed) out = out.slice(flushed);      // آنچه دور به دور ثبت شده دوباره برگردانده نمی‌شود
+  return { items: out, n: all, walked: walked, walkEnd: wFull, complete: !failed && total > 0 && !capped, note: failed ? 'ناقص: ' + failed + ' صفحه' : (capped ? 'ناقص: دیجی‌کالا فقط ۱۰۰ صفحه می‌دهد' + (extra ? (walked ? '؛ با بازه‌های قیمت ' : '؛ با ترتیب‌های دیگر ') + extra + ' کالای بیشتر خوانده شد' + wNote : (walked ? wNote : '')) : ''), dkCap: capped };
 }
 
 /* ---- HTML عمومی (برای سایت‌هایی که API ندارند) ---- */
@@ -2913,7 +2927,7 @@ async function wooOrHtml(base, start, net, rep, mode) {
 
 var SOURCES = [
   { id: 'liliome', name: 'لیلیوم', trusted: true, run: function (net, rep, mode) { return wooSource('https://liliome.com', net, rep, mode); } },
-  { id: 'digikala', name: 'دیجی‌کالا', trusted: true, run: function (net, rep, mode) { return digikalaSource(net, rep, mode); } },
+  { id: 'digikala', name: 'دیجی‌کالا', trusted: true, run: function (net, rep, mode, opt) { return digikalaSource(net, rep, mode, opt); } },
   { id: 'safir', name: 'سفیر', run: function (net, rep, mode) { return wooOrHtml('https://www.safirstores.com', 'https://www.safirstores.com/category/perfume', net, rep, mode); } },
   { id: 'hiland', name: 'هایلند', run: function (net, rep, mode) { return wooOrHtml('https://hilandbeauty.com', 'https://hilandbeauty.com/fa/%D8%B9%D8%B7%D8%B1-%D9%88-%D8%A7%D8%AF%DA%A9%D9%84%D9%86', net, rep, mode); } }
 ];

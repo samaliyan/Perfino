@@ -50,5 +50,18 @@ function server(o) {
   var s4 = server({}), g4 = s4.get, k4 = 0; s4.get = async function (u) { if (/price%5Bmin/.test(u) && ++k4 > 60) return { status: 503, body: '' }; return g4(u); };
   var r4 = await C.digikalaSource(s4, function () {}, 'full');
   chk(r4.items.length > 2500 && /نرسید/.test(r4.note), 'outage mid-walk keeps what was read and says so: ' + r4.items.length + ' ' + r4.note);
+  // ادامه از نیمه‌راه (۱.۵۵): دورِ اول وسطِ کار قطع می‌شود؛ هر ۱۰۰ صفحه ثبت شده و دورِ دوم از همان قیمت ادامه می‌دهد
+  var got = {}, cur1 = 0, rounds1 = 0, s5 = server({}), g5 = s5.get, k5 = 0; s5.get = async function (u) { if (/price%5Bmin/.test(u) && ++k5 > 230) return { status: 503, body: '' }; return g5(u); };
+  var r5 = await C.digikalaSource(s5, function () {}, 'full', { onRound: async function (items, cur) { rounds1++; if (cur) cur1 = cur; items.forEach(function (it) { got[it.id] = 1; }); } });
+  r5.items.forEach(function (it) { got[it.id] = 1; });
+  var n1 = Object.keys(got).length;
+  chk(rounds1 >= 2 && cur1 > 2500000 && n1 >= 4000 && n1 < above.length, 'first run flushed ' + rounds1 + ' rounds (' + n1 + ' products) and remembers price ' + cur1);
+  chk(r5.items.length < 2200, 'flushed products are not returned again: ' + r5.items.length);
+  var s6 = server({}), cur2 = -1, r6 = await C.digikalaSource(s6, function () {}, 'full', { from: cur1, conc: 8, onRound: async function (items, cur) { cur2 = cur; items.forEach(function (it) { got[it.id] = 1; }); } });
+  r6.items.forEach(function (it) { got[it.id] = 1; });
+  var miss6 = above.filter(function (x) { return !got[x.id]; }).length;
+  chk(miss6 === 0 && r6.walkEnd === true && cur2 === 0, 'second run continues from there, wraps to the start and finishes: missing ' + miss6 + ', end cursor ' + cur2);
+  var firstQ = s6.n.urls.filter(function (u) { return /price%5Bmin/.test(u); })[0];
+  chk(new RegExp('price%5Bmin%5D=' + cur1 + '$').test(firstQ), 'second run starts at the remembered price: ' + firstQ);
   console.log(ok + ' pass ' + bad + ' fail'); process.exit(bad ? 1 : 0);
 })();

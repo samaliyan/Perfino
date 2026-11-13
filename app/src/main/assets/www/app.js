@@ -1,7 +1,8 @@
 (function () {
 'use strict';
 var RM = !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
-var VERSION = '1.54';
+var VERSION = '1.55';
+var BG = /[?&]bg=1(?:&|$)/.test(String(location.search || ''));      // صفحه‌ی بی‌نمایشِ بروزرسانیِ پس‌زمینه (برنامه بسته است؛ اندروید هر ۲۴ ساعت با وای‌فای اجرایش می‌کند)
 var myCode = (function () { var m = /\/b(\d{1,10})\/index\.html$/.exec(String(location.pathname || '')); return m ? m[1] : '0'; })();      // نسخه‌ی این صفحه از روی آدرسش؛ در گزارش‌ها به جاوا فرستاده می‌شود تا صفحه‌ی کهنه نتواند نسخه‌ی تازه را «سالم» اعلام کند
 function otaCall(n) { try { if (window.Native && typeof window.Native[n] === 'function') window.Native[n](myCode); } catch (e) { } }
 otaCall('otaBoot');      // «جاوااسکریپتِ این صفحه شروع شد»: برنامه به صفحه‌ی بی‌نصب مهلتِ بیشتری برای ساختن فهرست می‌دهد
@@ -1306,11 +1307,24 @@ async function doSource(s) {
   var known = 0, M = db.it[s.id], G0 = db.fullGen | 0; if (M) known = Object.keys(M).length;
   var P = prog[s.id] = { n: 0, mode: mode, exp: known, done: false };
   function rep(n, p) { P.n = n; if (p != null) P.pct = p; tick(); }
-  var r = await s.run(net, rep, mode), Gi = db.fullGen | 0, st = await Core.ingestAsync(db, idx, s.id, r.items, r.complete);
+  /* دیجی‌کالا (بیش از ۸۰۰ صفحه): هر ۱۰۰ صفحه همان لحظه ثبت و جای کار یادداشت می‌شود؛ اگر اینترنت قطع یا برنامه بسته شد، تا ۳ ساعت بعد از همان‌جا ادامه می‌دهد.
+     برنامه‌ی باز ۸ درخواستِ هم‌زمان می‌فرستد؛ بروزرسانیِ پس‌زمینه آرام‌تر (۲ تا). */
+  var opt = null;
+  if (s.id === 'digikala') {
+    db.ck = db.ck || {}; var ck = db.ck[s.id];
+    opt = { conc: BG ? 2 : 8, from: ck && ck.cur > 0 && Date.now() - ck.t < 3 * 3600e3 && Date.now() >= ck.t ? ck.cur : 0,
+      onRound: async function (items, cur) {
+        await Core.ingestAsync(db, idx, s.id, items, false);
+        if (cur) db.ck[s.id] = { cur: cur, t: Date.now() }; else delete db.ck[s.id];
+        saveDb();
+      } };
+  }
+  var r = await s.run(net, rep, mode, opt), Gi = db.fullGen | 0, st = await Core.ingestAsync(db, idx, s.id, r.items, r.complete);
+  if (opt && r.walkEnd && db.ck) delete db.ck[s.id];
   if (mode === 'full' && (db.fullGen | 0) !== Gi) st = await Core.ingestAsync(db, idx, s.id, r.items, r.complete);      // قاعده‌ها وسطِ همین کار عوض شد: همان فهرستِ کاملِ دریافت‌شده یک بار دیگر ثبت شود (بدونِ دانلودِ دوباره)
   else if (mode === 'price' && (st.unknown > 0 || (db.fullGen | 0) !== G0)) {     // محصول تازه‌ای آمده که نامش را نمی‌شناسیم، یا قاعده‌های تازه‌ی برنامه (بعد از به‌روزرسانی) وسطِ کار دریافتِ کامل خواستند → همین حالا یک بار دریافتِ کامل
     mode = P.mode = 'full'; P.pct = null; P.n = 0;
-    r = await s.run(net, rep, 'full'); st = await Core.ingestAsync(db, idx, s.id, r.items, r.complete);
+    r = await s.run(net, rep, 'full', opt); st = await Core.ingestAsync(db, idx, s.id, r.items, r.complete);
   }
   db.t[s.id] = Date.now();
   if (mode === 'full') {
@@ -2181,7 +2195,8 @@ window.__updErr = function (m) {
 function autoMs() { var m = +set.auto; return m > 0 ? m * 60000 : 0; }      // ۰ = دستی (پیش‌فرض)
 function autoDue() { var lo = lastOk(); if (!lo) return true; var a = autoMs(); return a > 0 && Date.now() - lo > a; }
 var lastTry = +ls.get('pp.try', 0) || 0;       // آخرین تلاشِ بروزرسانی (ماندگار)؛ سایتِ همیشه‌خراب هر بار باز شدن را به بمباران تبدیل نکند
-function launchDue() { return !busy && needFresh() && Date.now() - lastTry > 1800000; }      // قیمت‌ها قدیمی‌اند یا سایتی هنوز نیامده: حتی در حالت دستی یک بار تازه شود
+function halfDone() { return !!(db.ck && Object.keys(db.ck).some(function (k) { return db.ck[k] && Date.now() - db.ck[k].t < 3 * 3600e3; })); }      // بروزرسانیِ نیمه‌کاره (قطعِ اینترنت، بسته‌شدنِ برنامه، یا کارِ پس‌زمینه)
+function launchDue() { return !busy && ((needFresh() && Date.now() - lastTry > 1800000) || (halfDone() && Date.now() - lastTry > 120000)); }      // قیمت‌ها قدیمی‌اند یا سایتی هنوز نیامده: حتی در حالت دستی یک بار تازه شود
 window.__resume = function () {
   updPill();
   if (updSt.phase === 'inst' && updSt.mode === 'apk') { clearTimeout(updSt.instTm); updSt.instTm = setTimeout(function () { if (updSt.phase === 'inst' && updSt.mode === 'apk') { updSt.phase = 'ready'; updSt.installing = false; updRender(); } }, 20000); }      // نصب‌کننده بسته شد (لغو یا تمام): بیست ثانیه بعد دکمه دوباره کار کند، نه «در حال نصب…» برای همیشه
@@ -2208,10 +2223,23 @@ var okTries = 0, okT = setInterval(function () {
     if (st && dk && (st.children.length || (ov && ov.classList.contains('on') && ov.children.length))) { clearInterval(okT); okSent = true; otaCall('otaOk'); }
   } catch (e) { clearInterval(okT); }
 }, 500);
+/* پس‌زمینه: اگر قیمت‌ها ۲۰ ساعت یا بیشتر کهنه‌اند یک بروزرسانی (فقط قیمت؛ عکس و بروزرسانیِ خودِ برنامه نه) و بعد خبر به اندروید. نیمه‌کاره ماند = دفعه‌ی بعد از همان‌جا */
+function bgDone(ok, more) { try { if (hasN('bgDone')) window.Native.bgDone(!!ok, !!more); } catch (e) { } }
+if (BG) {
+  try { Core.CFG.conc = 2; } catch (e) { }      // پس‌زمینه: آرام
+  setTimeout(function () {
+    try {
+      var last = oldestOk(), half = db.ck && Object.keys(db.ck).length > 0;
+      if (!db.ready || (!half && last && Date.now() - last < 20 * 3600e3)) { bgDone(true, false); return; }      // بارِ اول هنوز انجام نشده (کارِ برنامه‌ی باز است) یا قیمت‌ها تازه‌اند
+      refresh(false).then(function () { bgDone(true, !!(db.ck && Object.keys(db.ck).length)); }, function () { bgDone(false, true); });
+    } catch (e) { bgDone(false, false); }
+  }, 1500);
+} else {
 if (autoDue() || launchDue()) refresh(false);
 setTimeout(function () { if (updAutoOn() && (hasN('updCheck') || hasN('otaCheck'))) updCheck(false); }, 1500);
+}
 (function () { var to = +ls.get('pp.updTo', 0) || 0; if (!to) return; ls.set('pp.updTo', 0); var now = Math.max(+myCode || 0, hasN('appCode') ? +window.Native.appCode() : 0); if (now >= to) setTimeout(function () { toast('برنامه بروز شد ✓', 4000); }, 2500); })();      // بعد از بروزرسانیِ خودکار یک پیامِ کوتاه      // هر بار که برنامه باز می‌شود نسخه‌ی تازه را می‌پرسد
-setInterval(function () { updPill(); if (!busy && autoDue()) refresh(false); if (!document.hidden && updDue()) updCheck(false); if (!document.hidden && !busy && db.ready) newsLoad('bg'); }, 30000);      // برنامه باز مانده هم باشد، هر ۲۰ دقیقه یک بار نسخه‌ی تازه را می‌پرسد
+setInterval(function () { if (BG) return; updPill(); if (!busy && autoDue()) refresh(false); if (!document.hidden && updDue()) updCheck(false); if (!document.hidden && !busy && db.ready) newsLoad('bg'); }, 30000);      // برنامه باز مانده هم باشد، هر ۲۰ دقیقه یک بار نسخه‌ی تازه را می‌پرسد
 /* قفل ورود: اگر دانلود گیر کرد خودش دوباره تلاش کند؛ عکسی که جواب نداد جلوی ورود را نگیرد */
 setInterval(function () {
   if (db.ready) return;
