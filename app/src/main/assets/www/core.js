@@ -783,7 +783,7 @@ function priceGroups(groups, srcOrder, trusted, prior) {
             ۲) واژه‌نامه‌ی داخلی (پایین) ۳) واژه‌هایی که برنامه از جفت‌عنوان‌های سایت‌ها یاد گرفته (db.wd)
    اگر هیچ‌کدام نبود، واج‌نویسی تقریبی می‌کند. */
 var NAME_DICT = [
-['ساواج|ساوج|ساواژ|سواج|سواژ|سوواژ|ساوژ|ساوواژ|ساواگ', 'Sauvage'], ['اونتوس|آونتوس|اوانتوس|اونتوس', 'Aventus'], ['لیبره|لیبر', 'Libre'], ['وان میلیون|وان میلیون', 'One Million'],
+['ساواج|ساوج|ساواژ|سواج|سواژ|سوواژ|سووژ|ساوژ|ساوواژ|ساواگ', 'Sauvage'], ['اونتوس|آونتوس|اوانتوس|اونتوس', 'Aventus'], ['لیبره|لیبر', 'Libre'], ['وان میلیون|وان میلیون', 'One Million'],
 ['لیدی میلیون', 'Lady Million'], ['میلیون', 'Million'], ['وان میلیون|1 میلیون|یک میلیون', 'One Million'], ['اینویکتوس|اینوکتوس|اینویکتس', 'Invictus'], ['اروس|اروز', 'Eros'], ['اکوا دی جیو|آکوا دی جیو|اکوا دی جو', 'Acqua di Gio'],
 ['پروفومو', 'Profumo'], ['اکوا|آکوا', 'Acqua'], ['دیلان بلو', 'Dylan Blue'], ['دیلن بلو', 'Dylan Blue'], ['بلو دو', 'Bleu de'], ['بلو', 'Blue'], ['بلک', 'Black'], ['وایت', 'White'],
 ['رد', 'Red'], ['گرین', 'Green'], ['گلد', 'Gold'], ['گلدن', 'Golden'], ['سیلور', 'Silver'], ['پلاتینیوم|پلاتینوم', 'Platinum'], ['دارک', 'Dark'], ['نایت', 'Night'], ['نوآر|نویر|نوار', 'Noir'],
@@ -1505,6 +1505,7 @@ function enBrandWords(ent) {
 function enRest(g, ent) {      // نامِ لاتینِ عطر بدونِ برند و سال؛ [] یعنی سایت نامِ لاتین نداده
   var tk = pickEn(g); if (!tk) return [];
   var r = (ent && ent.id !== 'other' ? stripBrandEn(tk, ent) : tk).map(function (w) { return w.replace(/'/g, ''); }).filter(function (w) { return w && !YEAR_RE.test(w); });
+  while (r.length > 1 && /^[mwu]$/.test(r[r.length - 1])) r.pop();      // «… Sauvage M» (هایلند): حرفِ آخر جنسیت است، نه نام
   return r;
 }
 function enHard(a, b, ent) {      // دو نامِ لاتین واقعاً دو عطرند؟ (فرق فقط در واژه‌ی ربط/جنسیت/نامِ برند = همان عطر)

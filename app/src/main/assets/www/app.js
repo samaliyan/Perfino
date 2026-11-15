@@ -1,7 +1,7 @@
 (function () {
 'use strict';
 var RM = !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
-var VERSION = '1.55';
+var VERSION = '1.56';
 var BG = /[?&]bg=1(?:&|$)/.test(String(location.search || ''));      // صفحه‌ی بی‌نمایشِ بروزرسانیِ پس‌زمینه (برنامه بسته است؛ اندروید هر ۲۴ ساعت با وای‌فای اجرایش می‌کند)
 var myCode = (function () { var m = /\/b(\d{1,10})\/index\.html$/.exec(String(location.pathname || '')); return m ? m[1] : '0'; })();      // نسخه‌ی این صفحه از روی آدرسش؛ در گزارش‌ها به جاوا فرستاده می‌شود تا صفحه‌ی کهنه نتواند نسخه‌ی تازه را «سالم» اعلام کند
 function otaCall(n) { try { if (window.Native && typeof window.Native[n] === 'function') window.Native[n](myCode); } catch (e) { } }
@@ -569,7 +569,9 @@ if (mq && mq.addEventListener) mq.addEventListener('change', function () { if (s
 
 var STALE_H = 10;       // حالت دستی: بعد از این‌همه ساعت قیمت‌ها «قدیمی» حساب می‌شوند و هنگام باز شدنِ برنامه خودکار تازه می‌شوند
 function oldestOk() { var m = 0; actv().forEach(function (s) { var t = db.t[s.id] || 0; if (t && (!m || t < m)) m = t; }); return m || lastOk(); }
-function needFresh() { var now = Date.now(); return actv().some(function (s) { return !db.t[s.id] || now - db.t[s.id] > STALE_H * 3600000; }); }
+/* سایتی که کهنه است یا هنوز نیامده؛ ولی اگر همین ۳ ساعتِ اخیر امتحان شده و جواب نداده، دوباره بهانه‌ی بروزرسانیِ خودکار نمی‌شود
+   (وگرنه یک سایتِ خراب باعث می‌شد با هر بار باز کردنِ برنامه همه‌ی سایت‌ها از نو خوانده شوند) */
+function needFresh() { var now = Date.now(), tr = db.tr || {}; return actv().some(function (s) { return (!db.t[s.id] || now - db.t[s.id] > STALE_H * 3600000) && !(db.ready && tr[s.id] && now >= tr[s.id] && now - tr[s.id] < 3 * 3600000); }); }
 function lastOk() { var m = 0; Object.keys(db.t).forEach(function (k) { if (srcOn(k) && db.t[k] > m) m = db.t[k]; }); return m; }
 function agoText(ms) {
   var m = Math.floor(ms / 60000);
@@ -580,7 +582,8 @@ function agoText(ms) {
   return fa(Math.floor(h / 24)) + ' روز پیش';
 }
 function total() { var n = 0; Object.keys(prog).forEach(function (k) { n += prog[k].n || 0; }); return n; }
-function firstLoad() { return Object.keys(prog).some(function (k) { return prog[k].mode === 'full'; }); }
+function firstLoad() { return !db.ready; }      // «دریافتِ اولیه» فقط همان بارِ اول است. (قبلاً هر وقت یک سایت فهرستِ کاملش را دوباره می‌خواند هم همین نوشته می‌شد و به نظر می‌رسید برنامه هر بار از صفر شروع می‌کند.)
+function anyFull() { return Object.keys(prog).some(function (k) { return prog[k].mode === 'full'; }); }
 function pct() {   // درصد پیشرفت؛ null یعنی نامعلوم
   var ks = Object.keys(prog), sum = 0;
   for (var i = 0; i < ks.length; i++) {
@@ -1100,7 +1103,7 @@ function renderDetail() {
   var im = entryImg(dtId);
   var vs = m.variants.map(function (v) {
     var lab = [GN[v.gn], v.conc].filter(Boolean).join(' · ') || 'اندازه‌ها و قیمت‌ها';
-    return '<div class="vr g-' + (v.gn || 'x') + '"><div class="vh">' + esc(lab) + '</div>' + v.sizes.map(function (z, zi) {
+    return '<div class="vr g-' + (v.gn || 'x') + '"><div class="vh">' + esc(lab) + '</div>' + v.sizes.slice().sort(function (x, y) { return x.ml - y.ml; }).map(function (z, zi) {      // همیشه از کوچک به بزرگ
       var key = v.id + ':' + z.ml, op = szOpen[key] ? ' on' : '';
       return '<div class="sz' + op + '" data-k="' + esc(key) + '"><span class="zm"><bdi>' + fa(z.ml) + '</bdi> میل</span><span class="zp">' + pzh(z.price) + (z.n < 2 ? '<i title="فقط یک سایت"></i>' : '') + '<em class="cv"></em></span></div>'
         + '<div class="srl' + op + '">' + (function (ss) {
@@ -1308,6 +1311,7 @@ async function doSource(s) {
   var mode = db.full[s.id] && Date.now() - db.full[s.id] < FULL_EVERY ? 'price' : 'full';
   var known = 0, M = db.it[s.id], G0 = db.fullGen | 0; if (M) known = Object.keys(M).length;
   var P = prog[s.id] = { n: 0, mode: mode, exp: known, done: false };
+  db.tr = db.tr || {}; db.tr[s.id] = Date.now();      // آخرین تلاش برای این سایت (چه موفق چه ناموفق)
   function rep(n, p) { P.n = n; if (p != null) P.pct = p; tick(); }
   /* دیجی‌کالا (بیش از ۸۰۰ صفحه): هر ۱۰۰ صفحه همان لحظه ثبت و جای کار یادداشت می‌شود؛ اگر اینترنت قطع یا برنامه بسته شد، تا ۳ ساعت بعد از همان‌جا ادامه می‌دهد.
      برنامه‌ی باز ۸ درخواستِ هم‌زمان می‌فرستد؛ بروزرسانیِ پس‌زمینه آرام‌تر (۲ تا). */
@@ -1331,7 +1335,7 @@ async function doSource(s) {
   }
   db.t[s.id] = Date.now();
   if (mode === 'full') {
-    if (r.complete || (db.fa[s.id] = (db.fa[s.id] || 0) + 1) >= 3) { db.full[s.id] = Date.now(); db.fa[s.id] = 0; }
+    if (r.complete || r.walkEnd || (db.fa[s.id] = (db.fa[s.id] || 0) + 1) >= 3) { db.full[s.id] = Date.now(); db.fa[s.id] = 0; }      // walkEnd: دیجی‌کالا تا آخرِ فهرست خوانده شد
   }
   var cnt = 0; Object.keys(db.it[s.id] || {}).forEach(function (k) { var e = db.it[s.id][k]; if (e[2] && e[1] > 0) cnt++; });
   stt[s.id] = { ok: true, n: cnt, t: Date.now(), mode: mode, note: r.note || '', full: !!(db.full[s.id]), added: st.added, removed: st.removed | 0, merged: st.merged | 0, purged: st.purged | 0 };
@@ -1361,7 +1365,7 @@ async function refresh0(manual) {
       stt[s.id] = { ok: false, err: friendly(e && e.message || e).slice(0, 200), raw: String(e && e.message || e).slice(0, 200), n: pv.n || 0, t: pv.t || 0, note: pv.note || '' };
       if (prog[s.id]) prog[s.id].done = true;
     }
-    if (firstLoad()) saveDb();
+    if (anyFull()) saveDb();
     try { if (!list.length) rebuild(); } catch (e2) { stt[s.id].err = 'خطای ادغام: ' + e2.message; }
     tick();
   }));
@@ -1878,13 +1882,13 @@ function srRender() {
 function srLvStart(text) {
   text = String(text || '').trim(); if (!text) return;
   clearTimeout(srLvT); var tok = ++srLvTok, ids = actv().map(function (s) { return s.id; });
-  var L = srLv = { q: text, busy: true, done: 0, total: ids.length, fail: 0, mapped: [], other: [], seen: {}, oseen: {}, queue: [], run: false, fin: false };
+  var L = srLv = { need: Core.liveTerms(text).length >= 2 ? 2 : 1, q: text, busy: true, done: 0, total: ids.length, fail: 0, mapped: [], other: [], seen: {}, oseen: {}, queue: [], run: false, fin: false };
   srLvUi();
   function pump() {      // هر عنوانِ سایت با فهرستِ خودمان سنجیده می‌شود؛ تکه‌تکه تا صفحه نایستد
     if (tok !== srLvTok) return;
     var it = L.queue.shift();
     if (!it) { L.run = false; if (L.fin) L.busy = false; srLvUi(); return; }
-    var t = null, mine = null, drop = false;
+    var t = null, mine = null, drop = (it.k | 0) < L.need;      // پرسشِ چندواژه‌ای («بلو شنل»): کالایی که فقط یکی از واژه‌ها را دارد («بلو سداکشن») ربطی ندارد
     /* ۱) همین کالا را از قبل می‌شناسیم؟ (شناسه‌ی خودِ سایت): اگر در فهرست است همان کارتِ خودمان؛ اگر قبلاً کنار گذاشته شده (سمپل، تقلیدی…) دوباره نشان داده نمی‌شود */
     var known = it.pid && db.it[it.s] ? db.it[it.s][it.pid] : null;
     if (known) { var mid = known[2] ? VM[known[2]] : null; if (mid && MD_BY[mid]) mine = { m: MD_BY[mid], b: BR_BY[MD_BY[mid].brandId] }; else if (!known[2]) drop = true; }
@@ -1914,16 +1918,25 @@ function srLvStart(text) {
     function () { if (tok !== srLvTok) return; L.fin = true; L.busy = false; L.err = 1; srLvUi(); });
 }
 function srLvReset() { srLvTok++; clearTimeout(srLvT); srLv = null; }
+/* عنوانِ خامِ سایت («عطر ادکلن دیور ساواج | Dior Sauvage 100ml») → [نامِ فارسیِ بی‌پیشوند، نامِ لاتین] */
+function lvName(t) {
+  var p = String(t || '').split(/\s*[|·]\s*/), faP = p[0] || '', enP = p.slice(1).join(' ').trim();
+  faP = faP.replace(/^\s*(?:تستر\s+)?(?:عطر\s+ادکلن|ادکلن|عطر|ادو\s?پرفیوم|ادو\s?تویلت|ادو\s?کلن|پرفیوم)\s+(?:(?:مردانه|زنانه|یونیسکس)\s+)?/, '').replace(/\s+مدل\s+/, ' ').trim() || String(t || '');
+  if (faP.length > 60) faP = faP.slice(0, 60) + '…'; if (enP.length > 44) enP = enP.slice(0, 44) + '…';
+  return [faP, enP];
+}
 function lvCard(it) {
-  return '<button type="button" class="pc live" data-u="' + esc(it.u || '') + '"' + (it.u ? '' : ' disabled') + '><span class="pph">' + tile({ loc: '', img: it.img, k: (String(it.t).length * 7) % 64 }) + '</span><span class="pin"><b>' + esc(String(it.t).length > 70 ? String(it.t).slice(0, 70) + '…' : it.t) + '</b><small>' + esc(srcName(it.s)) + '</small><span class="pcp">' + (it.price > 0 ? pzh(it.price) : it.price < 0 ? '<span class="pz nu"><b>قیمت در سایت</b></span>' : '<span class="pz no"><b>ناموجود</b></span>') + '</span><small>فقط در خودِ سایت · بزنید تا باز شود</small></span><span class="pgo">‹</span></button>';
+  return '<button type="button" class="pc live" data-u="' + esc(it.u || '') + '"' + (it.u ? '' : ' disabled') + '><span class="pph">' + tile({ loc: '', img: it.img, k: (String(it.t).length * 7) % 64 }) + '</span><span class="pin"><b>' + esc(lvName(it.t)[0]) + '</b><small>' + esc((lvName(it.t)[1] ? lvName(it.t)[1] + ' · ' : '') + srcName(it.s)) + '</small><span class="pcp">' + (it.price > 0 ? pzh(it.price) : it.price < 0 ? '<span class="pz nu"><b>قیمت در سایت</b></span>' : '<span class="pz no"><b>ناموجود</b></span>') + '</span><small>فقط در خودِ سایت · بزنید تا باز شود</small></span><span class="pgo">‹</span></button>';
 }
 /* نوارِ باریکِ زیرِ کادرِ جستجو می‌گوید چه خبر است («دارم می‌گردم»، «۳ موردِ تازه»، «چیزِ تازه‌ای نبود»)؛ کارت‌های تازه زیرِ نتیجه‌های گوشی می‌آیند */
 function srLvUi() {
   var st = $('srst'), el = $('srlv'); if (!st || !srOn) return;
   var L = srLv, h = '', sh = '', cls = '';
   if (!L || !srNorm($('srq').value)) { st.className = ''; st.innerHTML = ''; if (el) { el.className = 'srlive'; el.innerHTML = ''; } return; }
-  var n = L.mapped.length + L.other.length, none = !Object.keys(srShown).length;
-  if (n) h = '<div class="srvh">تازه از سایت‌ها<small>این‌ها در نتیجه‌های بالا نبودند.</small></div>' + (L.mapped.length ? srCards(L.mapped, false) : '') + (L.other.length ? '<div class="pcs">' + L.other.map(lvCard).join('') + '</div>' : '');
+  var none = !Object.keys(srShown).length, others = L.other;
+  if (!none || L.mapped.length || others.some(function (it) { return it.price !== 0; })) others = others.filter(function (it) { return it.price !== 0; });      // «ناموجود»ِ سایت فقط وقتی نشان داده می‌شود که هیچ چیزِ دیگری پیدا نشده (تا معلوم باشد چنین عطری هست ولی الان نیست)
+  var n = L.mapped.length + others.length;
+  if (n) h = '<div class="srvh">تازه از سایت‌ها<small>این‌ها در نتیجه‌های بالا نبودند.</small></div>' + (L.mapped.length ? srCards(L.mapped, false) : '') + (others.length ? '<div class="pcs">' + others.map(lvCard).join('') + '</div>' : '');
   if (L.busy) { cls = 'on busy'; sh = '<span class="spn"></span>' + (none ? 'در گوشی نبود؛ ' : '') + 'در سایت‌ها هم می‌گردم… <bdi>' + fa(L.done) + ' از ' + fa(L.total) + '</bdi>' + (n ? ' · ' + fa(n) + ' موردِ تازه' : ''); }
   else if (L.err || (L.total && L.fail >= L.total)) { cls = 'on bad'; sh = 'سایت‌ها جواب ندادند · برای تلاشِ دوباره بزنید'; }
   else if (n) { cls = 'on new'; sh = '<b>' + fa(n) + '</b> موردِ تازه از سایت‌ها پیدا شد ↓'; }
