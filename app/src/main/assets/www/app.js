@@ -1,7 +1,7 @@
 (function () {
 'use strict';
 var RM = !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
-var VERSION = '1.56';
+var VERSION = '1.57';
 var BG = /[?&]bg=1(?:&|$)/.test(String(location.search || ''));      // صفحه‌ی بی‌نمایشِ بروزرسانیِ پس‌زمینه (برنامه بسته است؛ اندروید هر ۲۴ ساعت با وای‌فای اجرایش می‌کند)
 var myCode = (function () { var m = /\/b(\d{1,10})\/index\.html$/.exec(String(location.pathname || '')); return m ? m[1] : '0'; })();      // نسخه‌ی این صفحه از روی آدرسش؛ در گزارش‌ها به جاوا فرستاده می‌شود تا صفحه‌ی کهنه نتواند نسخه‌ی تازه را «سالم» اعلام کند
 function otaCall(n) { try { if (window.Native && typeof window.Native[n] === 'function') window.Native[n](myCode); } catch (e) { } }
@@ -986,6 +986,45 @@ function migrateFav() {
   });
   if (ch) ls.set('pp.set', set);
 }
+/* ---------- کارگرِ پس‌زمینه (Web Worker) ----------
+   سنگین‌ترین کارِ بعد از هر بروزرسانی ساختنِ فهرستِ برند/عطر از حافظه است (روی گوشی چند ثانیه) که صفحه را قفل می‌کرد.
+   حالا در یک کارگرِ جدا ساخته می‌شود و صفحه (اسکرول، جستجو) روان می‌ماند. کارگر از متنِ همان core.js ساخته می‌شود (Blob)، چون صفحه از file:// باز می‌شود.
+   اگر کارگر ساخته نشد، خطا داد یا دیر کرد، همان روشِ قبلی (روی صفحه) انجام می‌شود و کارگر تا آخرِ این اجرا کنار گذاشته می‌شود. */
+var wk = null, wkDead = false, wkSeq = 0, wkWait = {};
+function wkGet() {
+  if (wk || wkDead) return wk;
+  try {
+    if (typeof Worker === 'undefined' || typeof Blob === 'undefined' || !window.__coreFn || BG) { wkDead = true; return null; }
+    var src = '(' + window.__coreFn.toString() + ')(self);\n'
+      + 'self.onmessage=function(e){var d=e.data;try{self.Core.setClones(true);var l=self.Core.buildList(d.db,d.order,d.trusted,d.maxAge,d.order);'
+      + 'if(!l.length&&d.lastOk){var l2=self.Core.buildList(d.db,d.order,d.trusted,0,d.order);if(l2.length)l=l2;}'
+      + 'var t=self.Core.tree(l,d.lang,d.db.wd);self.postMessage({id:d.id,l:l,hidden:l.hidden||0,stale:l.stale||0,tree:t,audit:t.audit||null});}'
+      + 'catch(err){self.postMessage({id:d.id,err:String(err&&err.message||err)});}};';
+    var url = URL.createObjectURL(new Blob([src], { type: 'text/javascript' }));
+    wk = new Worker(url);
+    wk.onmessage = function (e) { var d = e.data || {}, w = wkWait[d.id]; if (!w) return; delete wkWait[d.id]; clearTimeout(w.tm); if (d.err) w.no(new Error(d.err)); else w.ok(d); };
+    wk.onerror = function () { wkKill(); };
+  } catch (e) { wk = null; wkDead = true; }
+  return wk;
+}
+function wkKill() { wkDead = true; try { if (wk) wk.terminate(); } catch (e) { } wk = null; Object.keys(wkWait).forEach(function (k) { var w = wkWait[k]; delete wkWait[k]; clearTimeout(w.tm); w.no(new Error('worker')); }); }
+/* مثلِ rebuild، ولی فهرست در کارگر ساخته می‌شود؛ بعد rebuild معمولی فقط نتیجه‌ی آماده را روی صفحه می‌نشاند */
+async function rebuildAsync() {
+  var lang = set.lang === 'en' ? 'en' : 'fa', stamp = dataStamp(lang), w = (ALLB.length && stamp === treeStamp) ? null : wkGet();
+  if (w) {
+    try {
+      var id = ++wkSeq, r = await new Promise(function (ok, no) {
+        wkWait[id] = { ok: ok, no: no, tm: setTimeout(function () { if (wkWait[id]) { delete wkWait[id]; no(new Error('timeout')); wkKill(); } }, 45000) };
+        w.postMessage({ id: id, db: db, order: order(), trusted: TRUSTED, maxAge: 12 * 3600e3, lastOk: !!lastOk(), lang: lang });
+      });
+      if (dataStamp(lang) === stamp && Array.isArray(r.l) && Array.isArray(r.tree)) {      // در این فاصله داده عوض نشده
+        var l = r.l; l.hidden = r.hidden; l.stale = r.stale; if (r.audit) r.tree.audit = r.audit;
+        hiddenN = l.hidden || 0; staleN = l.stale || 0; FLAT = l; ALLB = r.tree; treeStamp = stamp; window.__treeSrc = 'worker'; treeSave(lang, stamp, ALLB, l);
+      }
+    } catch (e) { }
+  }
+  return rebuild();
+}
 function rebuild(light) {
   var lang = set.lang === 'en' ? 'en' : 'fa', stamp = dataStamp(lang), l;
   if (ALLB.length && stamp === treeStamp) l = FLAT;                    // داده همان است (فقط روشن/خاموشیِ برندها یا عطرها عوض شده)
@@ -1098,6 +1137,35 @@ function dact(id) {
   var fv = !!set.fav[id];
   return '<div class="dact"><button type="button" class="' + (fv ? 'on' : '') + '" data-a="fav">' + (fv ? '★ در لیست مغازه' : '☆ افزودن به لیست مغازه') + '</button></div>';
 }
+/* ---------- قیمتِ فروشِ مغازه و اعتبارِ قیمت ----------
+   set.sell = { mode: 'off' | 'pct' | 'fix', v: درصد یا تومان, base: 'mid' (میانه‌ی بازار) | 'min' (ارزان‌ترین سایت), rnd: رند به بالا } */
+function sellCfg() { var c = set.sell || {}; return { mode: c.mode === 'pct' || c.mode === 'fix' ? c.mode : 'off', v: +c.v > 0 ? +c.v : 0, base: c.base === 'min' ? 'min' : 'mid', rnd: [1000, 10000, 50000, 100000].indexOf(+c.rnd) >= 0 ? +c.rnd : 10000 }; }
+function usedPrices(z) { var a = []; (z.srcs || []).forEach(function (q) { if (q.used && q.price > 0) a.push(q.price); }); return a; }
+function sellPrice(z) {
+  var c = sellCfg(); if (c.mode === 'off' || !(z.price > 0)) return 0;
+  var u = usedPrices(z), base = c.base === 'min' && u.length ? Math.min.apply(null, u) : z.price;
+  var p = c.mode === 'pct' ? base * (1 + c.v / 100) : base + c.v;
+  return Math.ceil(p / c.rnd - 1e-9) * c.rnd;
+}
+/* اعتبار: چند سایت این اندازه را دارند و قیمت‌هایشان چقدر به هم نزدیک است. lvl: ۳ = چند سایتِ هم‌نظر، ۲ = دو سایتِ نزدیک، ۱ = اختلافِ زیاد یا فقط یک سایت */
+function conf(z) {
+  var u = usedPrices(z), n = u.length || (z.n | 0);
+  if (n < 2) return { lvl: 1, n: n, sp: 0, cls: 'c1', txt: 'فقط یک سایت این اندازه را دارد؛ قیمت با سایتِ دیگری سنجیده نشده.' };
+  var lo = Math.min.apply(null, u), hi = Math.max.apply(null, u), sp = z.price > 0 ? Math.round((hi - lo) / z.price * 100) : 0;
+  if (sp > 15) return { lvl: 1, n: n, sp: sp, cls: 'cw', txt: fa(n) + ' سایت، ولی قیمت‌ها ' + fa(sp) + '٪ با هم فرق دارند؛ پیش از قیمت‌دادن سایت‌ها را ببینید.' };
+  if (n >= 3) return { lvl: 3, n: n, sp: sp, cls: 'c3', txt: fa(n) + ' سایت تقریباً هم‌قیمت‌اند (اختلاف ' + fa(sp) + '٪)؛ قیمتِ مطمئن.' };
+  return { lvl: 2, n: n, sp: sp, cls: 'c2', txt: 'دو سایت نزدیک به هم (اختلاف ' + fa(sp) + '٪).' };
+}
+function confHtml(c) { return '<span class="cf ' + c.cls + '" aria-label="' + esc(c.txt) + '"><i></i><i></i><i></i></span>'; }
+function shareText(m, v, z) {
+  var b = BR_BY[m.brandId], sp = sellPrice(z), lab = [GN[v.gn], v.conc].filter(Boolean).join(' · ');
+  return (b && b.id !== 'other' && b.id !== 'clone' ? b.name + ' ' : '') + m.name + '\n' + (lab ? lab + ' · ' : '') + fa(z.ml) + ' میل\nقیمت: ' + fa(sp || z.price) + ' تومان';
+}
+function shareOut(text) {
+  try { if (hasN('shareText') && window.Native.shareText(text)) return; } catch (e) { }
+  try { if (hasN('copy')) { window.Native.copy(text); toast('کپی شد؛ در واتساپ یا تلگرام بچسبانید', 3500); return; } } catch (e2) { }
+  toast('ارسال در این گوشی نشد', 3000);
+}
 function renderDetail() {
   var m = MD_BY[dtId]; if (!m) return;
   var im = entryImg(dtId);
@@ -1105,8 +1173,10 @@ function renderDetail() {
     var lab = [GN[v.gn], v.conc].filter(Boolean).join(' · ') || 'اندازه‌ها و قیمت‌ها';
     return '<div class="vr g-' + (v.gn || 'x') + '"><div class="vh">' + esc(lab) + '</div>' + v.sizes.slice().sort(function (x, y) { return x.ml - y.ml; }).map(function (z, zi) {      // همیشه از کوچک به بزرگ
       var key = v.id + ':' + z.ml, op = szOpen[key] ? ' on' : '';
-      return '<div class="sz' + op + '" data-k="' + esc(key) + '"><span class="zm"><bdi>' + fa(z.ml) + '</bdi> میل</span><span class="zp">' + pzh(z.price) + (z.n < 2 ? '<i title="فقط یک سایت"></i>' : '') + '<em class="cv"></em></span></div>'
-        + '<div class="srl' + op + '">' + (function (ss) {
+      var cf = conf(z), sp = sellPrice(z);
+      return '<div class="sz' + op + '" data-k="' + esc(key) + '"><span class="zm"><bdi>' + fa(z.ml) + '</bdi> میل</span><span class="zp">' + pzh(z.price) + confHtml(cf) + '<em class="cv"></em></span>' + (sp ? '<span class="zsl">فروشِ شما <b>' + fa(sp) + '</b> تومان</span>' : '') + '</div>'
+        + '<div class="srl' + op + '"><div class="cft ' + cf.cls + '">' + confHtml(cf) + '<span>' + esc(cf.txt) + '</span></div>'
+        + '<button type="button" class="shr" data-sh="' + esc(key) + '">' + (sp ? 'ارسالِ قیمتِ فروش برای مشتری' : 'ارسالِ این قیمت برای مشتری') + '</button>' + (function (ss) {
           var lo = 0, hi = 0, nu = 0;      // ارزان‌ترین فروشگاه (فقط وقتی چند فروشگاه با قیمتِ متفاوت هست) با رنگِ سبز
           ss.forEach(function (q) { if (q.used && q.price > 0) { nu++; if (!lo || q.price < lo) lo = q.price; if (q.price > hi) hi = q.price; } });
           return ss.map(function (q) {
@@ -1118,7 +1188,7 @@ function renderDetail() {
   }).join('');
   var keep = $('dtc').scrollTop;
   $('dtc').innerHTML = '<div class="dtop"><div class="dpic" data-vw="1">' + tile({ loc: im.loc, img: im.img, k: im.k }) + '<em>بزرگ‌نمایی</em></div><div class="dti"><div class="dbn">' + esc(BR_BY[m.brandId].name) + '</div><div class="dnm">' + esc(m.name) + '</div></div></div>' + dact(dtId) + vs
-    + '<div class="dnote">عددِ درشتِ هر اندازه، قیمتِ میانه‌ی بازار است (میانگینِ سایت‌ها)، نه قیمتِ یک مغازه. روی هر اندازه بزنید تا قیمتِ هر سایت و دکمه‌ی دیدن در سایت بیاید. سبز یعنی ارزان‌ترین سایت. نقطه‌ی کوچک یعنی فقط یک سایت آن را داشته.</div>';
+    + '<div class="dnote">عددِ درشتِ هر اندازه، قیمتِ میانه‌ی بازار است (میانگینِ سایت‌ها)، نه قیمتِ یک مغازه. روی هر اندازه بزنید تا قیمتِ هر سایت و دکمه‌ی دیدن در سایت بیاید. سبز یعنی ارزان‌ترین سایت. سه خطِ کوچکِ کنارِ قیمت می‌گوید قیمت چقدر مطمئن است: سه خطِ سبز = چند سایتِ هم‌قیمت؛ یک خط = فقط یک سایت؛ نارنجی = سایت‌ها اختلافِ زیاد دارند.</div>';
   var nm = $('dtc').querySelector('.dnm'); fitLines(nm, 3, 16);
   $('dtc').scrollTop = keep;
   if (dtEl.classList.contains('on')) fitPz($('dtc'));
@@ -1155,6 +1225,12 @@ $('dtc').addEventListener('click', function (e) {
   }
   if (e.target.closest('.dpic') && dtId) { var bm = MD_BY[dtId] && BR_BY[MD_BY[dtId].brandId]; viewImg(dtId, bm ? bm.models.map(function (m) { return m.id; }) : [dtId], 'detail'); return; }
   var g = e.target.closest('.go'); if (g) { openLink(g.dataset.u); return; }
+  var sh = e.target.closest('.shr');
+  if (sh && dtId && MD_BY[dtId]) {
+    var mS = MD_BY[dtId], kk = String(sh.dataset.sh).split(':'), done = false;
+    mS.variants.forEach(function (v) { if (done || v.id !== kk[0]) return; v.sizes.forEach(function (zz) { if (!done && String(zz.ml) === kk[1]) { done = true; shareOut(shareText(mS, v, zz)); } }); });
+    return;
+  }
   var z = e.target.closest('.sz'); if (z && z.dataset.k) { layerMark(); var on = !z.classList.contains('on'); szOpen[z.dataset.k] = on; z.classList.toggle('on', on); if (z.nextElementSibling) { z.nextElementSibling.classList.toggle('on', on); if (on) fitPz(z.nextElementSibling); } }
 });
 
@@ -1370,7 +1446,7 @@ async function refresh0(manual) {
     tick();
   }));
   var ch = 0;
-  try { ch = rebuild(); histTake(); } catch (e3) { console.error(e3); }
+  try { ch = await rebuildAsync(); histTake(); } catch (e3) { console.error(e3); }
   try {
     var au2 = (ALLB && ALLB.audit) || {}, mg = 0, pg = 0, CL2 = Core.CLEANSE || {};
     Core.SOURCES.forEach(function (s) { mg += (stt[s.id] && stt[s.id].merged) | 0; pg += (stt[s.id] && stt[s.id].purged) | 0; });
@@ -1393,6 +1469,14 @@ var sheetY = 1, open = false, adv = false, advN = 0;
 function renderSheet() {
   Array.prototype.forEach.call($('sTheme').children, function (b) { b.classList.toggle('on', b.dataset.v === set.theme); });
   Array.prototype.forEach.call($('sAuto').children, function (b) { b.classList.toggle('on', +b.dataset.m === (+set.auto > 0 ? +set.auto : 0)); });
+  var sc = sellCfg();
+  Array.prototype.forEach.call($('sSellM').children, function (b) { b.classList.toggle('on', b.dataset.v === sc.mode); });
+  Array.prototype.forEach.call($('sSellB').children, function (b) { b.classList.toggle('on', b.dataset.v === sc.base); });
+  Array.prototype.forEach.call($('sSellR').children, function (b) { b.classList.toggle('on', +b.dataset.v === sc.rnd); });
+  $('sSellX').style.display = sc.mode === 'off' ? 'none' : '';
+  $('sSellU').textContent = sc.mode === 'pct' ? 'درصد سود' : 'تومان سود روی هر عطر';
+  if (document.activeElement !== $('sSellV')) $('sSellV').value = sc.v ? String(sc.v) : '';
+  $('sSellE').textContent = sc.mode === 'off' ? '' : 'مثال: قیمتِ بازار ۱۰٬۰۰۰٬۰۰۰ ← فروشِ شما ' + fa(Math.ceil((sc.mode === 'pct' ? 1e7 * (1 + sc.v / 100) : 1e7 + sc.v) / sc.rnd - 1e-9) * sc.rnd) + ' تومان';
   Array.prototype.forEach.call($('sUpdA').children, function (b) { b.classList.toggle('on', +b.dataset.v === (updAutoOn() ? 1 : 0)); });
   Array.prototype.forEach.call($('sModel').children, function (b) { b.classList.toggle('on', b.dataset.v === set.model); });
   var bad = false;
@@ -1591,6 +1675,16 @@ $('updGo').onclick = function () {      // فقط برای نصبِ APK
   var ok = false; try { ok = window.Native.updInstall(); } catch (e) { }
   if (!ok) { updSt.ready = 0; window.__updErr('start'); setTimeout(function () { updSt.dismissed = false; updCheck(true); }, 600); }      // فایلِ دانلودشده از بین رفته (کمبود حافظه): دوباره دانلود شود، نه گیر کردن تا باز شدنِ بعدی
 };
+function sellSave(c) { set.sell = c; ls.set('pp.set', set); renderSheet(); if (dtId) renderDetail(); }
+$('sSellM').onclick = function (e) { var b = e.target.closest('button'); if (!b) return; var c = sellCfg(); c.mode = b.dataset.v; if (c.mode !== 'off' && !c.v) c.v = c.mode === 'pct' ? 10 : 500000; if (c.mode === 'pct' && c.v > 300) c.v = 10; sellSave(c); };
+$('sSellB').onclick = function (e) { var b = e.target.closest('button'); if (!b) return; var c = sellCfg(); c.base = b.dataset.v; sellSave(c); };
+$('sSellR').onclick = function (e) { var b = e.target.closest('button'); if (!b) return; var c = sellCfg(); c.rnd = +b.dataset.v; sellSave(c); };
+$('sSellV').addEventListener('change', function () {
+  var c = sellCfg(), n = parseFloat(String($('sSellV').value).replace(/[۰-۹]/g, function (d) { return '۰۱۲۳۴۵۶۷۸۹'.indexOf(d); }).replace(/[٫]/g, '.').replace(/[^0-9.]/g, ''));
+  if (!(n > 0)) n = 0;
+  c.v = c.mode === 'pct' ? Math.min(300, n) : Math.min(5e8, Math.round(n));
+  sellSave(c);
+});
 $('sAuto').onclick = function (e) { var b = e.target.closest('button'); if (!b || b.dataset.m == null) return; set.auto = +b.dataset.m; ls.set('pp.set', set); renderSheet(); updPill(); if (set.auto > 0 && !busy && autoDue()) refresh(false); };
 $('sRef').onclick = function () { if (busy) { toast('همین حالا در حال بروزرسانی است…', 2200); return; } refresh(true); };
 $('sFull').onclick = function () { if (busy) return; db.full = {}; db.fa = {}; saveDb(); refresh(true); };

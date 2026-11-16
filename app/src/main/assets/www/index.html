@@ -402,6 +402,19 @@ details.fold>.fb>h3:first-child{margin-top:10px}
 .zp{white-space:nowrap;font-variant-numeric:tabular-nums;min-width:0;flex:none;padding-inline-end:2px}
 .zp i{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--mu);opacity:.55;margin-inline-start:6px}
 .dnote{margin-top:14px;font-size:12px;color:var(--mu);text-align:center}
+.cf{display:inline-flex;align-items:flex-end;gap:2px;height:14px;margin-inline-start:8px;flex:none}
+.cf i{display:block;width:4px;border-radius:2px;background:rgba(128,134,160,.32);opacity:1;margin:0}
+.cf i:nth-child(1){height:6px}.cf i:nth-child(2){height:10px}.cf i:nth-child(3){height:14px}
+.cf.c3 i{background:#2bb673}.cf.c2 i:nth-child(-n+2){background:#2bb673}.cf.c1 i:nth-child(1){background:var(--mu)}.cf.cw i:nth-child(1){background:#f0a030}
+.zp .cf i{width:4px;margin:0;opacity:1;border-radius:2px}
+.cft{display:flex;align-items:center;gap:8px;font-size:13px;line-height:1.7;color:var(--mu);padding:6px 4px 2px}
+.cft .cf{margin:0}.cft.cw{color:#c77700}.cft.c3{color:#1f9a5e}
+#dtc .zsl{flex:1 1 100%;text-align:end;font-size:14px;color:#1f9a5e;padding-inline-end:26px}
+#dtc .zsl b{font-size:17px;font-variant-numeric:tabular-nums}
+.shr{display:block;width:100%;min-height:44px;margin:6px 0;border-radius:14px;border:1.5px solid #2bb673;background:none;color:#1f9a5e;font:inherit;font-size:15px;font-weight:700;cursor:pointer}
+:root[data-th="dark"] .shr,:root[data-th="dark"] #dtc .zsl,:root[data-th="dark"] .cft.c3{color:#5fdc9f}
+#sSellV{flex:1;min-width:0;height:48px;border-radius:24px;border:1.5px solid var(--gb);background:var(--pill);color:var(--tx);font:inherit;font-size:18px;padding:0 16px;outline:none;text-align:center}
+.pcs>.pc,.pcs>.pcw{content-visibility:auto;contain-intrinsic-size:auto 96px}
 /* عکس بزرگ */
 #vw{position:absolute;top:0;left:0;right:0;bottom:0;z-index:60;background:rgba(6,8,18,.94);display:none;align-items:center;justify-content:center;padding:70px 14px 120px;overflow:hidden;touch-action:none}
 #vw.on{display:flex}
@@ -547,6 +560,21 @@ details.fold>.fb>h3:first-child{margin-top:10px}
     <details class="fold"><summary>بروزرسانی خودکار قیمت‌ها<small>هر چند وقت یک‌بار، وقتی برنامه باز است</small></summary>
     <div class="fb">
     <div class="seg mods" id="sAuto"><button data-m="0">خاموش<small>دستی</small></button><button data-m="15">۱۵<small>دقیقه</small></button><button data-m="30">۳۰<small>دقیقه</small></button><button data-m="60">۱<small>ساعت</small></button><button data-m="180">۳<small>ساعت</small></button></div>
+    </div>
+    </details>
+    <details class="fold"><summary>قیمتِ فروشِ مغازه<small>سودِ شما روی قیمتِ بازار؛ برای فرستادن به مشتری</small></summary>
+    <div class="fb">
+    <div class="seg mods" id="sSellM"><button data-v="off">خاموش<small>فقط قیمتِ بازار</small></button><button data-v="pct">درصدی<small>مثلاً ۱۰٪ بیشتر</small></button><button data-v="fix">مبلغِ ثابت<small>مثلاً ۵۰۰ هزار</small></button></div>
+    <div id="sSellX" style="display:none">
+    <h3 id="sSellU">درصد سود</h3>
+    <div class="bkrow"><input id="sSellV" type="text" inputmode="decimal" autocomplete="off" placeholder="مثلاً 10"></div>
+    <h3>روی کدام قیمت</h3>
+    <div class="seg mods" id="sSellB"><button data-v="mid">میانه‌ی بازار<small>همان عددِ درشت</small></button><button data-v="min">ارزان‌ترین سایت<small>کمترین قیمت</small></button></div>
+    <h3>رُند شود به</h3>
+    <div class="seg mods" id="sSellR"><button data-v="1000">۱ هزار</button><button data-v="10000">۱۰ هزار</button><button data-v="50000">۵۰ هزار</button><button data-v="100000">۱۰۰ هزار</button></div>
+    <div class="hint2" id="sSellE"></div>
+    </div>
+    <div class="hint2">وقتی روشن باشد، در صفحه‌ی هر عطر زیرِ قیمتِ بازار «فروشِ شما» هم نوشته می‌شود و دکمه‌ی «ارسال برای مشتری» فقط نام عطر، اندازه و همین قیمت را می‌فرستد (بدونِ نامِ سایت‌ها).</div>
     </div>
     </details>
     <details class="fold"><summary>برندها<small>برندهایی که نمی‌فروشید را خاموش کنید</small></summary>

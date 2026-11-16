@@ -1,5 +1,5 @@
 /* منطق داده: خواندن سایت‌ها، یکی‌کردن نام‌ها، محاسبهٔ یک قیمت. بدون وابستگی به رابط. */
-(function (root) {
+var __perfinoCore = function (root) {
 'use strict';
 
 /* ---------- متن ---------- */
@@ -3862,4 +3862,6 @@ function searchRank(idx, alts, tools, opts) {
 root.Core = { probeShop: probeShop, fetchNews: fetchNews, newsMore: newsMore, newsFromWp: newsFromWp, newsFromRss: newsFromRss, newsPickImg: newsPickImg, newsExcerpt: newsExcerpt, NEWS_SRC: NEWS_SRC, liveSearch: liveSearch, atrafshanSource: atrafshanSource, atrCards: atrCards, atrafshanLive: atrafshanLive, setClones: setClones, isCloneKey: isCloneKey, CL_MARK: CL_MARK, liveTerms: liveTerms, liveHit: liveHit, liveScore: liveScore, digikalaLive: digikalaLive, wooLivePrice: wooLivePrice, searchIndex: searchIndex, searchRank: searchRank, searchSimilar: searchSimilar, simWord: simWord, simFold: simFold, srn: srn, fzKey: fzKey, explainTitle: explainTitle, useSz: useSz, sizeFromPage: sizeFromPage, nextDataCards: nextDataCards, RAWC: RAWC, stripPriceTail: stripPriceTail, marketStats: marketStats, marketView: marketView, histNew: histNew, histFix: histFix, histSnap: histSnap, histReport: histReport, purgeStored: purgeStored, setBlock: setBlock, REJ: REJ, vetReason: vetReason, reconcile: reconcile, reconcileAsync: reconcileAsync, CLEANSE: CLEANSE, cleanseText: cleanseText, cleanBrandName: cleanBrandName, itemUrl: itemUrl, STALE_MIN: STALE_MIN, fa2en: fa2en, en2fa: en2fa, enTokens: enTokens, titleEn: titleEn, tree: tree, brandOf: brandOf, specInfo: specInfo, enrichTitle: enrichTitle, genderOf: genderOf, nameCmp: nameCmp, CFG: CFG, newDb: newDb, dbIndex: dbIndex, ingest: ingest, ingestAsync: ingestAsync, buildList: buildList, normFa: normFa, parseTitle: parseTitle, aggregate: aggregate, SOURCES: SOURCES, extractCards: extractCards,
   wooSource: wooSource, digikalaSource: digikalaSource, htmlSource: htmlSource, letterOf: letterOf, median: median, priceFromText: priceFromText, similar: similar };
 if (typeof module !== 'undefined') module.exports = root.Core;
-})(typeof window !== 'undefined' ? window : globalThis);
+};
+__perfinoCore(typeof window !== 'undefined' ? window : (typeof self !== 'undefined' ? self : globalThis));
+if (typeof window !== 'undefined') window.__coreFn = __perfinoCore;      // متنِ همین تابع برای ساختنِ «کارگرِ پس‌زمینه» (Web Worker) به کار می‌رود
