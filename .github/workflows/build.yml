@@ -67,10 +67,11 @@ jobs:
         run: |
           mkdir -p "$RUNNER_TEMP/jt"
           J="${{ steps.p.outputs.dir }}/app/src/main/java/ir/perfume/price"
-          javac -encoding UTF-8 -d "$RUNNER_TEMP/jt" "$J/Ota.java" "$J/OtaGuard.java" "$J/Http.java" tests/java/ir/perfume/price/OtaTest.java tests/java/ir/perfume/price/GuardTest.java tests/java/ir/perfume/price/HttpTest.java
+          javac -encoding UTF-8 -d "$RUNNER_TEMP/jt" "$J/Ota.java" "$J/OtaGuard.java" "$J/Http.java" "$J/Store.java" "$J/HttpCache.java" tests/java/ir/perfume/price/OtaTest.java tests/java/ir/perfume/price/GuardTest.java tests/java/ir/perfume/price/HttpTest.java tests/java/ir/perfume/price/StoreCacheTest.java
           java -Dstdout.encoding=UTF-8 -cp "$RUNNER_TEMP/jt" ir.perfume.price.OtaTest "${{ steps.p.outputs.dir }}/app/src/main/assets/www" "$RUNNER_TEMP/ota"
           java -Dstdout.encoding=UTF-8 -cp "$RUNNER_TEMP/jt" ir.perfume.price.GuardTest
           java -Dstdout.encoding=UTF-8 -cp "$RUNNER_TEMP/jt" ir.perfume.price.HttpTest
+          java -Dstdout.encoding=UTF-8 -cp "$RUNNER_TEMP/jt" ir.perfume.price.StoreCacheTest
       - name: Core logic tests (Node; a failing test stops the release)
         run: bash tests/run_node.sh
       - uses: actions/upload-artifact@v4

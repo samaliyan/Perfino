@@ -110,7 +110,9 @@ public class BgJob extends JobService {
             s.setAllowUniversalAccessFromFileURLs(false);
             s.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
             s.setBlockNetworkImage(true);      // عکس در پس‌زمینه لازم نیست
+            final HttpCache hc = new HttpCache(new File(getCacheDir(), "http"), 40L * 1024 * 1024);
             web.setWebViewClient(new WebViewClient() {
+                @Override public android.webkit.WebResourceResponse shouldInterceptRequest(WebView v, android.webkit.WebResourceRequest req) { return Proxy.handle(req, hc); }
                 @Override public boolean shouldOverrideUrlLoading(WebView v, String u) { return true; }      // صفحه‌ی بی‌نمایش هیچ‌جا نمی‌رود
                 @Override public boolean onRenderProcessGone(WebView v, android.webkit.RenderProcessGoneDetail d) {
                     ui.post(new Runnable() { @Override public void run() { finish(true); } });
@@ -215,37 +217,13 @@ public class BgJob extends JobService {
 
         @JavascriptInterface
         public boolean fileSet(final String key, final String text) {
-            if (done || MainActivity.alive) return false;      // برنامه باز شده: دیگر چیزی روی حافظه‌اش ننویس
-            try {
-                String safe = key.replaceAll("[^A-Za-z0-9._-]", "_");
-                File dir = getFilesDir();
-                File tmp = new File(dir, safe + ".bg.tmp");
-                FileOutputStream fo = new FileOutputStream(tmp);
-                try { fo.write(text.getBytes("UTF-8")); fo.getFD().sync(); } finally { fo.close(); }
-                File f = new File(dir, safe + ".json");
-                if (!tmp.renameTo(f)) { f.delete(); if (!tmp.renameTo(f)) return false; }
-                return true;
-            } catch (Throwable e) {
-                return false;
-            }
+            if (done || MainActivity.front) return false;      // برنامه جلوی چشم آمده: دیگر چیزی روی حافظه‌اش ننویس
+            return Store.set(getFilesDir(), key, text, "bg");
         }
 
         @JavascriptInterface
         public String fileGet(final String key) {
-            try {
-                String safe = key.replaceAll("[^A-Za-z0-9._-]", "_");
-                File f = new File(getFilesDir(), safe + ".json");
-                if (!f.exists()) return "";
-                FileInputStream in = new FileInputStream(f);
-                try {
-                    ByteArrayOutputStream bo = new ByteArrayOutputStream((int) Math.min(f.length() + 16, 64L * 1024 * 1024));
-                    byte[] buf = new byte[65536]; int n;
-                    while ((n = in.read(buf)) > 0) bo.write(buf, 0, n);
-                    return bo.toString("UTF-8");
-                } finally { in.close(); }
-            } catch (Throwable e) {
-                return "";
-            }
+            return Store.get(getFilesDir(), key);
         }
 
         @JavascriptInterface public int appCode() { return BgJob.this.appCode(); }

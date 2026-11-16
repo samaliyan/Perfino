@@ -78,6 +78,7 @@ public class MainActivity extends Activity {
     static final String[] ALLOW_HOSTS = {"liliome.com", "digikala.com", "safirstores.com", "hilandbeauty.com", "atrafshan.ir", "hesperfume.ir", "flower-perfume.com", "khalifechi.com", "redmag.ir"};
     /** برنامه روی صفحه باز است؟ (بروزرسانیِ پس‌زمینه در این حال شروع نمی‌شود؛ خودِ صفحه بروز می‌کند) */
     static volatile boolean alive = false;
+    private HttpCache httpCache;
     /** برنامه همین حالا جلوی چشم است؟ */
     static volatile boolean front = false;
     private static MainActivity inst;      // فقط روی رشته‌ی اصلی
@@ -131,7 +132,14 @@ public class MainActivity extends Activity {
         imgDir = new File(getFilesDir(), "img");
         imgDir.mkdirs();
         try { File[] old = imgDir.listFiles(); if (old != null) for (File of : old) if (of.getName().endsWith(".tmp")) of.delete(); } catch (Exception ignore) { }      // فایل‌های نیمه‌کاره‌ی دانلودِ قبلی
-        new Thread(new Runnable() { @Override public void run() { pruneImgs(); } }).start();      // حافظه‌ی عکس بی‌نهایت بزرگ نشود
+        new Thread(new Runnable() { @Override public void run() {
+            pruneImgs();
+            try {      // عکس‌های بزرگی که از نسخه‌های قبل مانده‌اند: هر بار باز شدن حداکثر ۱۵۰ تا، با اولویتِ کم
+                Thread.currentThread().setPriority(Thread.MIN_PRIORITY);
+                File[] fs = imgDir.listFiles(); int n = 0;
+                if (fs != null) for (File f : fs) { if (n >= 150 || !alive) break; if (f.getName().endsWith(".img") && f.length() >= 150 * 1024 && ImgShrink.shrink(f)) n++; }
+            } catch (Throwable ignore) { }
+        } }).start();      // حافظه‌ی عکس بی‌نهایت بزرگ نشود
         root = new FrameLayout(this);
         root.setBackgroundColor(Color.parseColor("#0c0f1f"));
         root.setFitsSystemWindows(true);
@@ -151,7 +159,12 @@ public class MainActivity extends Activity {
         s.setSupportZoom(false);
         s.setTextZoom(100); // اندازه‌ی فونت سیستم نوشته‌ها را به‌هم نریزد
         web.setOverScrollMode(View.OVER_SCROLL_NEVER);
+        httpCache = new HttpCache(new File(getCacheDir(), "http"), 40L * 1024 * 1024);
         web.setWebViewClient(new WebViewClient() {
+            @Override
+            public android.webkit.WebResourceResponse shouldInterceptRequest(WebView v, android.webkit.WebResourceRequest req) {
+                return Proxy.handle(req, httpCache);      // فقط نشانیِ مجازیِ perfino.local؛ بقیه null (رفتارِ معمولی)
+            }
             @Override
             public boolean shouldOverrideUrlLoading(WebView v, String u) {
                 if (u == null) return true;
@@ -298,7 +311,7 @@ public class MainActivity extends Activity {
                                     try { out.close(); } catch (Exception ignore) { }
                                     try { in.close(); } catch (Exception ignore) { }
                                 }
-                                if (!big && magicOk && total > 200) ok = tmp.renameTo(dst);
+                                if (!big && magicOk && total > 200) { ok = tmp.renameTo(dst); if (ok) ImgShrink.shrink(dst); }      // عکسِ بزرگ همان‌جا کوچک می‌شود
                                 if (!ok) tmp.delete();
                             }
                         } catch (Exception e) {
@@ -483,37 +496,30 @@ public class MainActivity extends Activity {
         /** دادهٔ بزرگ را در فایلِ خودِ برنامه می‌نویسد (بدون سقفِ ۵ مگابایتیِ localStorage). نوشتن اتمیک: اول فایل موقت، بعد جایگزینی. */
         @JavascriptInterface
         public boolean fileSet(final String key, final String text) {
-            try {
-                String safe = key.replaceAll("[^A-Za-z0-9._-]", "_");
-                File dir = getFilesDir();
-                File tmp = new File(dir, safe + ".tmp");
-                FileOutputStream fo = new FileOutputStream(tmp);
-                try { fo.write(text.getBytes("UTF-8")); fo.getFD().sync(); } finally { fo.close(); }
-                File f = new File(dir, safe + ".json");
-                if (!tmp.renameTo(f)) { f.delete(); if (!tmp.renameTo(f)) return false; }
-                return true;
-            } catch (Exception e) {
-                return false;
-            }
+            return Store.set(getFilesDir(), key, text, "a");      // فشرده و اتمیک (Store.java)
         }
 
         /** فایلِ ذخیره‌شده را برمی‌گرداند؛ نبودن یا خطا = رشته‌ی خالی. */
         @JavascriptInterface
         public String fileGet(final String key) {
-            try {
-                String safe = key.replaceAll("[^A-Za-z0-9._-]", "_");
-                File f = new File(getFilesDir(), safe + ".json");
-                if (!f.exists()) return "";
-                FileInputStream in = new FileInputStream(f);
-                try {
-                    ByteArrayOutputStream bo = new ByteArrayOutputStream((int) Math.min(f.length() + 16, 64L * 1024 * 1024));
-                    byte[] buf = new byte[65536]; int n;
-                    while ((n = in.read(buf)) > 0) bo.write(buf, 0, n);
-                    return bo.toString("UTF-8");
-                } finally { in.close(); }
-            } catch (Exception e) {
-                return "";
-            }
+            return Store.get(getFilesDir(), key);
+        }
+
+        /** متنِ کوتاه (نام عطر و قیمت) را با برگه‌ی «ارسال»ِ گوشی می‌فرستد (واتساپ، تلگرام، پیامک…) */
+        @JavascriptInterface
+        public boolean shareText(final String text) {
+            if (text == null || text.length() == 0 || text.length() > 4000) return false;
+            runOnUiThread(new Runnable() {
+                @Override public void run() {
+                    try {
+                        Intent send = new Intent(Intent.ACTION_SEND);
+                        send.setType("text/plain");
+                        send.putExtra(Intent.EXTRA_TEXT, text);
+                        startActivity(Intent.createChooser(send, "ارسال قیمت"));
+                    } catch (Throwable ignore) { }
+                }
+            });
+            return true;
         }
 
 

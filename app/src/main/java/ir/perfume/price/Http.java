@@ -24,6 +24,8 @@ final class Http {
         int status;
         byte[] body = new byte[0];
         boolean truncated;      // پاسخ از maxBytes بزرگ‌تر بود و ادامه‌اش خوانده نشد
+        String etag = "", lastModified = "";      // هدرهای اعتبارِ پاسخ (برای کشِ شرطی)؛ خالی = سایت نداده
+        boolean fromCache;      // «۳۰۴ تغییر نکرده» بود و بدنه از کش آمد
     }
 
     /** قاعده‌ی برنامه برای کار با سایت‌ها: فقط https و فقط سایت‌های فهرست (و زیردامنه‌هایشان) */
@@ -111,6 +113,7 @@ final class Http {
         try {
             Result r = new Result();
             r.status = c.getResponseCode();
+            try { String et = c.getHeaderField("ETag"), lm = c.getHeaderField("Last-Modified"); if (et != null && et.length() <= 300) r.etag = et; if (lm != null && lm.length() <= 100) r.lastModified = lm; } catch (Exception ignore) { }
             InputStream in = r.status >= 400 ? c.getErrorStream() : c.getInputStream();
             ByteArrayOutputStream out = new ByteArrayOutputStream();
             if (in != null) {

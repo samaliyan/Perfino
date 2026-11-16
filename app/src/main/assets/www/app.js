@@ -472,8 +472,9 @@ window.__nat = function (id, status, body) {
   if (status === 0) p.rej(new Error(String(body || 'اینترنت وصل نیست')));
   else p.res({ status: status, body: body });
 };
-var netQ = [], netBusy = 0;
-function netPump() { while (netBusy < 6 && netQ.length) { netBusy++; var job = netQ.shift(); try { job(); } catch (e) { netBusy--; } } }
+var netQ = [], netBusy = 0, proxyDead = false, proxyApi = -1, netCached = 0;
+function proxyOn() { if (proxyDead || typeof fetch !== 'function') return false; if (proxyApi < 0) { try { proxyApi = window.Native && typeof window.Native.nativeApi === 'function' ? +window.Native.nativeApi() || 0 : 0; } catch (e) { proxyApi = 0; } } return proxyApi >= 4; }
+function netPump() { while (netBusy < 8 && netQ.length) { netBusy++; var job = netQ.shift(); try { job(); } catch (e) { netBusy--; } } }
 var net = {
   get: function (url, headers) {
     return new Promise(function (res, rej) {
@@ -482,6 +483,19 @@ var net = {
           var id = 'r' + (++seq), done = false;
           function rel() { if (done) return; done = true; netBusy--; netPump(); }
           pend[id] = { res: res, rej: rej, u: url, rel: rel, t: setTimeout(function () { delete pend[id]; rel(); rej(new Error('زمان انتظار تمام شد')); }, 30000) };
+          /* راهِ تازه (اندرویدِ نسخه‌ی ۴ به بالا): fetch به نشانیِ مجازی؛ بدنه مستقیم از موتورِ صفحه می‌آید، نه به‌صورتِ رشته‌ی تزریق‌شده.
+             اگر خودِ این راه کار نکرد (fetch رد شد)، برای همیشه‌ی این اجرا به پلِ قدیمی برمی‌گردیم و همین درخواست هم از همان راه می‌رود. */
+          if (proxyOn()) {
+            fetch('https://perfino.local/proxy?u=' + encodeURIComponent(url), { headers: headers && headers.Accept ? { Accept: headers.Accept } : {}, cache: 'no-store', credentials: 'omit' }).then(function (r) {
+              return r.text().then(function (b) {
+                var real = parseInt(r.headers.get('X-Perfino-Status') || '', 10);
+                if (r.headers.get('X-Perfino-Cache') === '1') netCached++;
+                if (!pend[id]) return;
+                if (r.status === 599) window.__nat(id, 0, b); else window.__nat(id, real > 0 ? real : r.status, b);
+              });
+            }).then(null, function () { proxyDead = true; if (pend[id]) { try { window.Native.fetch(id, url, JSON.stringify(headers || {})); } catch (e) { window.__nat(id, 0, 'اینترنت وصل نیست'); } } });
+            return;
+          }
           window.Native.fetch(id, url, JSON.stringify(headers || {}));
         });
         netPump();

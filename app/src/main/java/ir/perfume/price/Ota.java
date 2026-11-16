@@ -36,7 +36,7 @@ final class Ota {
      * هر بار که کلاس‌های جاوا طوری عوض شوند که صفحه‌ی تازه به آن نیاز دارد، این عدد و api در version.json با هم بالا می‌روند.
      * هر تغییری در نام یا ورودی‌های متدهای پل (otaBoot، otaErr، otaOk، …) هم همین‌طور است؛ وگرنه صفحه‌ی تازه با جاوای قدیمی ناسازگار می‌ماند.
      */
-    static final int NATIVE_API = 3;      // ۳: بروزرسانیِ پس‌زمینه (BgJob) و سایتِ عطرافشان در فهرستِ سایت‌های مجاز
+    static final int NATIVE_API = 4;      // ۳: بروزرسانیِ پس‌زمینه و عطرافشان · ۴: پلِ شبکه از راهِ WebView، کشِ شرطی، فایل‌های فشرده، کوچک‌کردنِ عکس، ارسالِ متن
 
     static final String BASE = "https://github.com/samaliyan/Perfino/releases/latest/download/";      // فایل‌های آخرین نسخه‌ی رسمی
     static final String INFO_URL = BASE + "ota.json";
